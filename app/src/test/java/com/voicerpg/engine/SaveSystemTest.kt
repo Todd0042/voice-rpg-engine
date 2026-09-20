@@ -211,22 +211,28 @@ class SaveSystemTest {
         storyVm.startNewGame(custom)
 
         assertEquals(GameScreen.STORY_EXPLORATION, storyVm.state.value.gameScreen)
-        assertEquals("scene_cottage", storyVm.state.value.currentScene.id)
-        assertEquals("cottage_intro", storyVm.state.value.currentNode.id)
+        assertEquals(StoryScript.SCENE_PROVING_GROUNDS.id, storyVm.state.value.currentScene.id)
+        assertEquals(StoryScript.NODE_INTRO.id, storyVm.state.value.currentNode.id)
         assertEquals("Rowan", storyVm.state.value.player.name)
 
-        // Make decision 1: "Try to speak"
-        val speakChoice = storyVm.state.value.currentNode.choices.first { it.id == "c1_speak" }
-        storyVm.selectChoice(speakChoice)
+        // Advance through intro to mentor greeting, then to choice hub
+        storyVm.advanceDialogue()
+        assertEquals("template_mentor_greeting", storyVm.state.value.currentNode.id)
+        storyVm.advanceDialogue()
+        assertEquals(StoryScript.NODE_CHOICE_HUB.id, storyVm.state.value.currentNode.id)
 
-        assertEquals("cottage_voice", storyVm.state.value.currentNode.id)
-        assertEquals(listOf("c1_speak"), storyVm.state.value.decisionsMade)
+        // Make decision 1: "Accept the Mentor's Blessing"
+        val blessingChoice = storyVm.state.value.currentNode.choices.first { it.id == "choice_blessing" }
+        storyVm.selectChoice(blessingChoice)
+
+        assertEquals("template_branch_blessing", storyVm.state.value.currentNode.id)
+        assertEquals(listOf("choice_blessing"), storyVm.state.value.decisionsMade)
 
         // Verify save was written to disk/memory
         val autoSavedData = saveManager.load()
         assertNotNull(autoSavedData)
-        assertEquals("cottage_voice", autoSavedData!!.currentNodeId)
-        assertEquals(listOf("c1_speak"), autoSavedData.decisionsMade)
+        assertEquals("template_branch_blessing", autoSavedData!!.currentNodeId)
+        assertEquals(listOf("choice_blessing"), autoSavedData.decisionsMade)
         assertEquals("Rowan", autoSavedData.player.name)
     }
 
@@ -250,19 +256,17 @@ class SaveSystemTest {
         )
         storyVm1.startNewGame(custom)
 
-        // Make choice
-        val choice = storyVm1.state.value.currentNode.choices.first { it.id == "c1_speak" }
+        // Advance through intro to mentor greeting, then to choice hub
+        storyVm1.advanceDialogue()
+        storyVm1.advanceDialogue()
+        assertEquals(StoryScript.NODE_CHOICE_HUB.id, storyVm1.state.value.currentNode.id)
+
+        // Make choice: "Inquire About the Realm's History"
+        val choice = storyVm1.state.value.currentNode.choices.first { it.id == "choice_history" }
         storyVm1.selectChoice(choice)
 
-        // Advance to village
-        val villageTransNode = StoryScript.ALL_NODES["cottage_to_village"]!!
-        val jumpChoice = com.voicerpg.engine.model.DialogueChoice("jump", "Go to village", emptyList(), villageTransNode.id)
-        storyVm1.selectChoice(jumpChoice)
-        storyVm1.advanceDialogue()
-
-        assertEquals("scene_village", storyVm1.state.value.currentScene.id)
-        assertEquals("village_intro", storyVm1.state.value.currentNode.id)
-        assertEquals(listOf("c1_speak", "jump"), storyVm1.state.value.decisionsMade)
+        assertEquals("template_branch_history", storyVm1.state.value.currentNode.id)
+        assertEquals(listOf("choice_history"), storyVm1.state.value.decisionsMade)
 
         // Session 2: Fresh launch of the app with existing save
         val storyVm2 = StoryViewModel(
@@ -282,11 +286,11 @@ class SaveSystemTest {
         // Continue chronicle resumes directly into story
         storyVm2.continueGame()
         assertEquals(GameScreen.STORY_EXPLORATION, storyVm2.state.value.gameScreen)
-        assertEquals("scene_village", storyVm2.state.value.currentScene.id)
-        assertEquals("village_intro", storyVm2.state.value.currentNode.id)
+        assertEquals(StoryScript.SCENE_PROVING_GROUNDS.id, storyVm2.state.value.currentScene.id)
+        assertEquals("template_branch_history", storyVm2.state.value.currentNode.id)
         assertEquals("Elora", storyVm2.state.value.player.name)
         assertEquals(HeroClass.CHANTER, storyVm2.state.value.player.heroClass)
-        assertEquals(listOf("c1_speak", "jump"), storyVm2.state.value.decisionsMade)
+        assertEquals(listOf("choice_history"), storyVm2.state.value.decisionsMade)
 
         // Return to title persists and transitions back to Title Screen
         storyVm2.returnToTitle()

@@ -39,8 +39,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
 data class StoryState(
-    val currentScene: StoryScene = StoryScript.SCENE_COTTAGE,
-    val currentNode: DialogueNode = StoryScript.ALL_NODES["cottage_intro"]!!,
+    val currentScene: StoryScene = StoryScript.SCENE_PROVING_GROUNDS,
+    val currentNode: DialogueNode = StoryScript.NODE_INTRO,
     val gameScreen: GameScreen = GameScreen.TITLE,
     val previousScreen: GameScreen? = null,
     val activeEncounter: EncounterDefinition? = null,
@@ -79,24 +79,12 @@ class StoryViewModel(
 
     companion object {
         val DEBUG_CHAPTER_TARGETS: List<DebugChapterTarget> = listOf(
-            DebugChapterTarget("🎮 Sandbox: Proving Grounds", "template_linear_narration", 99),
-            DebugChapterTarget("Prologue", "cottage_intro", 0),
-            DebugChapterTarget("Chapter 1", "crossroads_intro", 1),
-            DebugChapterTarget("Chapter 2", "camp_intro", 2),
-            DebugChapterTarget("Chapter 3", "chapter3_intro", 3),
-            DebugChapterTarget("Chapter 4", "chapter4_intro", 4),
-            DebugChapterTarget("Chapter 5", "ch5_intro", 5),
-            DebugChapterTarget("Chapter 6", "ch6_intro", 6),
-            DebugChapterTarget("Chapter 7", "ch7_intro", 7),
-            DebugChapterTarget("Chapter 8", "ch8_intro", 8),
-            DebugChapterTarget("Chapter 9", "ch9_intro", 9),
-            DebugChapterTarget("Chapter 10", "ch10_intro", 10),
-            DebugChapterTarget("Chapter 11", "ch11_intro", 11),
-            DebugChapterTarget("Chapter 12", "ch12_intro", 12),
-            DebugChapterTarget("Chapter 13", "ch13_intro", 13),
-            DebugChapterTarget("Chapter 14", "ch14_intro", 14),
-            DebugChapterTarget("Chapter 15", "ch15_intro", 15),
-            DebugChapterTarget("Chapter 16", "ch16_intro", 16)
+            DebugChapterTarget("Prologue: Linear Narration", "template_linear_narration", 0),
+            DebugChapterTarget("Mentor Greeting", "template_mentor_greeting", 1),
+            DebugChapterTarget("Choice Hub", "template_choice_hub", 2),
+            DebugChapterTarget("Solo Trial Battle", "template_trigger_solo_combat", 3),
+            DebugChapterTarget("Squad Trial Battle", "template_trigger_trio_combat", 4),
+            DebugChapterTarget("Victory Conclusion", "template_post_victory", 5)
         )
     }
 
@@ -138,7 +126,7 @@ class StoryViewModel(
         ) {
             return false
         }
-        return StoryScript.ALL_NODES.containsKey("camp_intro") || StoryScript.ALL_NODES.containsKey("crossroads_intro")
+        return StoryScript.ALL_NODES.containsKey("template_choice_hub")
     }
 
     fun schedulePocketModeAutoAdvance(node: DialogueNode) {
@@ -174,8 +162,8 @@ class StoryViewModel(
         saveManager.currentSlot = initialSlot
         val existingSave = saveManager.load(initialSlot)
         if (existingSave != null) {
-            val restoredScene = StoryScript.ALL_SCENES[existingSave.currentSceneId] ?: StoryScript.SCENE_COTTAGE
-            val rawRestoredNode = StoryScript.ALL_NODES[existingSave.currentNodeId] ?: StoryScript.ALL_NODES["cottage_intro"]!!
+            val restoredScene = StoryScript.ALL_SCENES[existingSave.currentSceneId] ?: StoryScript.SCENE_PROVING_GROUNDS
+            val rawRestoredNode = StoryScript.ALL_NODES[existingSave.currentNodeId] ?: StoryScript.NODE_INTRO
             val restoredNode = resolveEffectiveHubNode(rawRestoredNode, existingSave.narrativeFlags)
 
             val summary = saveManager.getSlotSummary(initialSlot)
@@ -245,8 +233,8 @@ class StoryViewModel(
         val targetSlot = (slot ?: _state.value.currentSlot).coerceIn(1, SaveManager.MAX_SLOTS)
         saveManager.currentSlot = targetSlot
         val existingSave = saveManager.load(targetSlot) ?: return
-        val restoredScene = StoryScript.ALL_SCENES[existingSave.currentSceneId] ?: StoryScript.SCENE_COTTAGE
-        val rawRestoredNode = StoryScript.ALL_NODES[existingSave.currentNodeId] ?: StoryScript.ALL_NODES["cottage_intro"]!!
+        val restoredScene = StoryScript.ALL_SCENES[existingSave.currentSceneId] ?: StoryScript.SCENE_PROVING_GROUNDS
+        val rawRestoredNode = StoryScript.ALL_NODES[existingSave.currentNodeId] ?: StoryScript.NODE_INTRO
         val restoredNode = resolveEffectiveHubNode(rawRestoredNode, existingSave.narrativeFlags)
 
         val restoredHistory = if (existingSave.recentDialogueLog.isNotEmpty()) {
@@ -427,8 +415,8 @@ class StoryViewModel(
         val targetSlot = (slot ?: _state.value.currentSlot).coerceIn(1, SaveManager.MAX_SLOTS)
         saveManager.currentSlot = targetSlot
         val initialSave = saveManager.createInitialSave(customization, targetSlot)
-        val initialNode = StoryScript.ALL_NODES["cottage_intro"]!!
-        val initialScene = StoryScript.SCENE_COTTAGE
+        val initialNode = StoryScript.NODE_INTRO
+        val initialScene = StoryScript.SCENE_PROVING_GROUNDS
         val initialEntry = DialogueLogEntry(
             speakerId = initialNode.speaker.id,
             speakerName = initialNode.speaker.name,
@@ -453,7 +441,7 @@ class StoryViewModel(
             saveSlots = saveManager.getAllSlotInfos(),
             dialogueHistory = listOf(initialEntry)
         )
-        musicManager?.playTrack(StoryScript.SCENE_COTTAGE.musicAsset)
+        musicManager?.playTrack(StoryScript.SCENE_PROVING_GROUNDS.musicAsset)
         persistCurrentState()
         narrateCurrentNode()
     }
@@ -575,7 +563,7 @@ class StoryViewModel(
             if (node.id.startsWith("ch3_") || node.id.startsWith("ch4_") || node.id.startsWith("ch5_") || node.id.startsWith("ch6_") || node.id.startsWith("ch7_") || node.id.startsWith("ch8_") || node.id.startsWith("ch9_") || node.id.startsWith("ch10_") || node.id.startsWith("ch11_") || node.id.startsWith("ch12_") || node.id.startsWith("ch13_") || node.id.startsWith("ch14_") || node.id.startsWith("ch15_") || node.id.startsWith("ch16_") || node.id.startsWith("epilogue_") || node.id == "ch4_act1_complete") {
                 return
             }
-            val fallbackNode = StoryScript.ALL_NODES["camp_intro"] ?: StoryScript.ALL_NODES["crossroads_intro"]
+            val fallbackNode = StoryScript.ALL_NODES["template_choice_hub"] ?: StoryScript.NODE_INTRO
             if (fallbackNode != null) {
                 applyNodeTransition(fallbackNode, suppressNarration = suppressNarration)
             }
@@ -766,84 +754,7 @@ class StoryViewModel(
     }
 
     private fun resolveEffectiveHubNode(node: DialogueNode, flags: Map<String, Boolean>): DialogueNode {
-        var effective = node
-        if (effective.id == "camp_intro" || effective.id == "camp_hub") {
-            val allThree = flags["substory_blight_complete"] == true &&
-                    flags["substory_towers_complete"] == true &&
-                    flags["substory_rest_complete"] == true
-            if (allThree) StoryScript.ALL_NODES["camp_all_completed"]?.let { effective = it }
-        }
-        if (effective.id == "chapter3_intro" || effective.id == "ch3_hub") {
-            if (flags["ch3_sentinels_complete"] == true && flags["ch3_chime_complete"] == true) {
-                StoryScript.ALL_NODES["ch3_all_completed"]?.let { effective = it }
-            }
-        }
-        if (effective.id == "ch5_intro" || effective.id == "ch5_hub") {
-            if (flags["ch5_creek_scouted"] == true && flags["ch5_wards_examined"] == true) {
-                StoryScript.ALL_NODES["ch5_all_completed"]?.let { effective = it }
-            }
-        }
-        if (effective.id == "ch6_intro" || effective.id == "ch6_hub") {
-            if (flags["ch6_lore_complete"] == true && flags["ch6_spores_complete"] == true) {
-                StoryScript.ALL_NODES["ch6_all_completed"]?.let { effective = it }
-            }
-        }
-        if (effective.id == "ch7_intro" || effective.id == "ch7_hub") {
-            if (flags["ch7_tuning_complete"] == true && flags["ch7_stele_complete"] == true && flags["ch7_cedric_complete"] == true && flags["ch7_dagger_complete"] == true) {
-                StoryScript.ALL_NODES["ch7_all_completed"]?.let { effective = it }
-            }
-        }
-        if (effective.id == "ch7_camp_intro" || effective.id == "ch7_camp_hub") {
-            if (flags["ch7_camp_lyra_complete"] == true && flags["ch7_camp_cedric_complete"] == true && flags["ch7_camp_watch_complete"] == true) {
-                StoryScript.ALL_NODES["ch7_camp_all_completed"]?.let { effective = it }
-            }
-        }
-        if (effective.id == "ch8_scout_hub") {
-            if (flags["ch8_wire_complete"] == true && flags["ch8_herbs_scout_complete"] == true) {
-                StoryScript.ALL_NODES["ch8_scout_all_completed"]?.let { effective = it }
-            }
-        }
-        if (effective.id == "ch8_hub") {
-            if (flags["ch8_motives_complete"] == true && flags["ch8_map_complete"] == true && flags["ch8_herbs_complete"] == true) {
-                StoryScript.ALL_NODES["ch8_all_completed"]?.let { effective = it }
-            }
-        }
-        if (effective.id == "ch9_intro" || effective.id == "ch9_hub") {
-            if (flags["ch9_knights_complete"] == true && flags["ch9_altar_complete"] == true && flags["ch9_reliquary_complete"] == true) {
-                StoryScript.ALL_NODES["ch9_all_completed"]?.let { effective = it }
-            }
-        }
-        if (effective.id == "ch10_intro" || effective.id == "ch10_hub") {
-            if (flags["ch10_dryads_complete"] == true && flags["ch10_seed_complete"] == true && flags["ch10_hymn_complete"] == true) {
-                StoryScript.ALL_NODES["ch10_all_completed"]?.let { effective = it }
-            }
-        }
-        if (effective.id == "ch11_intro" || effective.id == "ch11_hub") {
-            if (flags["ch11_traps_complete"] == true && flags["ch11_vials_complete"] == true && flags["ch11_doctrine_complete"] == true) {
-                StoryScript.ALL_NODES["ch11_all_completed"]?.let { effective = it }
-            }
-        }
-        if (effective.id == "ch12_intro" || effective.id == "ch12_hub") {
-            if (flags["ch12_valves_complete"] == true && flags["ch12_cogs_complete"] == true && flags["ch12_grimoire_complete"] == true) {
-                StoryScript.ALL_NODES["ch12_all_completed"]?.let { effective = it }
-            }
-        }
-        if (effective.id == "ch13_intro" || effective.id == "ch13_hub") {
-            if (flags["ch13_gate_complete"] == true && flags["ch13_seal_complete"] == true && flags["ch13_banners_complete"] == true) {
-                StoryScript.ALL_NODES["ch13_all_completed"]?.let { effective = it }
-            }
-        }
-        if (effective.id == "ch14_intro" || effective.id == "ch14_hub") {
-            if (flags["ch14_archons_complete"] == true && flags["ch14_eddies_complete"] == true && flags["ch14_rites_complete"] == true) {
-                StoryScript.ALL_NODES["ch14_all_completed"]?.let { effective = it }
-            }
-        }
-        if (effective.id == "ch15_intro" || effective.id == "ch15_hub") {
-            if (flags["ch15_cedric_complete"] == true && flags["ch15_lyra_complete"] == true && flags["ch15_zephyr_complete"] == true && flags["ch15_bell_complete"] == true) {
-                StoryScript.ALL_NODES["ch15_all_completed"]?.let { effective = it }
-            }
-        }
-        return effective
+        return node
     }
 
     var onOpenOptions: (() -> Unit)? = null
@@ -854,39 +765,9 @@ class StoryViewModel(
         val encounter = when (encounterId) {
             TemplateEncounters.ENCOUNTER_SOLO_ID -> TemplateEncounters.TEMPLATE_SOLO_BATTLE
             TemplateEncounters.ENCOUNTER_TRIO_ID -> TemplateEncounters.TEMPLATE_TRIO_BATTLE
-            "prologue_solo" -> StoryEncounters.PROLOGUE_SOLO
-            "forest_ambush" -> StoryEncounters.FOREST_AMBUSH
-            "blight_trackers" -> StoryEncounters.BLIGHT_TRACKERS
-            "ch3_sentinels" -> StoryEncounters.CH3_SENTINELS
-            "cave_broodmother" -> StoryEncounters.CAVE_BROODMOTHER
-            "dungeon_descent" -> StoryEncounters.DUNGEON_DESCENT
-            "castle_horde" -> StoryEncounters.CASTLE_HORDE
-            "marsh_rescue" -> StoryEncounters.MARSH_RESCUE
-            "swamp_behemoth" -> StoryEncounters.SWAMP_BEHEMOTH
-            "ch7_mire_wyrm" -> StoryEncounters.CH7_MIRE_WYRM
-            "ch8_executioner_ambush" -> StoryEncounters.CH8_EXECUTIONER_AMBUSH
-            "ch9_galahault_trial" -> StoryEncounters.CH9_GALAHAULT_TRIAL
-            "ch10_broodmother_trial" -> StoryEncounters.CH10_BROODMOTHER_TRIAL
-            "ch11_nocturne_trial" -> StoryEncounters.CH11_NOCTURNE_TRIAL
-            "ch12_warmaster_ouros" -> StoryEncounters.CH12_WARMASTER_OUROS
-            "ch13_commander_vaelor" -> StoryEncounters.CH13_COMMANDER_VAELOR
-            "ch14_abyssal_leviathan" -> StoryEncounters.CH14_ABYSSAL_LEVIATHAN
-            "ch15_archon_custodians" -> StoryEncounters.CH15_ARCHON_CUSTODIANS
-            "ch16_malakor_finale" -> StoryEncounters.CH16_MALAKOR_FINALE
-            "ch9_penitent_gate" -> StoryEncounters.CH9_PENITENT_GATE
-            "ch10_thicket_guardians" -> StoryEncounters.CH10_THICKET_GUARDIANS
-            "ch11_gorge_stalkers" -> StoryEncounters.CH11_GORGE_STALKERS
-            "ch11_archive_enforcers" -> StoryEncounters.CH11_ARCHIVE_ENFORCERS
-            "ch12_automaton_patrol" -> StoryEncounters.CH12_AUTOMATON_PATROL
-            "ch13_plaza_legion" -> StoryEncounters.CH13_PLAZA_LEGION
-            "ch14_shallows_husks" -> StoryEncounters.CH14_SHALLOWS_HUSKS
-            "ch14_trench_leeches" -> StoryEncounters.CH14_TRENCH_LEECHES
-            "ch15_trial_gold" -> StoryEncounters.CH15_TRIAL_GOLD
-            "ch15_trial_grove" -> StoryEncounters.CH15_TRIAL_GROVE
-            "ch15_trial_shadow" -> StoryEncounters.CH15_TRIAL_SHADOW
-            "ch16_nullifier_gate" -> StoryEncounters.CH16_NULLIFIER_GATE
-            "ch16_mirror_gauntlet" -> StoryEncounters.CH16_MIRROR_GAUNTLET
-            else -> StoryEncounters.ALL_ENCOUNTERS.firstOrNull { it.id == encounterId } ?: StoryEncounters.PROLOGUE_SOLO
+            else -> TemplateEncounters.ALL_TEMPLATE_ENCOUNTERS[encounterId]
+                ?: StoryEncounters.ALL_ENCOUNTERS.find { it.id == encounterId }
+                ?: TemplateEncounters.TEMPLATE_SOLO_BATTLE
         }
         speechManager.cancel()
         combatNarrator.stop()
@@ -900,42 +781,7 @@ class StoryViewModel(
         cancelPendingAutoAdvance()
         val lastNode = _state.value.currentNode
         val encounterId = lastNode.triggerBattleEncounterId ?: _state.value.activeEncounter?.id ?: "unknown"
-        val postBattleNodeId = when (encounterId) {
-            TemplateEncounters.ENCOUNTER_SOLO_ID, TemplateEncounters.ENCOUNTER_TRIO_ID -> "template_post_victory"
-            "prologue_solo" -> "village_post_battle"
-            "forest_ambush" -> "crossroads_post_battle"
-            "blight_trackers" -> "camp_scout_victory"
-            "ch3_sentinels" -> "ch3_sentinels_victory"
-            "cave_broodmother" -> "ch3_boss_victory"
-            "dungeon_descent" -> "ch4_crypt_victory"
-            "castle_horde" -> "ch4_tower_victory"
-            "marsh_rescue" -> "ch5_rescue_victory"
-            "swamp_behemoth" -> "ch6_willow_purified"
-            "ch7_mire_wyrm" -> "ch7_wyrm_victory"
-            "ch8_executioner_ambush" -> "ch8_executioner_victory"
-            "ch9_galahault_trial" -> "ch9_galahault_victory"
-            "ch10_broodmother_trial" -> "ch10_broodmother_victory"
-            "ch11_nocturne_trial" -> "ch11_nocturne_victory"
-            "ch12_warmaster_ouros" -> "ch12_warmaster_victory"
-            "ch13_commander_vaelor" -> "ch13_vaelor_victory"
-            "ch14_abyssal_leviathan" -> "ch14_leviathan_victory"
-            "ch15_archon_custodians" -> "ch15_custodians_victory"
-            "ch16_malakor_finale" -> "ch16_malakor_victory"
-            "ch9_penitent_gate" -> "ch9_penitent_victory"
-            "ch10_thicket_guardians" -> "ch10_thicket_victory"
-            "ch11_gorge_stalkers" -> "ch11_first_strike_victory"
-            "ch11_archive_enforcers" -> "ch11_archive_victory"
-            "ch12_automaton_patrol" -> "ch12_patrol_victory"
-            "ch13_plaza_legion" -> "ch13_plaza_victory"
-            "ch14_shallows_husks" -> "ch14_shallows_victory"
-            "ch14_trench_leeches" -> "ch14_trench_victory"
-            "ch15_trial_gold" -> "ch15_trial_gold_victory"
-            "ch15_trial_grove" -> "ch15_trial_grove_victory"
-            "ch15_trial_shadow" -> "ch15_trial_shadow_victory"
-            "ch16_nullifier_gate" -> "ch16_vest_victory"
-            "ch16_mirror_gauntlet" -> "ch16_mirror_victory"
-            else -> null
-        }
+        val postBattleNodeId = "template_post_victory"
 
         val updatedDefeated = if (encounterId !in _state.value.defeatedEncounters) {
             _state.value.defeatedEncounters + encounterId

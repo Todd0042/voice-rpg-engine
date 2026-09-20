@@ -173,7 +173,7 @@ fun TitleScreen(
                 modifier = Modifier.padding(top = 16.dp)
             ) {
                 Text(
-                    text = "VOICE RPG",
+                    text = "VOICE RPG ENGINE",
                     color = LogosGold.copy(alpha = 0.9f),
                     fontSize = 13.sp,
                     fontWeight = FontWeight.Bold,
@@ -184,7 +184,7 @@ fun TitleScreen(
                 Spacer(modifier = Modifier.height(4.dp))
 
                 Text(
-                    text = "ECHOES OF THE LOGOS",
+                    text = "STARTER TEMPLATE",
                     color = LogosGold,
                     fontSize = 24.sp,
                     fontWeight = FontWeight.Black,
@@ -210,7 +210,7 @@ fun TitleScreen(
                 Spacer(modifier = Modifier.height(8.dp))
 
                 Text(
-                    text = "A Voice-First High Fantasy Chronicle",
+                    text = "Modular Voice-First JRPG Framework",
                     color = Color.LightGray.copy(alpha = 0.85f),
                     fontSize = 11.sp,
                     fontFamily = FontFamily.Monospace,

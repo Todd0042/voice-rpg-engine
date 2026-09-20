@@ -1,7 +1,7 @@
 package com.voicerpg.engine.engine
 
-import com.voicerpg.engine.template.TemplateEncounters
 
+import com.voicerpg.engine.template.TemplateEncounters
 import androidx.compose.ui.graphics.Color
 import com.voicerpg.engine.model.BattleEnvironment
 import com.voicerpg.engine.model.Enemy
@@ -11,6 +11,9 @@ import com.voicerpg.engine.model.Spell
 import com.voicerpg.engine.model.SpellSchool
 
 object StoryEncounters {
+    val TEMPLATE_SOLO = TemplateEncounters.TEMPLATE_SOLO_BATTLE
+    val TEMPLATE_TRIO = TemplateEncounters.TEMPLATE_TRIO_BATTLE
+
 
     // Party spell sets (single source of truth; mirrors docs/combat-design/data/spells.json)
     // Aethel's breath discipline: free, costs the turn, restores 35% of max MP regardless of
