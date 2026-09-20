@@ -12,6 +12,10 @@ import com.voicerpg.engine.engine.StoryChoiceMatcher
 import com.voicerpg.engine.engine.StoryEncounters
 import com.voicerpg.engine.engine.StoryRecapEngine
 import com.voicerpg.engine.engine.StoryScript
+import com.voicerpg.engine.template.TemplateEncounters
+import com.voicerpg.engine.template.TemplateStory
+import com.voicerpg.engine.template.TemplateHero
+
 import com.voicerpg.engine.model.DialogueChoice
 import com.voicerpg.engine.model.DialogueLogEntry
 import com.voicerpg.engine.model.DialogueNode
@@ -75,6 +79,7 @@ class StoryViewModel(
 
     companion object {
         val DEBUG_CHAPTER_TARGETS: List<DebugChapterTarget> = listOf(
+            DebugChapterTarget("🎮 Sandbox: Proving Grounds", "template_linear_narration", 99),
             DebugChapterTarget("Prologue", "cottage_intro", 0),
             DebugChapterTarget("Chapter 1", "crossroads_intro", 1),
             DebugChapterTarget("Chapter 2", "camp_intro", 2),
@@ -392,6 +397,31 @@ class StoryViewModel(
     /**
      * Initializes a fresh game from Character Creation.
      */
+    
+    fun startTemplateStory() {
+        cancelPendingAutoAdvance()
+        val initialNode = TemplateStory.NODE_LINEAR_NARRATION
+        val initialScene = TemplateStory.TEMPLATE_SCENE
+        val initialEntry = DialogueLogEntry(
+            speakerId = initialNode.speaker.id,
+            speakerName = initialNode.speaker.name,
+            speakerTitle = initialNode.speaker.title,
+            text = initialNode.text,
+            sceneName = initialScene.name,
+            isNarrator = initialNode.speaker == DialogueSpeaker.NARRATOR
+        )
+        _state.value = _state.value.copy(
+            currentScene = initialScene,
+            currentNode = initialNode,
+            gameScreen = GameScreen.STORY_EXPLORATION,
+            decisionsMade = emptyList(),
+            narrativeFlags = emptyMap(),
+            dialogueHistory = listOf(initialEntry)
+        )
+        musicManager?.playTrack(initialScene.musicAsset)
+        narrateCurrentNode()
+    }
+
     fun startNewGame(customization: PlayerCustomization, slot: Int? = null) {
         cancelPendingAutoAdvance()
         val targetSlot = (slot ?: _state.value.currentSlot).coerceIn(1, SaveManager.MAX_SLOTS)
@@ -822,6 +852,8 @@ class StoryViewModel(
     fun triggerEncounter(encounterId: String) {
         cancelPendingAutoAdvance()
         val encounter = when (encounterId) {
+            TemplateEncounters.ENCOUNTER_SOLO_ID -> TemplateEncounters.TEMPLATE_SOLO_BATTLE
+            TemplateEncounters.ENCOUNTER_TRIO_ID -> TemplateEncounters.TEMPLATE_TRIO_BATTLE
             "prologue_solo" -> StoryEncounters.PROLOGUE_SOLO
             "forest_ambush" -> StoryEncounters.FOREST_AMBUSH
             "blight_trackers" -> StoryEncounters.BLIGHT_TRACKERS
@@ -869,6 +901,7 @@ class StoryViewModel(
         val lastNode = _state.value.currentNode
         val encounterId = lastNode.triggerBattleEncounterId ?: _state.value.activeEncounter?.id ?: "unknown"
         val postBattleNodeId = when (encounterId) {
+            TemplateEncounters.ENCOUNTER_SOLO_ID, TemplateEncounters.ENCOUNTER_TRIO_ID -> "template_post_victory"
             "prologue_solo" -> "village_post_battle"
             "forest_ambush" -> "crossroads_post_battle"
             "blight_trackers" -> "camp_scout_victory"

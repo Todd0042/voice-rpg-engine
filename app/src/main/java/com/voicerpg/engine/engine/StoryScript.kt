@@ -5,6 +5,7 @@ import com.voicerpg.engine.model.DialogueNode
 import com.voicerpg.engine.model.DialogueSpeaker
 import com.voicerpg.engine.model.SpeakerSide
 import com.voicerpg.engine.model.StoryScene
+import com.voicerpg.engine.template.TemplateStory
 
 object StoryScript {
 
@@ -277,13 +278,14 @@ object StoryScript {
         SCENE_OBSIDIAN_VAULTS.id to SCENE_OBSIDIAN_VAULTS,
         SCENE_UMBRAL_TRENCH.id to SCENE_UMBRAL_TRENCH,
         SCENE_CELESTIAL_VESTIBULE.id to SCENE_CELESTIAL_VESTIBULE,
-        SCENE_EPILOGUE.id to SCENE_EPILOGUE
+        SCENE_EPILOGUE.id to SCENE_EPILOGUE,
+        TemplateStory.TEMPLATE_SCENE.id to TemplateStory.TEMPLATE_SCENE
     )
 
     // -------------------------------------------------------------------------
     // Dialogue Graph
     // -------------------------------------------------------------------------
-    val ALL_NODES: Map<String, DialogueNode> = listOf(
+    val ALL_NODES: Map<String, DialogueNode> = (listOf(
         // === SCENE 1: COTTAGE BEDROOM ===
         DialogueNode(
             id = "cottage_intro",
@@ -2906,5 +2908,5 @@ object StoryScript {
             setFlagOnEnter = "game_completed",
             text = "CONGRATULATIONS! You have completed Voice RPG: Chronicles of the Logos! Every chapter, every trial, every companion bond, and the ultimate confrontation with the Mute Sovereign was conquered by your courage, your voice, and your heart. Thank you for playing!"
         )
-    ).associateBy { it.id }
+    ) + TemplateStory.ALL_TEMPLATE_NODES.values).associateBy { it.id }
 }

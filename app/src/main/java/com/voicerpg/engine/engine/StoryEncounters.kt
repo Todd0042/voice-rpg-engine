@@ -1,5 +1,7 @@
 package com.voicerpg.engine.engine
 
+import com.voicerpg.engine.template.TemplateEncounters
+
 import androidx.compose.ui.graphics.Color
 import com.voicerpg.engine.model.BattleEnvironment
 import com.voicerpg.engine.model.Enemy

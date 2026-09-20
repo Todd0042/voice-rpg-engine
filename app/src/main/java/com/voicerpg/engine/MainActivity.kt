@@ -46,6 +46,7 @@ import com.voicerpg.engine.ui.title.TitleScreen
 import com.voicerpg.engine.ui.tutorial.TutorialBattleScreen
 import com.voicerpg.engine.viewmodel.CombatViewModel
 import com.voicerpg.engine.viewmodel.StoryViewModel
+import com.voicerpg.engine.template.TemplateEncounters
 import com.voicerpg.engine.viewmodel.TutorialBattleViewModel
 
 class MainActivity : ComponentActivity() {
@@ -232,6 +233,15 @@ class MainActivity : ComponentActivity() {
                                 onTutorial = {
                                     tutorialBattleViewModel.resetTutorial()
                                     storyViewModel.openTutorial()
+                                },
+                                onStartTemplateStory = {
+                                    storyViewModel.startTemplateStory()
+                                },
+                                onStartTemplateSoloCombat = {
+                                    storyViewModel.triggerEncounter(TemplateEncounters.ENCOUNTER_SOLO_ID)
+                                },
+                                onStartTemplateTrioCombat = {
+                                    storyViewModel.triggerEncounter(TemplateEncounters.ENCOUNTER_TRIO_ID)
                                 },
                                 onStartListening = {
                                     speechManager.startListening(
