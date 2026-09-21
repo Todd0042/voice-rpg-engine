@@ -99,9 +99,8 @@ fun TitleScreen(
     onAudioSetup: () -> Unit,
     onOptions: () -> Unit,
     onTutorial: () -> Unit,
-    onStartTemplateStory: () -> Unit = {},
-    onStartTemplateSoloCombat: () -> Unit = {},
-    onStartTemplateTrioCombat: () -> Unit = {},
+    storyModeSummary: SaveSummary? = null,
+    onPureStoryMode: (fresh: Boolean) -> Unit = {},
     onStartListening: () -> Unit,
     onStopListening: () -> Unit,
     modifier: Modifier = Modifier
@@ -109,8 +108,8 @@ fun TitleScreen(
     val context = LocalContext.current
     var showOverwriteDialog by remember { mutableStateOf(false) }
     var showSlotArchivesDialog by remember { mutableStateOf(false) }
+    var showStoryModePromptDialog by remember { mutableStateOf(false) }
     var slotDialogIsNewGameMode by remember { mutableStateOf(false) }
-    var showSandboxDialog by remember { mutableStateOf(false) }
 
     val backgroundBitmap = remember {
         StoryAssetLoader.loadBitmap(context, "backgrounds/bg_summit.jpg")
@@ -173,7 +172,7 @@ fun TitleScreen(
                 modifier = Modifier.padding(top = 16.dp)
             ) {
                 Text(
-                    text = "VOICE RPG ENGINE",
+                    text = "VOICE RPG",
                     color = LogosGold.copy(alpha = 0.9f),
                     fontSize = 13.sp,
                     fontWeight = FontWeight.Bold,
@@ -184,7 +183,7 @@ fun TitleScreen(
                 Spacer(modifier = Modifier.height(4.dp))
 
                 Text(
-                    text = "STARTER TEMPLATE",
+                    text = "ECHOES OF THE LOGOS",
                     color = LogosGold,
                     fontSize = 24.sp,
                     fontWeight = FontWeight.Black,
@@ -210,7 +209,7 @@ fun TitleScreen(
                 Spacer(modifier = Modifier.height(8.dp))
 
                 Text(
-                    text = "Modular Voice-First JRPG Framework",
+                    text = "A Voice-First High Fantasy Chronicle",
                     color = Color.LightGray.copy(alpha = 0.85f),
                     fontSize = 11.sp,
                     fontFamily = FontFamily.Monospace,
@@ -384,6 +383,44 @@ fun TitleScreen(
                     }
                 }
 
+                // Pure Story Mode (Auto-Play) Button
+                Button(
+                    onClick = {
+                        if (storyModeSummary != null) {
+                            showStoryModePromptDialog = true
+                        } else {
+                            onPureStoryMode(true)
+                        }
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .border(1.dp, Color(0xFFBA68C8), RoundedCornerShape(8.dp)),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFF311B92).copy(alpha = 0.88f)
+                    ),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.PlayArrow,
+                            contentDescription = null,
+                            tint = Color(0xFFE1BEE7),
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "PURE STORY MODE (AUTO-PLAY)",
+                            color = Color(0xFFF3E5F5),
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = FontFamily.Monospace
+                        )
+                    }
+                }
+
                 // 3. Audio & Voice Calibration Button
                 Button(
                     onClick = onAudioSetup,
@@ -473,38 +510,6 @@ fun TitleScreen(
                         Text(
                             text = "CHRONICLE GUIDE",
                             color = Color.White,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold,
-                            fontFamily = FontFamily.Monospace
-                        )
-                    }
-                }
-
-                // 6. Creator Template Sandbox Button
-                Button(
-                    onClick = { showSandboxDialog = true },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .border(1.dp, Color(0xFFAB47BC), RoundedCornerShape(8.dp)),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFF1E1428).copy(alpha = 0.95f)
-                    ),
-                    shape = RoundedCornerShape(8.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.padding(vertical = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.PlayArrow,
-                            contentDescription = null,
-                            tint = Color(0xFFE040FB),
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "🎮 CREATOR TEMPLATE SANDBOX",
-                            color = Color(0xFFE1BEE7),
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Bold,
                             fontFamily = FontFamily.Monospace
@@ -635,6 +640,101 @@ fun TitleScreen(
             }
         }
 
+        // Story Mode Resume / Start Over Prompt Dialog
+        if (showStoryModePromptDialog && storyModeSummary != null) {
+            Dialog(onDismissRequest = { showStoryModePromptDialog = false }) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(RetroBlack.copy(alpha = 0.98f))
+                        .border(2.dp, Color(0xFFBA68C8), RoundedCornerShape(12.dp))
+                        .padding(20.dp)
+                ) {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(14.dp)
+                    ) {
+                        Text(
+                            text = "📖 PURE STORY MODE",
+                            color = Color(0xFFE1BEE7),
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Black,
+                            fontFamily = FontFamily.Monospace,
+                            textAlign = TextAlign.Center
+                        )
+
+                        Text(
+                            text = "Previous Story Mode progress found:\n📍 ${storyModeSummary.chapterTitle} • ${storyModeSummary.sceneName}\n\nWould you like to resume your story or start fresh from the beginning?\n\n(Your 3 main campaign save slots are safe and unaffected.)",
+                            color = Color.LightGray,
+                            fontSize = 11.sp,
+                            fontFamily = FontFamily.Monospace,
+                            textAlign = TextAlign.Center,
+                            lineHeight = 17.sp
+                        )
+
+                        Button(
+                            onClick = {
+                                showStoryModePromptDialog = false
+                                onPureStoryMode(false)
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .border(1.dp, Color(0xFF4CAF50), RoundedCornerShape(8.dp)),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1B5E20)),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Text(
+                                text = "▶ RESUME STORY PROGRESS",
+                                color = Color.White,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = FontFamily.Monospace
+                            )
+                        }
+
+                        Button(
+                            onClick = {
+                                showStoryModePromptDialog = false
+                                onPureStoryMode(true)
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .border(1.dp, Color(0xFFFFB300), RoundedCornerShape(8.dp)),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE65100)),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Text(
+                                text = "🔄 START FROM THE BEGINNING",
+                                color = Color.White,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = FontFamily.Monospace
+                            )
+                        }
+
+                        Button(
+                            onClick = { showStoryModePromptDialog = false },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .border(1.dp, RetroBorder, RoundedCornerShape(8.dp)),
+                            colors = ButtonDefaults.buttonColors(containerColor = RetroDeepSlate),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Text(
+                                text = "CANCEL",
+                                color = Color.LightGray,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = FontFamily.Monospace
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
         // Multi-Slot Campaign Archives Modal Dialog
         if (showSlotArchivesDialog) {
             SaveSlotDialog(
@@ -657,122 +757,6 @@ fun TitleScreen(
                 }
             )
         }
-
-    // Sub-dialog: Creator Template Sandbox
-    if (showSandboxDialog) {
-        Dialog(onDismissRequest = { showSandboxDialog = false }) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(RetroBlack.copy(alpha = 0.98f))
-                    .border(2.dp, Color(0xFFE040FB), RoundedCornerShape(12.dp))
-                    .padding(18.dp)
-            ) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    Text(
-                        text = "🎮 TEMPLATE SANDBOX",
-                        color = Color(0xFFE040FB),
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.Black,
-                        fontFamily = FontFamily.Monospace
-                    )
-
-                    Text(
-                        text = "Test individual template systems or use them as a starting point for your own game.",
-                        color = Color.LightGray,
-                        fontSize = 10.sp,
-                        fontFamily = FontFamily.Monospace,
-                        textAlign = TextAlign.Center
-                    )
-
-                    Spacer(modifier = Modifier.height(4.dp))
-
-                    Button(
-                        onClick = {
-                            showSandboxDialog = false
-                            onStartTemplateStory()
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .border(1.dp, Color(0xFF8E24AA), RoundedCornerShape(6.dp)),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4A148C)),
-                        shape = RoundedCornerShape(6.dp)
-                    ) {
-                        Text(
-                            text = "📖 TEMPLATE STORY (Narration & Choices)",
-                            color = Color.White,
-                            fontSize = 10.5.sp,
-                            fontWeight = FontWeight.Bold,
-                            fontFamily = FontFamily.Monospace
-                        )
-                    }
-
-                    Button(
-                        onClick = {
-                            showSandboxDialog = false
-                            onStartTemplateSoloCombat()
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .border(1.dp, Color(0xFF1E88E5), RoundedCornerShape(6.dp)),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0D47A1)),
-                        shape = RoundedCornerShape(6.dp)
-                    ) {
-                        Text(
-                            text = "⚔️ SOLO BATTLE (1 Hero vs 1 Drone)",
-                            color = Color.White,
-                            fontSize = 10.5.sp,
-                            fontWeight = FontWeight.Bold,
-                            fontFamily = FontFamily.Monospace
-                        )
-                    }
-
-                    Button(
-                        onClick = {
-                            showSandboxDialog = false
-                            onStartTemplateTrioCombat()
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .border(1.dp, Color(0xFF43A047), RoundedCornerShape(6.dp)),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1B5E20)),
-                        shape = RoundedCornerShape(6.dp)
-                    ) {
-                        Text(
-                            text = "⚔️⚔️⚔️ SQUAD BATTLE (1 Hero vs 3 Drones)",
-                            color = Color.White,
-                            fontSize = 10.5.sp,
-                            fontWeight = FontWeight.Bold,
-                            fontFamily = FontFamily.Monospace
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(4.dp))
-
-                    Button(
-                        onClick = { showSandboxDialog = false },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .border(1.dp, RetroBorder, RoundedCornerShape(6.dp)),
-                        colors = ButtonDefaults.buttonColors(containerColor = RetroDeepSlate),
-                        shape = RoundedCornerShape(6.dp)
-                    ) {
-                        Text(
-                            text = "RETURN",
-                            color = Color.LightGray,
-                            fontSize = 11.sp,
-                            fontFamily = FontFamily.Monospace
-                        )
-                    }
-                }
-            }
-        }
-    }
-
     }
 }
 

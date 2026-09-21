@@ -211,28 +211,22 @@ class SaveSystemTest {
         storyVm.startNewGame(custom)
 
         assertEquals(GameScreen.STORY_EXPLORATION, storyVm.state.value.gameScreen)
-        assertEquals(StoryScript.SCENE_PROVING_GROUNDS.id, storyVm.state.value.currentScene.id)
-        assertEquals(StoryScript.NODE_INTRO.id, storyVm.state.value.currentNode.id)
+        assertEquals("scene_cottage", storyVm.state.value.currentScene.id)
+        assertEquals("cottage_intro", storyVm.state.value.currentNode.id)
         assertEquals("Rowan", storyVm.state.value.player.name)
 
-        // Advance through intro to mentor greeting, then to choice hub
-        storyVm.advanceDialogue()
-        assertEquals("template_mentor_greeting", storyVm.state.value.currentNode.id)
-        storyVm.advanceDialogue()
-        assertEquals(StoryScript.NODE_CHOICE_HUB.id, storyVm.state.value.currentNode.id)
+        // Make decision 1: "Try to speak"
+        val speakChoice = storyVm.state.value.currentNode.choices.first { it.id == "c1_speak" }
+        storyVm.selectChoice(speakChoice)
 
-        // Make decision 1: "Accept the Mentor's Blessing"
-        val blessingChoice = storyVm.state.value.currentNode.choices.first { it.id == "choice_blessing" }
-        storyVm.selectChoice(blessingChoice)
-
-        assertEquals("template_branch_blessing", storyVm.state.value.currentNode.id)
-        assertEquals(listOf("choice_blessing"), storyVm.state.value.decisionsMade)
+        assertEquals("cottage_voice", storyVm.state.value.currentNode.id)
+        assertEquals(listOf("c1_speak"), storyVm.state.value.decisionsMade)
 
         // Verify save was written to disk/memory
         val autoSavedData = saveManager.load()
         assertNotNull(autoSavedData)
-        assertEquals("template_branch_blessing", autoSavedData!!.currentNodeId)
-        assertEquals(listOf("choice_blessing"), autoSavedData.decisionsMade)
+        assertEquals("cottage_voice", autoSavedData!!.currentNodeId)
+        assertEquals(listOf("c1_speak"), autoSavedData.decisionsMade)
         assertEquals("Rowan", autoSavedData.player.name)
     }
 
@@ -256,17 +250,19 @@ class SaveSystemTest {
         )
         storyVm1.startNewGame(custom)
 
-        // Advance through intro to mentor greeting, then to choice hub
-        storyVm1.advanceDialogue()
-        storyVm1.advanceDialogue()
-        assertEquals(StoryScript.NODE_CHOICE_HUB.id, storyVm1.state.value.currentNode.id)
-
-        // Make choice: "Inquire About the Realm's History"
-        val choice = storyVm1.state.value.currentNode.choices.first { it.id == "choice_history" }
+        // Make choice
+        val choice = storyVm1.state.value.currentNode.choices.first { it.id == "c1_speak" }
         storyVm1.selectChoice(choice)
 
-        assertEquals("template_branch_history", storyVm1.state.value.currentNode.id)
-        assertEquals(listOf("choice_history"), storyVm1.state.value.decisionsMade)
+        // Advance to village
+        val villageTransNode = StoryScript.ALL_NODES["cottage_to_village"]!!
+        val jumpChoice = com.voicerpg.engine.model.DialogueChoice("jump", "Go to village", emptyList(), villageTransNode.id)
+        storyVm1.selectChoice(jumpChoice)
+        storyVm1.advanceDialogue()
+
+        assertEquals("scene_village", storyVm1.state.value.currentScene.id)
+        assertEquals("village_intro", storyVm1.state.value.currentNode.id)
+        assertEquals(listOf("c1_speak", "jump"), storyVm1.state.value.decisionsMade)
 
         // Session 2: Fresh launch of the app with existing save
         val storyVm2 = StoryViewModel(
@@ -286,11 +282,11 @@ class SaveSystemTest {
         // Continue chronicle resumes directly into story
         storyVm2.continueGame()
         assertEquals(GameScreen.STORY_EXPLORATION, storyVm2.state.value.gameScreen)
-        assertEquals(StoryScript.SCENE_PROVING_GROUNDS.id, storyVm2.state.value.currentScene.id)
-        assertEquals("template_branch_history", storyVm2.state.value.currentNode.id)
+        assertEquals("scene_village", storyVm2.state.value.currentScene.id)
+        assertEquals("village_intro", storyVm2.state.value.currentNode.id)
         assertEquals("Elora", storyVm2.state.value.player.name)
         assertEquals(HeroClass.CHANTER, storyVm2.state.value.player.heroClass)
-        assertEquals(listOf("choice_history"), storyVm2.state.value.decisionsMade)
+        assertEquals(listOf("c1_speak", "jump"), storyVm2.state.value.decisionsMade)
 
         // Return to title persists and transitions back to Title Screen
         storyVm2.returnToTitle()
@@ -472,10 +468,102 @@ class SaveSystemTest {
 
     @Test
     fun testSlotBoundaryClamping() {
-        saveManager.currentSlot = 0
+        // Slot 0 is reserved for Pure Story Mode
+        saveManager.currentSlot = SaveManager.STORY_MODE_SLOT
+        assertEquals(SaveManager.STORY_MODE_SLOT, saveManager.currentSlot)
+
+        // Negative numbers clamp to slot 1
+        saveManager.currentSlot = -1
         assertEquals(1, saveManager.currentSlot)
 
+        // Numbers exceeding MAX_SLOTS clamp to MAX_SLOTS
         saveManager.currentSlot = 99
         assertEquals(SaveManager.MAX_SLOTS, saveManager.currentSlot)
+    }
+
+    @Test
+    fun testPureStoryModeDedicatedSlotIsolation() {
+        val testScope = CoroutineScope(Dispatchers.Default)
+
+        // Setup campaign saves in slot 1 and 2
+        val custom1 = PlayerCustomization(name = "CampaignHero1", heroClass = HeroClass.ELEMENTALIST)
+        val custom2 = PlayerCustomization(name = "CampaignHero2", heroClass = HeroClass.BATTLEMAGE)
+        val save1 = saveManager.createInitialSave(custom1, slot = 1).copy(saveTimestamp = 1000L)
+        saveManager.save(save1, slot = 1, updateTimestamp = false)
+        val save2 = saveManager.createInitialSave(custom2, slot = 2).copy(saveTimestamp = 2000L)
+        saveManager.save(save2, slot = 2, updateTimestamp = false)
+
+        val storyVm = StoryViewModel(
+            speechManager = speechManager,
+            combatNarrator = combatNarrator,
+            saveManager = saveManager,
+            scopeOverride = testScope
+        )
+
+        // Slot 2 has a newer timestamp, so it should be the active campaign slot initially
+        assertEquals(2, storyVm.state.value.currentSlot)
+        assertEquals("CampaignHero2", storyVm.state.value.saveSummary?.heroName)
+
+        // Start Pure Story Mode
+        storyVm.startPureStoryMode(fresh = true)
+        assertTrue(storyVm.state.value.isPureStoryMode)
+        assertEquals(SaveManager.STORY_MODE_SLOT, storyVm.state.value.currentSlot)
+        assertTrue(saveManager.hasSave(SaveManager.STORY_MODE_SLOT))
+
+        // Ensure campaign saves in slot 1 and slot 2 are pristine
+        val slot1Data = saveManager.load(1)
+        val slot2Data = saveManager.load(2)
+        assertNotNull(slot1Data)
+        assertNotNull(slot2Data)
+        assertEquals("CampaignHero1", slot1Data?.player?.name)
+        assertEquals("CampaignHero2", slot2Data?.player?.name)
+
+        // Check Story Mode summary
+        val storySummary = storyVm.getStoryModeSaveSummary()
+        assertNotNull(storySummary)
+        assertEquals(SaveManager.STORY_MODE_SLOT, storySummary?.slotIndex)
+
+        // Return to title screen
+        storyVm.returnToTitle()
+        assertFalse(storyVm.state.value.isPureStoryMode)
+        // Should have restored back to the most recently saved campaign slot (slot 2)
+        assertEquals(2, storyVm.state.value.currentSlot)
+        assertEquals("CampaignHero2", storyVm.state.value.saveSummary?.heroName)
+
+        // Archives list must only contain slots 1..3, never slot 0
+        val archives = saveManager.getAllSlotInfos()
+        assertEquals(3, archives.size)
+        assertEquals(listOf(1, 2, 3), archives.map { it.slotIndex })
+    }
+
+    @Test
+    fun testAutoSelectsMostRecentlySavedCampaignSlot() {
+        val testScope = CoroutineScope(Dispatchers.Default)
+
+        // Create save 1 earlier
+        val save1 = saveManager.createInitialSave(
+            PlayerCustomization(name = "OldHero"),
+            slot = 1
+        ).copy(saveTimestamp = 1000L)
+        saveManager.save(save1, slot = 1, updateTimestamp = false)
+
+        // Create save 3 later
+        val save3 = saveManager.createInitialSave(
+            PlayerCustomization(name = "RecentHero"),
+            slot = 3
+        ).copy(saveTimestamp = 5000L)
+        saveManager.save(save3, slot = 3, updateTimestamp = false)
+
+        // Boot StoryViewModel
+        val storyVm = StoryViewModel(
+            speechManager = speechManager,
+            combatNarrator = combatNarrator,
+            saveManager = saveManager,
+            scopeOverride = testScope
+        )
+
+        // Should automatically choose slot 3 because its timestamp is newer
+        assertEquals(3, storyVm.state.value.currentSlot)
+        assertEquals("RecentHero", storyVm.state.value.saveSummary?.heroName)
     }
 }

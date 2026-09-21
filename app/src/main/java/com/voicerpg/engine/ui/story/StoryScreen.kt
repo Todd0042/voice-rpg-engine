@@ -98,11 +98,25 @@ fun StoryScreen(
     }
 
     val currentNode = storyState.currentNode
-    val isAethelSpeaking = (currentNode.speaker == DialogueSpeaker.AETHEL || currentNode.side == SpeakerSide.LEFT)
+    val isNarratorSpeaking = (currentNode.speaker == DialogueSpeaker.NARRATOR)
+
+    val narratorAsset = remember(currentNode.id) {
+        DialogueSpeaker.NARRATOR.effectivePortraitAsset()
+    }
+    val narratorBitmap = remember(narratorAsset) {
+        narratorAsset?.let { StoryAssetLoader.loadBitmap(context, it) }
+    }
+
+    val leftSpeaker = if (isNarratorSpeaking) DialogueSpeaker.NARRATOR else DialogueSpeaker.AETHEL
+    val leftBitmap = if (isNarratorSpeaking) narratorBitmap else aethelBitmap
+    val isLeftSpeaking = if (isNarratorSpeaking) true else (currentNode.speaker == DialogueSpeaker.AETHEL || currentNode.side == SpeakerSide.LEFT)
 
     val rightSpeaker: DialogueSpeaker? = remember(currentNode.id, currentNode.speaker.id, storyState.currentScene.name) {
         when {
-            currentNode.speaker != DialogueSpeaker.AETHEL && currentNode.speaker != DialogueSpeaker.NARRATOR -> {
+            currentNode.speaker == DialogueSpeaker.NARRATOR -> {
+                null
+            }
+            currentNode.speaker != DialogueSpeaker.AETHEL -> {
                 currentNode.speaker
             }
             storyState.currentScene.chapterTitle.contains("Prologue", ignoreCase = true) ||
@@ -134,7 +148,7 @@ fun StoryScreen(
     }
 
     val rightSpeakerAsset = remember(rightSpeaker?.id) {
-        rightSpeaker?.effectivePortraitAsset()
+        rightSpeaker?.effectivePortraitAsset(currentNode.id)
     }
     val rightBitmap = remember(rightSpeakerAsset) {
         rightSpeakerAsset?.let { StoryAssetLoader.loadBitmap(context, it) }
@@ -164,7 +178,9 @@ fun StoryScreen(
                 .fillMaxSize()
                 .padding(innerPadding)
                 .then(
-                    if (storyState.isFastForwarding) {
+                    if (storyState.isPureStoryMode) {
+                        Modifier
+                    } else if (storyState.isFastForwarding) {
                         Modifier.clickable { storyViewModel.stopFastForward() }
                     } else if (speechState is com.voicerpg.engine.audio.SpeechState.Standby) {
                         Modifier.clickable { storyViewModel.resumeVoiceListening() }
@@ -204,14 +220,75 @@ fun StoryScreen(
             )
 
             // 2. Top Header: Chapter & Scene Location Banner on Left + Stacked Controls on Right
-            Row(
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .align(Alignment.TopCenter)
-                    .padding(horizontal = 12.dp, vertical = if (isLandscape) 4.dp else 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.Top
+                    .padding(horizontal = 12.dp, vertical = if (isLandscape) 4.dp else 8.dp)
             ) {
+                if (storyState.isPureStoryMode) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 6.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(Color(0xFF311B92).copy(alpha = 0.95f))
+                            .border(1.dp, Color(0xFFBA68C8), RoundedCornerShape(8.dp))
+                            .padding(horizontal = 10.dp, vertical = 6.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = if (storyState.isStoryAutoPlayPaused) "⏸ STORY MODE (PAUSED)" else "▶ STORY MODE (AUTO-PLAY)",
+                                color = Color(0xFFF3E5F5),
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Black,
+                                fontFamily = FontFamily.Monospace
+                            )
+                            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(6.dp))
+                                        .background(if (storyState.isStoryAutoPlayPaused) Color(0xFF2E7D32) else Color(0xFFE65100))
+                                        .clickable { storyViewModel.toggleStoryAutoPlayPause() }
+                                        .padding(horizontal = 10.dp, vertical = 5.dp)
+                                ) {
+                                    Text(
+                                        text = if (storyState.isStoryAutoPlayPaused) "RESUME" else "PAUSE",
+                                        color = Color.White,
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        fontFamily = FontFamily.Monospace
+                                    )
+                                }
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(6.dp))
+                                        .background(Color(0xFFC62828))
+                                        .clickable { storyViewModel.returnToTitle() }
+                                        .padding(horizontal = 10.dp, vertical = 5.dp)
+                                ) {
+                                    Text(
+                                        text = "EXIT",
+                                        color = Color.White,
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        fontFamily = FontFamily.Monospace
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.Top
+                ) {
                 // Title Banner Card (with set flex width and clean multi-line wrapping)
                 Box(
                     modifier = Modifier
@@ -354,6 +431,7 @@ fun StoryScreen(
                     }
                 }
             }
+        }
 
             // 3. Characters & Dialogue Presentation (Responsive Portrait vs Landscape)
             if (!isLandscape) {
@@ -373,13 +451,13 @@ fun StoryScreen(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.Bottom
                     ) {
-                        // Left Character (Aethel)
+                        // Left Character (Aethel or Narrator)
                         CharacterPortraitBust(
-                            bitmap = aethelBitmap,
-                            speaker = DialogueSpeaker.AETHEL,
-                            isSpeaking = isAethelSpeaking,
+                            bitmap = leftBitmap,
+                            speaker = leftSpeaker,
+                            isSpeaking = isLeftSpeaking,
                             sizeDp = 84.dp,
-                            modifier = Modifier.offset(y = (if (isAethelSpeaking) floatY else 0f).dp)
+                            modifier = Modifier.offset(y = (if (isLeftSpeaking) floatY else 0f).dp)
                         )
 
                         // Right Character (Companion / NPC)
@@ -417,6 +495,7 @@ fun StoryScreen(
                             }
                         },
                         isEyesFreeMode = isEyesFreeMode,
+                        speakerBitmapOverride = if (isNarratorSpeaking) narratorBitmap else null,
                         modifier = Modifier
                             .fillMaxWidth()
                             .wrapContentHeight(Alignment.Top)
@@ -472,16 +551,16 @@ fun StoryScreen(
                 }
             } else {
                 // ==================== LANDSCAPE ORIENTATION (Full Widescreen JRPG Layout) ====================
-                // Left Flank: Protagonist Bust standing proudly on the left
+                // Left Flank: Protagonist or Narrator Bust standing proudly on the left
                 CharacterPortraitBust(
-                    bitmap = aethelBitmap,
-                    speaker = DialogueSpeaker.AETHEL,
-                    isSpeaking = isAethelSpeaking,
+                    bitmap = leftBitmap,
+                    speaker = leftSpeaker,
+                    isSpeaking = isLeftSpeaking,
                     sizeDp = 110.dp,
                     modifier = Modifier
                         .align(Alignment.BottomStart)
                         .padding(start = 14.dp, bottom = 8.dp)
-                        .offset(y = (if (isAethelSpeaking) floatY else 0f).dp)
+                        .offset(y = (if (isLeftSpeaking) floatY else 0f).dp)
                 )
 
                 // Right Flank: Companion / NPC Bust standing on the right
@@ -527,6 +606,7 @@ fun StoryScreen(
                             }
                         },
                         isEyesFreeMode = isEyesFreeMode,
+                        speakerBitmapOverride = if (isNarratorSpeaking) narratorBitmap else null,
                         modifier = Modifier
                             .fillMaxWidth()
                             .wrapContentHeight(Alignment.Top)
@@ -805,13 +885,14 @@ private fun RetroSpeechBubble(
     node: DialogueNode,
     onTapToAdvance: () -> Unit,
     isEyesFreeMode: Boolean = false,
+    speakerBitmapOverride: ImageBitmap? = null,
     modifier: Modifier = Modifier
 ) {
     val speakerColor = node.speaker.themeColor
     val context = LocalContext.current
     val speakerAsset = remember(node.id) { node.speaker.effectivePortraitAsset() }
-    val speakerBitmap = remember(speakerAsset) {
-        speakerAsset?.let { StoryAssetLoader.loadBitmap(context, it) }
+    val speakerBitmap = remember(speakerAsset, speakerBitmapOverride) {
+        speakerBitmapOverride ?: speakerAsset?.let { StoryAssetLoader.loadBitmap(context, it) }
     }
 
     // Subtle breathing pulse for advance arrow

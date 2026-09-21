@@ -67,7 +67,8 @@ data class CombatState(
     val screenShakeOffsetY: Float = 0f,
     val currentEnvironment: BattleEnvironment = BattleEnvironment.DUNGEON,
     val isEyesFreeMode: Boolean = false,
-    val isOptionsOpen: Boolean = false
+    val isOptionsOpen: Boolean = false,
+    val isPureStoryMode: Boolean = false
 ) {
     val activePartyMember: PartyMember?
         get() = party.firstOrNull { it.id == activePartyMemberId }
@@ -350,8 +351,23 @@ class CombatViewModel(
                     if (it.id == readyHero.id) it.copy(stance = CharacterStance.READY) else it
                 }
             )
+            if (_state.value.isPureStoryMode) {
+                activeScope.launch {
+                    delay(700)
+                    if (_state.value.phase == CombatPhase.PLAYER_INPUT && _state.value.isPureStoryMode) {
+                        triggerAutoHeroAction(readyHero)
+                    }
+                }
+            }
             combatNarrator.narratePlayerTurn(readyHero, freshEnemies) {
-                if (speechManager.isAutoListen.value) {
+                if (_state.value.isPureStoryMode) {
+                    activeScope.launch {
+                        delay(200)
+                        if (_state.value.phase == CombatPhase.PLAYER_INPUT && _state.value.isPureStoryMode) {
+                            triggerAutoHeroAction(readyHero)
+                        }
+                    }
+                } else if (speechManager.isAutoListen.value) {
                     activeScope.launch {
                         delay(100)
                         startVoiceListening()
@@ -378,7 +394,8 @@ class CombatViewModel(
         var fell = false
 
         if (dot > 0) {
-            val newHp = (member.currentHp - dot).coerceAtLeast(0)
+            val minHp = if (_state.value.isPureStoryMode) 1 else 0
+            val newHp = (member.currentHp - dot).coerceAtLeast(minHp)
             fell = newHp <= 0
             val (sx, sy) = partyFloatSlot(heroId)
             val fct = FloatingCombatText(text = "-$dot", color = Color(0xFF9CCC65), startX = sx, startY = sy)
@@ -671,7 +688,10 @@ class CombatViewModel(
                         defenderStatusMitigation = blessMitigation.coerceIn(0.5f, 1.25f)
                     )
                     totalDamage += damage
-                    anyFallen = anyFallen || (hero.currentHp - damage) <= 0
+                    val minHp = if (_state.value.isPureStoryMode) 1 else 0
+                    val newHp = (hero.currentHp - damage).coerceAtLeast(minHp)
+                    val isFallen = newHp <= 0
+                    anyFallen = anyFallen || isFallen
                     struckHeroName = hero.name
                     val landedStatus = if (moveStatusId != null) {
                         if (move.targetRule == "PARTY_AOE" && (moveStatusId == StatusId.OVERLOAD || moveStatusId == StatusId.FREEZE)) {
@@ -684,8 +704,6 @@ class CombatViewModel(
                     } else null
                     val (hx, hy) = partyFloatSlot(hero.id)
                     newFloats += FloatingCombatText(text = "-$damage", color = Color(0xFFFF1744), startX = hx, startY = hy)
-                    val newHp = (hero.currentHp - damage).coerceAtLeast(0)
-                    val isFallen = newHp <= 0
                     hero.copy(
                         currentHp = newHp,
                         currentMp = if (isFallen) 0 else hero.currentMp,
@@ -797,8 +815,23 @@ class CombatViewModel(
     private fun concludeVictory() {
         _state.value = _state.value.copy(phase = CombatPhase.BATTLE_WON)
         awardVictoryXp()
+        if (_state.value.isPureStoryMode) {
+            activeScope.launch {
+                delay(3000)
+                if (_state.value.phase == CombatPhase.BATTLE_WON && _state.value.isPureStoryMode) {
+                    onContinueStory?.invoke()
+                }
+            }
+        }
         combatNarrator.narrateConclusion(isVictory = true) {
-            if (speechManager.isAutoListen.value) {
+            if (_state.value.isPureStoryMode) {
+                activeScope.launch {
+                    delay(1200)
+                    if (_state.value.phase == CombatPhase.BATTLE_WON && _state.value.isPureStoryMode) {
+                        onContinueStory?.invoke()
+                    }
+                }
+            } else if (speechManager.isAutoListen.value) {
                 activeScope.launch {
                     delay(150)
                     startVoiceListening()
@@ -931,8 +964,23 @@ class CombatViewModel(
                     if (it.id == nextHero.id) it.copy(stance = CharacterStance.READY) else it
                 }
             )
+            if (_state.value.isPureStoryMode) {
+                activeScope.launch {
+                    delay(700)
+                    if (_state.value.phase == CombatPhase.PLAYER_INPUT && _state.value.isPureStoryMode) {
+                        triggerAutoHeroAction(nextHero)
+                    }
+                }
+            }
             combatNarrator.narratePlayerTurn(nextHero, currentEnemies) {
-                if (speechManager.isAutoListen.value) {
+                if (_state.value.isPureStoryMode) {
+                    activeScope.launch {
+                        delay(200)
+                        if (_state.value.phase == CombatPhase.PLAYER_INPUT && _state.value.isPureStoryMode) {
+                            triggerAutoHeroAction(nextHero)
+                        }
+                    }
+                } else if (speechManager.isAutoListen.value) {
                     activeScope.launch {
                         delay(100)
                         startVoiceListening()
@@ -1215,6 +1263,41 @@ class CombatViewModel(
         _state.value = _state.value.copy(isEyesFreeMode = enabled)
     }
 
+    fun setPureStoryMode(enabled: Boolean) {
+        _state.value = _state.value.copy(isPureStoryMode = enabled)
+    }
+
+    fun triggerAutoHeroAction(hero: PartyMember) {
+        if (_state.value.phase != CombatPhase.PLAYER_INPUT) return
+        val affordableSpells = hero.spells.filter { it.mpCost <= hero.currentMp }
+        val chosenSpell = if (affordableSpells.isNotEmpty()) {
+            val lowestAlly = _state.value.party.filter { it.isAlive }.minByOrNull { it.currentHp.toFloat() / it.maxHp }
+            val healSpell = affordableSpells.firstOrNull { it.isHeal }
+            if (lowestAlly != null && (lowestAlly.currentHp.toFloat() / lowestAlly.maxHp) < 0.5f && healSpell != null) {
+                healSpell
+            } else {
+                affordableSpells.filter { !it.isHeal }.maxByOrNull { it.basePower } ?: affordableSpells.random()
+            }
+        } else {
+            hero.spells.firstOrNull { it.mpCost == 0 } ?: hero.spells.firstOrNull()
+        }
+
+        if (chosenSpell != null) {
+            val aliveEnemy = _state.value.enemies.firstOrNull { it.isAlive }
+            val chant = if (chosenSpell.manaRestorePct > 0f) {
+                "attune"
+            } else if (chosenSpell.isHeal) {
+                val lowestAlly = _state.value.party.filter { it.isAlive }.minByOrNull { it.currentHp.toFloat() / it.maxHp }
+                if (lowestAlly != null) "${chosenSpell.name} ${lowestAlly.name}" else chosenSpell.name
+            } else if (aliveEnemy != null && !chosenSpell.hitsAll) {
+                "${chosenSpell.name} ${aliveEnemy.name}"
+            } else {
+                chosenSpell.name
+            }
+            submitTypedChant(chant)
+        }
+    }
+
     fun openOptions() {
         _state.value = _state.value.copy(isOptionsOpen = true)
         combatNarrator.speak("Options open. Say Pocket Mode, Auto Listen, Speaker Names, Help, or Close Options.", force = _state.value.isEyesFreeMode) {
@@ -1452,6 +1535,51 @@ class CombatViewModel(
             }
             MetaCommand.HELP -> {
                 combatNarrator.narrateHelp {
+                    if (_state.value.phase == CombatPhase.PLAYER_INPUT && speechManager.isAutoListen.value) {
+                        activeScope.launch {
+                            delay(100)
+                            startVoiceListening()
+                        }
+                    }
+                }
+            }
+            MetaCommand.SPEED_UP_NARRATION -> {
+                val current = combatNarrator.speechRate.value
+                val next = when {
+                    current < 0.95f -> 1.05f
+                    current < 1.15f -> 1.25f
+                    else -> 1.50f
+                }
+                combatNarrator.setSpeechRate(next)
+                combatNarrator.speak("Narration speed increased to %.2fx.".format(next), force = true) {
+                    if (_state.value.phase == CombatPhase.PLAYER_INPUT && speechManager.isAutoListen.value) {
+                        activeScope.launch {
+                            delay(100)
+                            startVoiceListening()
+                        }
+                    }
+                }
+            }
+            MetaCommand.SLOW_DOWN_NARRATION -> {
+                val current = combatNarrator.speechRate.value
+                val next = when {
+                    current > 1.35f -> 1.25f
+                    current > 1.15f -> 1.05f
+                    else -> 0.85f
+                }
+                combatNarrator.setSpeechRate(next)
+                combatNarrator.speak("Narration speed decreased to %.2fx.".format(next), force = true) {
+                    if (_state.value.phase == CombatPhase.PLAYER_INPUT && speechManager.isAutoListen.value) {
+                        activeScope.launch {
+                            delay(100)
+                            startVoiceListening()
+                        }
+                    }
+                }
+            }
+            MetaCommand.RESET_NARRATION_SPEED -> {
+                combatNarrator.setSpeechRate(1.05f)
+                combatNarrator.speak("Narration speed reset to normal 1.05x.", force = true) {
                     if (_state.value.phase == CombatPhase.PLAYER_INPUT && speechManager.isAutoListen.value) {
                         activeScope.launch {
                             delay(100)
@@ -2022,9 +2150,18 @@ class CombatViewModel(
                     else listOfNotNull(currentEnemies.firstOrNull { it.isAlive })
                 }
             }
-            target == TargetSelection.ORC -> currentEnemies.filter { it.id == "orc" && it.isAlive }
-            target == TargetSelection.ARCHER -> currentEnemies.filter { it.id == "archer" && it.isAlive }
-            target == TargetSelection.SHAMAN -> currentEnemies.filter { it.id == "shaman" && it.isAlive }
+            target == TargetSelection.ORC -> {
+                val matched = currentEnemies.filter { it.id == "orc" && it.isAlive }
+                if (matched.isNotEmpty()) matched else listOfNotNull(currentEnemies.firstOrNull { it.isAlive })
+            }
+            target == TargetSelection.ARCHER -> {
+                val matched = currentEnemies.filter { it.id == "archer" && it.isAlive }
+                if (matched.isNotEmpty()) matched else listOfNotNull(currentEnemies.firstOrNull { it.isAlive })
+            }
+            target == TargetSelection.SHAMAN -> {
+                val matched = currentEnemies.filter { it.id == "shaman" && it.isAlive }
+                if (matched.isNotEmpty()) matched else listOfNotNull(currentEnemies.firstOrNull { it.isAlive })
+            }
             else -> {
                 val marked = currentEnemies.firstOrNull { it.isTargeted && it.isAlive }
                 if (marked != null) listOf(marked)
@@ -2138,7 +2275,12 @@ class CombatViewModel(
                     attackerWeakened = weakenedCaster
                 )
             )
-            HitOutcome(enemy, strike.damage, strike.affinity, statusId?.let { StatusSystem.apply(it, resonance.tier.name, familyOf(enemy), strike.damage.toFloat()) })
+            val effectiveDamage = if (_state.value.isPureStoryMode) {
+                (strike.damage * 2.5f).toInt().coerceAtLeast(100)
+            } else {
+                strike.damage
+            }
+            HitOutcome(enemy, effectiveDamage, strike.affinity, statusId?.let { StatusSystem.apply(it, resonance.tier.name, familyOf(enemy), effectiveDamage.toFloat()) })
         }
         val totalDamage = hits.sumOf { it.damage }
 
@@ -2453,7 +2595,8 @@ class CombatViewModel(
             roundNumber = 1,
             party = party,
             enemies = enemies.map { decorateEnemy(it).let { e -> e.copy(atbGauge = e.atbGauge.coerceAtLeast(0.25f)) } }.take(6),
-            currentEnvironment = environment
+            currentEnvironment = environment,
+            isPureStoryMode = _state.value.isPureStoryMode
         )
         startAtbLoop()
     }
@@ -2463,7 +2606,10 @@ class CombatViewModel(
         turnsTakenInRound = 0
         lastActedHeroId = null
         lastActedFaction = CombatantFaction.NONE
-        _state.value = createInitialState().copy(currentEnvironment = currentEnv)
+        _state.value = createInitialState().copy(
+            currentEnvironment = currentEnv,
+            isPureStoryMode = _state.value.isPureStoryMode
+        )
         _combatantPositions.clear()
         particleEmitter.clear()
         spellVfxEngine.projectiles.clear()
