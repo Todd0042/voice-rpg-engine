@@ -11,6 +11,17 @@ import com.voicerpg.engine.model.MetaCommand
 
 object IntentParser {
 
+    /**
+     * Dynamic party-member matching: a member is invoked when the utterance contains their
+     * display name, their lore class, or any voiceAlias declared in their character data file.
+     */
+    private fun memberMatchesUtterance(member: PartyMember, lower: String): Boolean {
+        if (member.name.isNotBlank() && lower.contains(member.name.lowercase())) return true
+        if (member.loreClass.isNotBlank() && lower.contains(member.loreClass.lowercase())) return true
+        return com.voicerpg.engine.content.GameContent.voiceAliasesFor(member.id)
+            .any { it.isNotBlank() && lower.contains(it.lowercase()) }
+    }
+
     fun parse(
         utterance: String,
         availableSpells: List<Spell> = emptyList(),
@@ -114,33 +125,16 @@ object IntentParser {
         }
 
         val hasHealKeyword = lower.contains("heal") || lower.contains("mend") || lower.contains("restore") ||
-                lower.contains("cure") || lower.contains("rain") || lower.contains("soothing")
+                lower.contains("cure")
 
         var targetEnemyId: String? = null
         var targetHeroId: String? = null
 
-        // 1. Detect target
+        // 1. Detect target — fully dynamic: party members are matched by name or by the
+        //    voiceAliases declared in their character data files. No hardcoded characters.
         var target: TargetSelection = when {
-            // Check Party targets
-            lower.contains("cedric") || lower.contains("templar") -> {
-                targetHeroId = party.firstOrNull { it.id == "cedric" }?.id ?: "cedric"
-                TargetSelection.CEDRIC
-            }
-            lower.contains("lyra") || lower.contains("warden") || lower.contains("druid") -> {
-                targetHeroId = party.firstOrNull { it.id == "lyra" }?.id ?: "lyra"
-                TargetSelection.LYRA
-            }
-            lower.contains("zephyr") || lower.contains("assassin") -> {
-                targetHeroId = party.firstOrNull { it.id == "zephyr" }?.id ?: "zephyr"
-                TargetSelection.ZEPHYR
-            }
-            lower.contains("aethel") || ((lower.contains("mage") || lower.contains("elementalist")) && hasHealKeyword) -> {
-                targetHeroId = party.firstOrNull { it.id == "hero" }?.id ?: "hero"
-                TargetSelection.HERO
-            }
-            // Check dynamic party names if not standard 4
-            party.any { lower.contains(it.name.lowercase()) } -> {
-                val matchedHero = party.first { lower.contains(it.name.lowercase()) }
+            party.any { memberMatchesUtterance(it, lower) } -> {
+                val matchedHero = party.first { memberMatchesUtterance(it, lower) }
                 targetHeroId = matchedHero.id
                 TargetSelection.SPECIFIC_HERO
             }
@@ -197,39 +191,17 @@ object IntentParser {
                 val matchedByName = scoredEnemies.maxByOrNull { it.second }?.first
 
                 if (matchedByName != null) {
-                    target = when (matchedByName.id) {
-                        "orc" -> TargetSelection.ORC
-                        "archer" -> TargetSelection.ARCHER
-                        "shaman" -> TargetSelection.SHAMAN
-                        else -> TargetSelection.SPECIFIC_ENEMY
-                    }
+                    target = TargetSelection.SPECIFIC_ENEMY
                     targetEnemyId = matchedByName.id
                 } else {
-                    // C. Fallback to classic keyword matching (useful when activeEnemies list is empty or for presets)
-                    when {
-                        lower.contains("orc") || lower.contains("warrior") -> {
-                            target = TargetSelection.ORC
-                            targetEnemyId = "orc"
-                        }
-                        lower.contains("archer") || lower.contains("skeleton") -> {
-                            target = TargetSelection.ARCHER
-                            targetEnemyId = "archer"
-                        }
-                        lower.contains("shaman") || lower.contains("caster") || (lower.contains("mage") && !hasHealKeyword) -> {
-                            target = TargetSelection.SHAMAN
-                            targetEnemyId = "shaman"
-                        }
-                        else -> {
-                            // D. If an enemy is currently marked as targeted by the player, lock on to it
-                            val currentTargeted = activeEnemies.firstOrNull { it.isTargeted && it.isAlive }
-                            if (currentTargeted != null) {
-                                target = TargetSelection.SPECIFIC_ENEMY
-                                targetEnemyId = currentTargeted.id
-                            } else {
-                                target = TargetSelection.FIRST_ALIVE_ENEMY
-                                targetEnemyId = aliveEnemies.firstOrNull()?.id
-                            }
-                        }
+                    // C. If an enemy is currently marked as targeted by the player, lock on to it
+                    val currentTargeted = activeEnemies.firstOrNull { it.isTargeted && it.isAlive }
+                    if (currentTargeted != null) {
+                        target = TargetSelection.SPECIFIC_ENEMY
+                        targetEnemyId = currentTargeted.id
+                    } else {
+                        target = TargetSelection.FIRST_ALIVE_ENEMY
+                        targetEnemyId = aliveEnemies.firstOrNull()?.id
                     }
                 }
             }
@@ -277,13 +249,14 @@ object IntentParser {
 
     private fun defaultFallbackSpell(): Spell {
         return Spell(
-            id = "fireball_1",
-            name = "Fireball",
-            school = SpellSchool.PYROMANCY,
+            id = "fallback_strike",
+            name = "Strike",
+            school = SpellSchool.PHYSICAL,
             basePower = 45,
-            mpCost = 10,
-            description = "Hurls a sphere of roaring flame at the target.",
-            exampleChant = "Fireball archer"
+            mpCost = 0,
+            description = "A basic template attack used when no spell matches.",
+            exampleChant = "Strike the enemy",
+            aliases = listOf("strike", "attack")
         )
     }
 }

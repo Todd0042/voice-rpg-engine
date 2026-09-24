@@ -1,0 +1,15 @@
+{
+  "_doc": "HERO CLASS — the Night Guardian: warden of the 4 AM unload, alliance with the dark hours.",
+  "id": "night_guardian",
+  "title": "Night Guardian",
+  "subtitle": "Warden of the 4 AM Unload",
+  "description": "Works unseen, strikes from the shadows of the schedule, and drinks the coffee the day crew never makes.",
+  "startingHp": 300,
+  "startingMp": 100,
+  "startingSpeed": 63,
+  "startingBaseAttack": 29,
+  "preferredSchool": "SHADOW",
+  "starterSpellIds": ["night_shift", "shadow_doubt", "drain_energy", "backroom_whisper", "breathe"],
+  "voiceKeywords": ["night guardian", "guardian", "overnight", "shadow", "third shift", "stealth"],
+  "growth": { "maxHp": 13, "maxMp": 10, "speed": 2, "defense": 1, "potencyPct": 0.035 }
+}

@@ -6,10 +6,13 @@ plugins {
 
 android {
     namespace = "com.voicerpg.engine"
-    compileSdk = 35
+    compileSdk = 34
 
     defaultConfig {
-        applicationId = "com.voicerpg.engine"
+        // Install/launch identity is the game's brand. The code namespace stays the generic
+        // engine package (com.voicerpg.engine) so the engine remains content-neutral; only the
+        // applicationId carries the campaign identity that Android shows and the launcher uses.
+        applicationId = "com.wallysworld.app"
         minSdk = 26
         targetSdk = 35
         versionCode = 1
@@ -57,10 +60,15 @@ android {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
     }
+
+    aaptOptions {
+        noCompress("tflite", "lite")
+        // Ignore patterns if needed, or configure resource prefix
+    }
 }
 
 dependencies {
-    implementation("androidx.core:core-ktx:1.15.0")
+    implementation("androidx.core:core-ktx:1.13.1")
     implementation("androidx.appcompat:appcompat:1.7.0")
     implementation("androidx.activity:activity-compose:1.9.3")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.7")

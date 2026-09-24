@@ -81,4 +81,4 @@ com.voicerpg.engine/
    ```bash
    adb install -r app/build/outputs/apk/debug/app-debug.apk
    ```
-4. **Follow [STARTER_GUIDE.md](STARTER_GUIDE.md)** to swap in your custom story script, characters, and encounters!
+4. **Follow [STARTER_GUIDE.md](STARTER_GUIDE.md)** to swap in your own world: game content is drop-in **JSON + assets** under `app/src/main/assets/game/` (story graph, characters, spells, enemies, encounters, voices, art, music) — no engine code changes required.

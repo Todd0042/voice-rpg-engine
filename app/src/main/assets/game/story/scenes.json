@@ -1,0 +1,73 @@
+{
+  "_doc": "STORY SCENES for The Squeeze (Act I, Utah). A scene binds a background image, a music track, and an entry dialogue node. Chapter/act/milestone fields feed the spoken Quest Recap and the debug chapter-warp menu.",
+  "scenes": [
+    {
+      "id": "scene_utah_trench",
+      "name": "The Backroom Trench",
+      "chapterTitle": "Chapter 1: The 4 AM Unload",
+      "backgroundAsset": "story/squeeze_utah_trench.jpg",
+      "initialNodeId": "squeeze_intro",
+      "ambientDescription": "A dead building at 3:47 in the morning: hydraulic hiss at the bay, the ballast hum of the fluorescents, and forty-eight feet of freight still on the trailer.",
+      "musicAsset": "audio/music/bgm_exploration.ogg",
+      "chapterIndex": 1,
+      "actNumber": 1,
+      "actTitle": "Act I: The Utah Grind",
+      "milestoneTitle": "Chapter 1: The 4 AM Unload",
+      "milestoneLocation": "The Backroom Trench",
+      "milestoneSummary": "You clocked in at a Wally's World overnight unload, learned the freight line, met the crew, and survived your first wall of boxes.",
+      "milestoneIcon": "📦",
+      "defaultObjective": "Learn the floor, meet the crew, brew the coffee, and run the 4 AM unload."
+    },
+    {
+      "id": "scene_utah_floor",
+      "name": "The Sales Floor",
+      "chapterTitle": "Chapter 2: The Promotion",
+      "backgroundAsset": "story/squeeze_utah_floor.jpg",
+      "initialNodeId": "floor_intro",
+      "ambientDescription": "A hundred thousand square feet of concrete and shelving under a vaulted ceiling: the store wakes, the floor crews fan out, and someone has to be in charge of the freight lanes.",
+      "musicAsset": "audio/music/bgm_exploration.ogg",
+      "chapterIndex": 2,
+      "actNumber": 1,
+      "actTitle": "Act I: The Utah Grind",
+      "milestoneTitle": "Chapter 2: The Promotion",
+      "milestoneLocation": "The Sales Floor",
+      "milestoneSummary": "You were promoted to IMS2 Supervisor, led the overnight crews, fixed the process, and held the floor through a front-end storm.",
+      "milestoneIcon": "🗂️",
+      "defaultObjective": "Lead the crew, fix the process, and stand your ground on the floor."
+    },
+    {
+      "id": "scene_utah_front_end",
+      "name": "The Front End",
+      "chapterTitle": "Chapter 3: The Rot and the Offer",
+      "backgroundAsset": "story/squeeze_utah_front_end.jpg",
+      "initialNodeId": "front_intro",
+      "ambientDescription": "The registers at the edge of the building, where the machine meets the public: the layoffs flow through here, and every exit is a door somebody was walked through.",
+      "musicAsset": "audio/music/bgm_act1_forest.ogg",
+      "chapterIndex": 3,
+      "actNumber": 1,
+      "actTitle": "Act I: The Utah Grind",
+      "milestoneTitle": "Chapter 3: The Rot and the Offer",
+      "milestoneLocation": "The Front End",
+      "milestoneSummary": "You saw the machine up close at the front end, made a private vow, and Jodie offered you an assistant-coach slot in Colorado.",
+      "milestoneIcon": "🧾",
+      "defaultObjective": "Hear the offer, see the rot, and decide whether to take the door out."
+    },
+    {
+      "id": "scene_utah_office",
+      "name": "The Manager's Office",
+      "chapterTitle": "Chapter 4: The Office",
+      "backgroundAsset": "story/squeeze_utah_office.jpg",
+      "initialNodeId": "office_intro",
+      "ambientDescription": "The manager's office at the end of the hall: a cheap desk, a wall of laminated posters, and a computer that has already sent the email.",
+      "musicAsset": "audio/music/bgm_act1_forest.ogg",
+      "chapterIndex": 4,
+      "actNumber": 1,
+      "actTitle": "Act I: The Utah Grind",
+      "milestoneTitle": "Chapter 4: The Office",
+      "milestoneLocation": "The Manager's Office",
+      "milestoneSummary": "You faced Mattie-T in her own office, survived the squeeze, and walked out to a truck pointed at Colorado.",
+      "milestoneIcon": "🚪",
+      "defaultObjective": "Face what Mattie-T built, survive the office, and choose your way out."
+    }
+  ]
+}

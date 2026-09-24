@@ -1,0 +1,13 @@
+{
+  "_doc": "Mattie-T — the store manager whose surname is reduced to an initial on the schedule, and Todd's Act 1 antagonist. Dialogue-only in the story; her 'showdown' manifests as an enemy encounter.",
+  "id": "mattie_t",
+  "role": "npc",
+  "name": "Mattie-T",
+  "title": "Store Manager",
+  "portraitAsset": "portraits/mattie_t.jpg",
+  "themeColor": "#EF5350",
+  "ttsPitch": 0.8,
+  "samplePhrase": "We're going to need a little more from you.",
+  "preferredVoiceId": null,
+  "voiceAliases": ["mattie", "mattie t", "the store manager", "store manager", "the manager"]
+}

@@ -1,0 +1,27 @@
+{
+  "_doc": "Todd — the hero, an hourly freight associate at the fictional megastore chain Wally's World. Names, titles, policies, and brand terms are deliberately fictional for legal distance (see AGENTS.md 'Walmart-Distance Rule'); the fiction is a recognizable-but-unproveable portrait of big-box retail labor.",
+  "id": "hero",
+  "role": "hero",
+  "name": "Todd",
+  "title": "Hourly Associate",
+  "portraitAsset": "portraits/todd.jpg",
+  "spriteId": "hero",
+  "themeColor": "#F5B041",
+  "ttsPitch": 0.92,
+  "samplePhrase": "The truck's here early again.",
+  "preferredVoiceId": null,
+  "voiceAliases": ["todd", "protagonist", "the associate", "hourly", "me"],
+  "loreClass": "Freight Associate",
+  "combat": {
+    "maxHp": 300,
+    "maxMp": 95,
+    "speed": 58,
+    "defense": 6,
+    "avatarTint": "#F5B041",
+    "startAtb": 0.45,
+    "spellIds": ["line_drill", "freight_push", "hold_ground", "grind_out", "breathe"],
+    "growth": { "maxHp": 15, "maxMp": 9, "speed": 1, "defense": 1, "potencyPct": 0.03 }
+  },
+  "joinWhenFlag": null,
+  "spellGrants": []
+}

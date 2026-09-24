@@ -142,16 +142,11 @@ fun AudioSetupScreen(
             return
         }
 
+        val registered = combatNarrator.getRegisteredSpeakers()
         // 4. Cycle / Switch companion voices
         if (lower.contains("cycle") || lower.contains("switch") || lower.contains("change voice") || lower.contains("next voice")) {
-            val targetSpeaker = when {
-                lower.contains("cedric") -> DialogueSpeaker.CEDRIC
-                lower.contains("lyra") -> DialogueSpeaker.LYRA
-                lower.contains("aethel") -> DialogueSpeaker.AETHEL
-                lower.contains("zephyr") -> DialogueSpeaker.ZEPHYR
-                lower.contains("malakor") -> DialogueSpeaker.MALAKOR
-                lower.contains("narrator") || lower.contains("storyteller") -> DialogueSpeaker.NARRATOR
-                else -> null
+            val targetSpeaker = registered.firstOrNull { speaker ->
+                lower.contains(speaker.name.lowercase()) || lower.contains(speaker.id.lowercase())
             }
             if (targetSpeaker != null) {
                 combatNarrator.cycleSpeakerVoice(targetSpeaker)
@@ -162,28 +157,11 @@ fun AudioSetupScreen(
         }
 
         // 5. Preview / sample companion voices
-        if (lower.contains("cedric")) {
-            combatNarrator.previewSpeakerVoice(DialogueSpeaker.CEDRIC)
-            return
+        val previewMatch = registered.firstOrNull { speaker ->
+            lower.contains(speaker.name.lowercase()) || lower.contains(speaker.id.lowercase())
         }
-        if (lower.contains("lyra")) {
-            combatNarrator.previewSpeakerVoice(DialogueSpeaker.LYRA)
-            return
-        }
-        if (lower.contains("aethel")) {
-            combatNarrator.previewSpeakerVoice(DialogueSpeaker.AETHEL)
-            return
-        }
-        if (lower.contains("zephyr")) {
-            combatNarrator.previewSpeakerVoice(DialogueSpeaker.ZEPHYR)
-            return
-        }
-        if (lower.contains("malakor")) {
-            combatNarrator.previewSpeakerVoice(DialogueSpeaker.MALAKOR)
-            return
-        }
-        if (lower.contains("narrator") || lower.contains("storyteller")) {
-            combatNarrator.previewSpeakerVoice(DialogueSpeaker.NARRATOR)
+        if (previewMatch != null) {
+            combatNarrator.previewSpeakerVoice(previewMatch)
             return
         }
 
@@ -329,7 +307,7 @@ fun AudioSetupScreen(
             ) {
                 Column {
                     Text(
-                        text = "🏰 VOICES OF THE REALM",
+                        text = "🎭 VOICES OF THE STORY",
                         color = LogosGlow,
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Black,
@@ -337,7 +315,7 @@ fun AudioSetupScreen(
                     )
                     Spacer(modifier = Modifier.height(6.dp))
                     Text(
-                        text = "In Echoes of the Aether, your journey is accompanied by distinct party companions and adversaries:",
+                        text = "Customize the distinctive voice engine model for each story character and adversary:",
                         color = Color.White,
                         fontSize = 11.sp,
                         fontFamily = FontFamily.Monospace,
@@ -346,67 +324,24 @@ fun AudioSetupScreen(
 
                     Spacer(modifier = Modifier.height(8.dp))
 
-                    // Companion voice breakdown with live assigned model, audition preview, and cycle switch
-                    CompanionVoiceBadge(
-                        speaker = DialogueSpeaker.CEDRIC,
-                        assignedVoiceName = remember(voiceUpdateKey, installedVoiceCount) { combatNarrator.getVoiceForSpeaker(DialogueSpeaker.CEDRIC)?.name },
-                        onPreview = { combatNarrator.previewSpeakerVoice(DialogueSpeaker.CEDRIC) },
-                        onCycle = {
-                            combatNarrator.cycleSpeakerVoice(DialogueSpeaker.CEDRIC)
-                            voiceUpdateKey++
-                            onVoiceChanged()
+                    val activeSpeakers = remember(installedVoiceCount) {
+                        combatNarrator.getRegisteredSpeakers().ifEmpty {
+                            listOf(DialogueSpeaker.NARRATOR)
                         }
-                    )
-                    CompanionVoiceBadge(
-                        speaker = DialogueSpeaker.LYRA,
-                        assignedVoiceName = remember(voiceUpdateKey, installedVoiceCount) { combatNarrator.getVoiceForSpeaker(DialogueSpeaker.LYRA)?.name },
-                        onPreview = { combatNarrator.previewSpeakerVoice(DialogueSpeaker.LYRA) },
-                        onCycle = {
-                            combatNarrator.cycleSpeakerVoice(DialogueSpeaker.LYRA)
-                            voiceUpdateKey++
-                            onVoiceChanged()
-                        }
-                    )
-                    CompanionVoiceBadge(
-                        speaker = DialogueSpeaker.AETHEL,
-                        assignedVoiceName = remember(voiceUpdateKey, installedVoiceCount) { combatNarrator.getVoiceForSpeaker(DialogueSpeaker.AETHEL)?.name },
-                        onPreview = { combatNarrator.previewSpeakerVoice(DialogueSpeaker.AETHEL) },
-                        onCycle = {
-                            combatNarrator.cycleSpeakerVoice(DialogueSpeaker.AETHEL)
-                            voiceUpdateKey++
-                            onVoiceChanged()
-                        }
-                    )
-                    CompanionVoiceBadge(
-                        speaker = DialogueSpeaker.ZEPHYR,
-                        assignedVoiceName = remember(voiceUpdateKey, installedVoiceCount) { combatNarrator.getVoiceForSpeaker(DialogueSpeaker.ZEPHYR)?.name },
-                        onPreview = { combatNarrator.previewSpeakerVoice(DialogueSpeaker.ZEPHYR) },
-                        onCycle = {
-                            combatNarrator.cycleSpeakerVoice(DialogueSpeaker.ZEPHYR)
-                            voiceUpdateKey++
-                            onVoiceChanged()
-                        }
-                    )
-                    CompanionVoiceBadge(
-                        speaker = DialogueSpeaker.MALAKOR,
-                        assignedVoiceName = remember(voiceUpdateKey, installedVoiceCount) { combatNarrator.getVoiceForSpeaker(DialogueSpeaker.MALAKOR)?.name },
-                        onPreview = { combatNarrator.previewSpeakerVoice(DialogueSpeaker.MALAKOR) },
-                        onCycle = {
-                            combatNarrator.cycleSpeakerVoice(DialogueSpeaker.MALAKOR)
-                            voiceUpdateKey++
-                            onVoiceChanged()
-                        }
-                    )
-                    CompanionVoiceBadge(
-                        speaker = DialogueSpeaker.NARRATOR,
-                        assignedVoiceName = remember(voiceUpdateKey, installedVoiceCount) { combatNarrator.getVoiceForSpeaker(DialogueSpeaker.NARRATOR)?.name },
-                        onPreview = { combatNarrator.previewSpeakerVoice(DialogueSpeaker.NARRATOR) },
-                        onCycle = {
-                            combatNarrator.cycleSpeakerVoice(DialogueSpeaker.NARRATOR)
-                            voiceUpdateKey++
-                            onVoiceChanged()
-                        }
-                    )
+                    }
+
+                    activeSpeakers.forEach { speaker ->
+                        CompanionVoiceBadge(
+                            speaker = speaker,
+                            assignedVoiceName = remember(voiceUpdateKey, installedVoiceCount) { combatNarrator.getVoiceForSpeaker(speaker)?.name },
+                            onPreview = { combatNarrator.previewSpeakerVoice(speaker) },
+                            onCycle = {
+                                combatNarrator.cycleSpeakerVoice(speaker)
+                                voiceUpdateKey++
+                                onVoiceChanged()
+                            }
+                        )
+                    }
 
                     Spacer(modifier = Modifier.height(10.dp))
 
@@ -766,7 +701,7 @@ fun AudioSetupScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = if (isFromGame) "🎤 Say 'Return', 'Switch Cedric', or 'Install voices'" else "🎤 Say 'Proceed' or 'Install voices'",
+                    text = if (isFromGame) "🎤 Say 'Return', 'Switch [Character]', or 'Install voices'" else "🎤 Say 'Proceed', 'Switch [Character]', or 'Install voices'",
                     color = Color.Gray,
                     fontSize = 10.sp,
                     fontFamily = FontFamily.Monospace
@@ -816,8 +751,8 @@ private fun CompanionVoiceBadge(
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        val displayName = if (speaker.id == "malakor") "Malakor" else speaker.name
-        val displayTitle = if (speaker.id == "malakor") "Inquisitor" else speaker.title
+        val displayName = speaker.name
+        val displayTitle = speaker.title
         Column(modifier = Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(

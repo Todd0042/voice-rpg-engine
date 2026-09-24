@@ -1,56 +1,54 @@
-# VoiceRPG Android: Agent Guidelines & Engineering Rules
+# VoiceRPG Engine: Agent Guidelines & Engineering Rules
 
-This repository contains the native Android implementation of *VoiceRPG: Echoes of the Logos*. When pair programming on this codebase, adhere strictly to the following architectural guidelines and core project rules.
+# VoiceRPG Engine: Agent Guidelines & Engineering Rules
 
----
-
-## 1. Combat Roster & Story Synchronization
-* **Strict Narrative Roster Fidelity:** Never include companions in combat who have not yet officially joined the fellowship in the active story.
-  * **Act I (Chapters 1–4):** Strictly the **Duo Fellowship** (**Aethel** + **Sir Cedric**). Lyra must NOT appear in combat.
-  * **Act II Chapter 5:** Strictly the **Duo Fellowship** on a rescue operation.
-  * **Act II Chapter 6:** **Trio Fellowship** (**Aethel**, **Sir Cedric**, and **Lyra the Grove Warden**).
-  * Subsequent companions (Vane, Zephyr) join only when recruited in their respective chapters.
-* Default fallback parties in `CombatViewModel` and test encounters must default to the Duo Fellowship unless testing multi-character mechanics explicitly.
+This repository is the **standalone, reusable engine** for voice-commanded JRPGs on Android (Kotlin, Jetpack Compose, Android Speech & TTS APIs). All game content has been stripped out and replaced with **drop-in JSON templates** under `app/src/main/assets/game/`. When working on this codebase, adhere strictly to the rules below.
 
 ---
 
-## 2. Dialogue Hubs & Completed Option Elimination
-* **No Endless Loops:** When the player visits a narrative hub offering multiple choices/inquiries (e.g. Camp, Aqueducts, Solaria Belfry, Drowned Fane):
-  1. Each choice branch must set a distinct completion flag (e.g., `setFlagOnEnter = "ch5_creek_scouted"`).
-  2. Choices with matching `completionFlag` must be filtered out / eliminated once completed so the player cannot loop endlessly.
-  3. When all sub-story options in a hub are completed, the hub node must automatically advance to the next narrative milestone.
-* **Rich Narrative Prose:** Maintain evocative, atmospheric JRPG storytelling with meaningful dialogue and distinct character voices, avoiding 1-line dismissive dialogue.
+## 1. Content Neutrality (THE core rule)
 
----
+- **Engine code never references game content.** `app/src/main` must not hardcode character names, story chapters, spell names, dialogue, encounters, or art/music filenames. The completed game (`voice-rpg-android` / *Echoes of the Logos*) is a **separate repo and must never be reintroduced here**.
+- All content lives in `app/src/main/assets/game/**` as JSON, loaded at runtime by `GameContent`:
+  - `manifest.json` (title, starting scene/node, default encounter, victory/defeat lines)
+  - `characters/*.json`, `classes/*.json`, `spells/spells.json`
+  - `enemies/enemies.json`, `encounters/encounters.json`
+  - `story/scenes.json`, `story/nodes.json`
+- Bundled art/music referenced by those JSON files live under `app/src/main/assets/{portraits,story,audio,sprites}`.
+- New game content = **JSON + assets only**. If a change requires touching `app/src/main`, it must be a genuinely generic engine improvement, not content.
 
-## 3. Screenless & Audio-First Playability (Pocket Mode)
-* The game must remain **100% playable without looking at the screen**:
-  * All dialogue lines and combat actions must support Text-To-Speech (TTS) narration.
-  * Available choices must be readable aloud via `isReadChoicesEnabled` (*"Option 1: ... Option 2: ... What is your command?"*).
-  * System toggles and status queries must be operable hands-free via speech meta-commands (*"Status"*, *"Enemies"*, *"Toggle narration"*, *"Read choices"*, *"Pocket mode"*, *"Auto listen"*, *"Options"*).
-  * Auto-listen microphone re-arms seamlessly after TTS completion.
+## 2. Tests Are Content-Agnostic Guarantees
 
----
+The unit suite (`./gradlew testDebugUnitTest`) must stay **green with any drop-in content**. Two test flavors are required:
 
-## 4. Multi-Voice Character Assignment
-* Use Android's `android.speech.tts.Voice` API to programmatically discover installed voice models on the device:
-  * Bind distinct physical voice models to each character:
-    * **Sir Cedric:** Installed deep male baritone voice.
-    * **Aethel (Hero):** Heroic female / invocator voice.
-    * **Lyra:** Gentle nature warden voice.
-    * **Narrator:** Impartial chronicle storyteller voice.
-  * Fall back smoothly if fewer voice models are installed, using pitch and rate modulation as secondary character expressions.
+1. **Schema/invariant tests** that iterate `GameContent` and assert engine-contract invariants (every node link resolves, no dead-ends except `game_completed`, every choice has a `voiceKeyword`, every battle trigger resolves to an encounter, flag names are non-blank, hub `requiredFlags` resolve, scene entries resolve, full reachability).
+2. **Engine-mechanics tests** that exercise behavior on whatever the template data is (resonance calibration, tutorial flow, combat economy, voice resolution, save/persistence).
 
----
+Never write a test that asserts a specific story/person/place. The template story ("Proving Grounds", "Echo Hall", the Guardian) is a **fixture**, and only tests the state machine's mechanics, not the fiction.
 
-## 5. Mandatory Verification, GitHub Release & Device Deployment
-* **Automated Testing:** Always verify all changes with automated tests: `./gradlew test`.
-* **Compilation:** Always build a fresh debug APK: `./gradlew assembleDebug`.
-* **Mandatory GitHub Release For Every Change:** For every change or feature completed, always tag, create, and publish a new GitHub release with the compiled `app-debug.apk` attached as an asset.
-* **Mandatory Phone Installation For Every Change:** For every change or feature completed, always automatically install the updated APK directly onto the user's connected phone via ADB (`adb install -r app/build/outputs/apk/debug/app-debug.apk`) without waiting to be asked.
+## 3. Story Graph Conventions (engine contract)
 
----
+- **No endless loops:** hub choices set a `completionFlag`, completed choices are eliminated on return, and a hub whose sub-stories are all complete auto-redirects via `hubCompletion.requiredFlags` + `hubCompletion.redirectToNodeId`.
+- **No dead ends:** every node must continue via `nextNodeId`, `choices`, `hubCompletion`, or a battle trigger (`triggerBattleEncounterId` + `nextNodeId`). The **only** terminal node is one that sets `game_completed`.
+- Scenes bind background + music + entry node; `chapterIndex`/`actNumber`/milestone fields feed the recap and chapter-warp menu — nothing hardcoded.
 
-## 6. Standalone Engine Synchronization
-* **Engine Parity:** Any major engine-level feature, system capability, persistence improvement, audio option, or gameplay mode (e.g., Pure Story Mode auto-play, multi-slot `AtomicFile` persistence, narration playback rate controls, playstyle presets, cheat codes) added or updated in `voice-rpg-android` MUST be synchronized into this standalone engine repository.
+## 4. Resonance Calibration Invariant
 
+- `SpellChantPresets` builds generic per-tier chants from any spell name; `AcousticProfile` constants per tier are fixed.
+- The engine's thematic matcher (root lexicon in `SpellThesaurus`) must cover each spell's name with **exactly one** root word. Zero-root names are unreachable at TRANSCENDENTAL; two-root names overflow BASIC. Keep the lexicon per-school and generic; `testAllSpellChantPresetsAcrossAllResonanceTiers` guards this for the whole spell catalog.
+- **Resonance is sacred:** it is the only skill multiplier (1.0x–3.0x). Affinity and stats may never exceed or replace it.
+
+## 5. ViewModel Tests: The Settle Pattern (livelock guard)
+
+Driving `StoryViewModel`/`TutorialBattleViewModel`/`CombatViewModel` in tests that rapidly cancel + relaunch animation jobs on the same event loop can livelock kotlinx-coroutines' `LockFreeLinkedList.finishAdd` and hang the suite for minutes. Follow the pattern in `TutorialBattleTest`: advance state, then **wait for a ref/state change and settle** (small `delay` loop) before the next step. Never `advance()` in a hot loop without a settle.
+
+## 6. Voice & Audio-First (retained engine pillars)
+
+- All dialogue and combat actions must be operable hands-free: TTS narration, `Read choices`, meta-commands ("Status", "Enemies", "Options", "Pocket mode", "Auto listen", "Toggle narration"), and auto-listen re-arm after TTS.
+- Bind distinct physical TTS voices per character via `android.speech.tts.Voice`; characters declare `preferredVoiceId` (fallback: pitch/rate modulation). Only characters with a non-null `preferredVoiceId` appear in `GameContent.preferredVoiceIds` / `CombatNarrator.PREFERRED_VOICE_IDS`.
+
+## 7. Verification Before Any Commit
+
+- Always run the full unit suite: `./gradlew testDebugUnitTest` (must be clean).
+- Compilation of engine code: `./gradlew compileDebugKotlin` (must be clean).
+- GitHub releases / ADB device installs are the **game project's** choice; do not auto-create releases or install without being asked.

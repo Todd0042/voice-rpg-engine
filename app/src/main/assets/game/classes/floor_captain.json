@@ -1,0 +1,15 @@
+{
+  "_doc": "HERO CLASS — the Floor Captain: voice of the freight line. Physical, durable, all grind.",
+  "id": "floor_captain",
+  "title": "Floor Captain",
+  "subtitle": "Voice of the Freight Line",
+  "description": "The one who clears the dock and holds the line. Heavy vitality, plain language, and the endurance to outlast the wall of boxes.",
+  "startingHp": 330,
+  "startingMp": 90,
+  "startingSpeed": 55,
+  "startingBaseAttack": 30,
+  "preferredSchool": "PHYSICAL",
+  "starterSpellIds": ["line_drill", "freight_push", "hold_ground", "grind_out", "breathe"],
+  "voiceKeywords": ["floor captain", "captain", "freight", "line leader", "stocking", "physical"],
+  "growth": { "maxHp": 16, "maxMp": 8, "speed": 1, "defense": 2, "potencyPct": 0.03 }
+}

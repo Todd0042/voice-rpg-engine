@@ -52,9 +52,9 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.voicerpg.engine.engine.ClassSpellLibrary
+import com.voicerpg.engine.content.GameContent
+import com.voicerpg.engine.content.HeroClassDef
 import com.voicerpg.engine.model.AuraColor
-import com.voicerpg.engine.model.HeroClass
 import com.voicerpg.engine.model.PlayerCustomization
 import com.voicerpg.engine.model.SpellSchool
 import com.voicerpg.engine.ui.story.StoryAssetLoader
@@ -103,7 +103,7 @@ fun CharacterCreationScreen(
         speechManager?.cancel()
         val finalCustomization = PlayerCustomization(
             name = if (name.isBlank()) "Aethel" else name.trim(),
-            heroClass = selectedClass,
+            heroClassId = selectedClass.id,
             title = selectedTitle,
             auraColor = selectedAura,
             voiceAffinityBonusSchool = selectedClass.preferredSchool
@@ -133,28 +133,15 @@ fun CharacterCreationScreen(
             return
         }
 
-        // 2. Class selection commands
-        when {
-            lower.contains("elementalist") || lower.contains("mage") || lower.contains("sorcerer") || lower.contains("wizard") || lower.contains("pyromancer") -> {
-                selectedClass = HeroClass.ELEMENTALIST
-                selectedAffinity = SpellSchool.PYROMANCY
-                combatNarrator?.speak("Elementalist selected. Master of pyromancy and destructive elements.", force = true)
-            }
-            lower.contains("battlemage") || lower.contains("templar") || lower.contains("paladin") || lower.contains("knight") || lower.contains("crusader") || lower.contains("warrior") || lower.contains("spellblade") -> {
-                selectedClass = HeroClass.BATTLEMAGE
-                selectedAffinity = SpellSchool.PHYSICAL
-                combatNarrator?.speak("Battlemage selected. Frontline spellblade vanguard.", force = true)
-            }
-            lower.contains("chanter") || lower.contains("chronomancer") || lower.contains("bard") || lower.contains("acoustic") || lower.contains("lightning") -> {
-                selectedClass = HeroClass.CHANTER
-                selectedAffinity = SpellSchool.ELECTROMANCY
-                combatNarrator?.speak("Chanter selected. Acoustic chronomancer and master of cadence.", force = true)
-            }
-            lower.contains("shadowweaver") || lower.contains("shadowblade") || lower.contains("rogue") || lower.contains("assassin") || lower.contains("shadow") || lower.contains("thief") || lower.contains("occultist") -> {
-                selectedClass = HeroClass.SHADOWWEAVER
-                selectedAffinity = SpellSchool.SHADOW
-                combatNarrator?.speak("Shadowweaver selected. Umbral occultist of lethal precision.", force = true)
-            }
+        // 2. Class selection commands - data-driven via the loaded content classes
+        GameContent.classes.firstOrNull { hc ->
+            lower.contains(hc.title.lowercase()) ||
+                lower.contains(hc.id) ||
+                hc.voiceKeywords.any { kw -> kw.isNotBlank() && lower.contains(kw) }
+        }?.let { matched ->
+            selectedClass = matched
+            selectedAffinity = matched.preferredSchool
+            combatNarrator?.speak("${matched.title} selected. ${matched.subtitle}.", force = true)
         }
 
         // 3. Title selection
@@ -227,18 +214,19 @@ fun CharacterCreationScreen(
 
             // Header
             Text(
-                text = "⚔️ FORGE YOUR INVOCATOR ⚔️",
+                text = "⚔️ TEMPLATE CHARACTER CREATION ⚔️",
                 color = LogosGold,
                 fontSize = 18.sp,
                 fontWeight = FontWeight.Black,
                 fontFamily = FontFamily.Monospace
             )
             Text(
-                text = "Character Creation & Initial Loadout",
+                text = "Template Character Setup & Initial Loadout",
                 color = Color.LightGray,
                 fontSize = 11.sp,
                 fontFamily = FontFamily.Monospace
             )
+
 
             Spacer(modifier = Modifier.height(14.dp))
 
@@ -389,7 +377,7 @@ fun CharacterCreationScreen(
             Spacer(modifier = Modifier.height(8.dp))
 
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                HeroClass.entries.forEach { hc ->
+                GameContent.classes.forEach { hc ->
                     ClassOptionCard(
                         heroClass = hc,
                         isSelected = hc == selectedClass,
@@ -551,11 +539,11 @@ fun CharacterCreationScreen(
 
 @Composable
 private fun ClassOptionCard(
-    heroClass: HeroClass,
+    heroClass: HeroClassDef,
     isSelected: Boolean,
     onSelect: () -> Unit
 ) {
-    val spells = remember(heroClass) { ClassSpellLibrary.getSpellsForClass(heroClass) }
+    val spells = remember(heroClass) { GameContent.spellsForClass(heroClass.id) }
 
     Box(
         modifier = Modifier

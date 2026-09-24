@@ -1,0 +1,13 @@
+{
+  "_doc": "The narrator — the memoir's voice. It reads scene text, combat flow, menus, and recaps, and never appears as a party member.",
+  "id": "narrator",
+  "role": "narrator",
+  "name": "Narrator",
+  "title": "The Memoir",
+  "portraitAsset": "portraits/narrator.jpg",
+  "themeColor": "#B0BEC5",
+  "ttsPitch": 1.0,
+  "samplePhrase": "The clock on the wall never lies.",
+  "preferredVoiceId": "en-gb-x-rjs-local",
+  "voiceAliases": []
+}

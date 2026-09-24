@@ -1,0 +1,322 @@
+{
+  "_doc": "STORY GRAPH for The Squeeze (Act I, Utah). Every engine story feature is exercised: linear narration, character dialogue, choice hubs with voiceKeywords + completionFlag elimination, combat triggers (triggerBattleEncounterId + nextNodeId), scene changes (changeSceneId), hub auto-redirect when all flags are set (hubCompletion), a victory chain, and the engine-convention 'game_completed' flag that ends the playthrough. All names, titles, and policies are fictional (Walmart-Distance Rule: see AGENTS.md).",
+  "nodes": [
+    {
+      "id": "squeeze_intro",
+      "speakerId": "narrator",
+      "side": "CENTER_NARRATOR",
+      "text": "3:47 in the morning, Provo. A Wally's World megamart sits in the dark like a poured slab of concrete waiting to be alive. Behind the building, a trailer is backed up to the bay door, forty-eight feet of freight, and it is not going to unload itself. Speak aloud to advance, or say 'Options' at any time.",
+      "nextNodeId": "todd_awake"
+    },
+    {
+      "id": "todd_awake",
+      "speakerId": "hero",
+      "side": "LEFT",
+      "text": "The clock says I should be asleep. The register says otherwise. Somebody's got to pull this line, and today that somebody is me.",
+      "nextNodeId": "trench_hub"
+    },
+    {
+      "id": "trench_hub",
+      "speakerId": "narrator",
+      "side": "CENTER_NARRATOR",
+      "text": "The building hums. Half a dozen lawn chairs and a ten-year-old coffee maker sit in the break pit like a monument. Speak a choice aloud, or tap it. Completed tasks are removed automatically.",
+      "hubCompletion": {
+        "requiredFlags": ["flag_trench_floor_read", "flag_trench_crew_met", "flag_trench_coffee"],
+        "redirectToNodeId": "trench_to_floor"
+      },
+      "choices": [
+        {
+          "id": "choice_learn_floor",
+          "text": "Learn the freight line before you touch it.",
+          "voiceKeywords": ["learn", "freight", "line", "floor", "how does this work", "training"],
+          "nextNodeId": "branch_learn_floor",
+          "completionFlag": "flag_trench_floor_read"
+        },
+        {
+          "id": "choice_meet_crew",
+          "text": "Meet the overnight crew in the break pit.",
+          "voiceKeywords": ["crew", "meet", "overnight", "associates", "people", "co-workers"],
+          "nextNodeId": "branch_meet_crew",
+          "completionFlag": "flag_trench_crew_met"
+        },
+        {
+          "id": "choice_brew_coffee",
+          "text": "Brew the ancient coffee before anyone needs it.",
+          "voiceKeywords": ["coffee", "brew", "the pot", "caffeine", "break"],
+          "nextNodeId": "branch_brew_coffee",
+          "completionFlag": "flag_trench_coffee"
+        },
+        {
+          "id": "choice_first_shift",
+          "text": "Throw the bay door open and run the unload.",
+          "voiceKeywords": ["unload", "bay", "the wall", "freight wall", "trailer", "run it", "battle", "fight"],
+          "nextNodeId": "trench_trigger_battle"
+        },
+        {
+          "id": "choice_open_floor",
+          "text": "Head up to the sales floor to see what the day holds.",
+          "voiceKeywords": ["floor", "sales floor", "store", "go upstairs", "open", "next", "proceed"],
+          "nextNodeId": "trench_to_floor"
+        }
+      ]
+    },
+    {
+      "id": "branch_learn_floor",
+      "speakerId": "narrator",
+      "side": "CENTER_NARRATOR",
+      "text": "The line has a rhythm: case, scan, slot, move on. Step off the rhythm and the boxes stack up behind you until they're taller than you are. The line is honest. The line does not care who you are.",
+      "setFlagOnEnter": "flag_trench_floor_read",
+      "nextNodeId": "trench_hub"
+    },
+    {
+      "id": "branch_meet_crew",
+      "speakerId": "narrator",
+      "side": "CENTER_NARRATOR",
+      "text": "The overnight crew is four bodies in lawn chairs and one in a trucker hat. They don't look up much. One of them makes room for you on the cooler. That's the welcome. Hold on to it.",
+      "setFlagOnEnter": "flag_trench_crew_met",
+      "nextNodeId": "trench_hub"
+    },
+    {
+      "id": "branch_brew_coffee",
+      "speakerId": "narrator",
+      "side": "CENTER_NARRATOR",
+      "text": "You find the old grounds, the cracked carafe, and the water that tastes like the back of the store. You brew it anyway. By the time the crew smells it, you're already somebody.",
+      "setFlagOnEnter": "flag_trench_coffee",
+      "nextNodeId": "trench_hub"
+    },
+    {
+      "id": "trench_trigger_battle",
+      "speakerId": "narrator",
+      "side": "CENTER_NARRATOR",
+      "text": "The bay door rattles up and the freight is right there, wall to wall. The fluorescents start their whine. Say 'Enemies' anytime to scan the field — and remember, speak sharp and it lands harder.",
+      "triggerBattleEncounterId": "trench_unload",
+      "nextNodeId": "trench_post_victory"
+    },
+    {
+      "id": "trench_post_victory",
+      "speakerId": "hero",
+      "side": "LEFT",
+      "text": "Pallet by pallet, the wall comes down. My back is loud about it, but the trailer is empty before the sun comes up.",
+      "nextNodeId": "trench_hub"
+    },
+    {
+      "id": "trench_to_floor",
+      "speakerId": "narrator",
+      "side": "CENTER_NARRATOR",
+      "text": "You ride the pallet jack up to the sales floor and the doors slide apart into a hundred thousand square feet of house, garden, food, and florescent sky.",
+      "changeSceneId": "scene_utah_floor",
+      "nextNodeId": "floor_intro"
+    },
+    {
+      "id": "floor_intro",
+      "speakerId": "narrator",
+      "side": "CENTER_NARRATOR",
+      "text": "The morning walkie crackles. The store manager's voice — Mattie-T, they call her, because her last name is one letter and nobody says the rest — calls for the overnight supervisor. There is no supervisor.",
+      "nextNodeId": "floor_promo"
+    },
+    {
+      "id": "floor_promo",
+      "speakerId": "hero",
+      "side": "LEFT",
+      "text": "The title lands before the raise does: IMS2 Supervisor. It means I'm still hauling freight, and now I'm the one who explains why the freight is late. Corners of the store I didn't know existed are suddenly mine.",
+      "nextNodeId": "floor_hub"
+    },
+    {
+      "id": "floor_hub",
+      "speakerId": "narrator",
+      "side": "CENTER_NARRATOR",
+      "text": "The floor stretches out, waiting. What do you do with your new little square of the machine?",
+      "hubCompletion": {
+        "requiredFlags": ["flag_floor_led", "flag_floor_process"],
+        "redirectToNodeId": "floor_to_front"
+      },
+      "choices": [
+        {
+          "id": "choice_lead_crew",
+          "text": "Take the overnight crews to the floor and lead the morning.",
+          "voiceKeywords": ["lead", "crew", "morning", "overnight", "supervise", "walk the floor"],
+          "nextNodeId": "branch_lead_crew",
+          "completionFlag": "flag_floor_led"
+        },
+        {
+          "id": "choice_fix_process",
+          "text": "Rebuild the stocking process from the label sheets up.",
+          "voiceKeywords": ["process", "fix", "labels", "system", "stocking", "efficiency", "change"],
+          "nextNodeId": "branch_fix_process",
+          "completionFlag": "flag_floor_process"
+        },
+        {
+          "id": "choice_floor_battle",
+          "text": "Hold the floor through the front-end storm.",
+          "voiceKeywords": ["front end", "storm", "rush", "dashboard", "hold", "battle", "fight", "customers"],
+          "nextNodeId": "floor_trigger_battle"
+        },
+        {
+          "id": "choice_front_end",
+          "text": "Walk up to the front end and see the machine's mouth.",
+          "voiceKeywords": ["front", "registers", "checkout", "exit", "walk up", "next", "proceed"],
+          "nextNodeId": "floor_to_front"
+        }
+      ]
+    },
+    {
+      "id": "branch_lead_crew",
+      "speakerId": "hero",
+      "side": "LEFT",
+      "text": "I tell the overnight crew the only thing I believe: nobody gets left to ride the wave alone. A body goes down, the line stops for a body. We move freight, and we move it together.",
+      "setFlagOnEnter": "flag_floor_led",
+      "nextNodeId": "floor_hub"
+    },
+    {
+      "id": "branch_fix_process",
+      "speakerId": "narrator",
+      "side": "CENTER_NARRATOR",
+      "text": "You rebuild the process from the label sheets up: zones, flow, the four big aisles running like arteries. The numbers climb. The walkie goes quiet. Somebody upstairs notices.",
+      "setFlagOnEnter": "flag_floor_process",
+      "nextNodeId": "floor_hub"
+    },
+    {
+      "id": "floor_trigger_battle",
+      "speakerId": "narrator",
+      "side": "CENTER_NARRATOR",
+      "text": "The hour-occupancy gauge is deep in the red and the pages start firing. Front-end storm. Everybody on the floor.",
+      "triggerBattleEncounterId": "floor_war",
+      "nextNodeId": "floor_post_victory"
+    },
+    {
+      "id": "floor_post_victory",
+      "speakerId": "hero",
+      "side": "LEFT",
+      "text": "Customers leave with their carts and their receipts. The gauge drips back down to green. I stand in the middle of the floor, breathing like it's the first time.",
+      "nextNodeId": "floor_hub"
+    },
+    {
+      "id": "floor_to_front",
+      "speakerId": "narrator",
+      "side": "CENTER_NARRATOR",
+      "text": "You head for the front of the building, where the registers face the parking lot and the machine shows its face to the public.",
+      "changeSceneId": "scene_utah_front_end",
+      "nextNodeId": "front_intro"
+    },
+    {
+      "id": "front_intro",
+      "speakerId": "narrator",
+      "side": "CENTER_NARRATOR",
+      "text": "The front end is the machine's mouth. Every register is a slot in a wall. And at the back of it, behind the service desk, Jodie from people services waves you over, a manila folder already open in her hands.",
+      "nextNodeId": "front_vow"
+    },
+    {
+      "id": "front_vow",
+      "speakerId": "hero",
+      "side": "LEFT",
+      "text": "I'd watched the layoffs roll through by then. The duffle-bag-of-thousand-cuts kind. I make a promise nobody can hear: if I run a crew, the machine eats numbers, not bodies. I don't know yet how much that promise will cost.",
+      "nextNodeId": "front_jodie"
+    },
+    {
+      "id": "front_jodie",
+      "speakerId": "jodie",
+      "side": "RIGHT",
+      "text": "Todd. Sit down for a second. There's a slot opening up — assistant coach track, ACCM, the reserve ladder. It's in Colorado. Lamar. If you take it, you're not an hourly anymore. You're in the machine, on purpose, with a key.",
+      "nextNodeId": "front_hub"
+    },
+    {
+      "id": "front_hub",
+      "speakerId": "narrator",
+      "side": "CENTER_NARRATOR",
+      "text": "The folder is open on the desk. The truck that could take you to Colorado is parked out front. What do you need to know first?",
+      "hubCompletion": {
+        "requiredFlags": ["flag_front_offer_details", "flag_front_rot_seen"],
+        "redirectToNodeId": "front_to_office"
+      },
+      "choices": [
+        {
+          "id": "choice_ask_jodie",
+          "text": "Ask Jodie what the slot really is.",
+          "voiceKeywords": ["ask", "jodie", "slot", "details", "accm", "ladder", "what really"],
+          "nextNodeId": "branch_ask_jodie",
+          "completionFlag": "flag_front_offer_details"
+        },
+        {
+          "id": "choice_see_rot",
+          "text": "Watch the front end work one more time.",
+          "voiceKeywords": ["watch", "front end", "rot", "registers", "see", "observe", "one more"],
+          "nextNodeId": "branch_see_rot",
+          "completionFlag": "flag_front_rot_seen"
+        },
+        {
+          "id": "choice_office",
+          "text": "Walk to the manager's office to give the answer.",
+          "voiceKeywords": ["office", "manager", "answer", "decision", "mattie", "walk", "next", "proceed"],
+          "nextNodeId": "front_to_office"
+        }
+      ]
+    },
+    {
+      "id": "branch_ask_jodie",
+      "speakerId": "jodie",
+      "side": "RIGHT",
+      "text": "The slot is real. The pay is real. The hours are real, twice as many as you'd expect, and the first of them is on a store that is on fire, figuratively. Mattie-T knows you're leaving. That's the only part that worries me.",
+      "setFlagOnEnter": "flag_front_offer_details",
+      "nextNodeId": "front_hub"
+    },
+    {
+      "id": "branch_see_rot",
+      "speakerId": "narrator",
+      "side": "CENTER_NARRATOR",
+      "text": "You watch the front end run for ten minutes. It runs. Nobody stops to breathe. The refugees of the last round of cuts are already being retrained to cut the next round. The machine doesn't blink. The machine loves everyone equally.",
+      "setFlagOnEnter": "flag_front_rot_seen",
+      "nextNodeId": "front_hub"
+    },
+    {
+      "id": "front_to_office",
+      "speakerId": "narrator",
+      "side": "CENTER_NARRATOR",
+      "text": "The manager's office is at the end of the hall, behind the wall of laminated posters. The door is open. The computer is already on.",
+      "changeSceneId": "scene_utah_office",
+      "nextNodeId": "office_intro"
+    },
+    {
+      "id": "office_intro",
+      "speakerId": "narrator",
+      "side": "CENTER_NARRATOR",
+      "text": "Mattie-T is behind the desk, smiling the way management smiles. On the monitor, an email is already halfway to being sent. Your name is in the body. The words say you abandoned the floor when it mattered.",
+      "nextNodeId": "office_confront"
+    },
+    {
+      "id": "office_confront",
+      "speakerId": "hero",
+      "side": "LEFT",
+      "text": "The email is the whole game in one paragraph. She's not fighting me. She's filing the version of me that fits the machine. The office goes quiet. Somewhere, the building leans on the wall.",
+      "nextNodeId": "office_trigger_battle"
+    },
+    {
+      "id": "office_trigger_battle",
+      "speakerId": "narrator",
+      "side": "CENTER_NARRATOR",
+      "text": "The office contracts. The clock on the wall ticks once, and everything Todd has built this act comes at him at once: the email, the squeeze, the whole machine. Speak sharp — say it loud, say it clear.",
+      "triggerBattleEncounterId": "mattie_t_showdown",
+      "nextNodeId": "office_post_victory"
+    },
+    {
+      "id": "office_post_victory",
+      "speakerId": "hero",
+      "side": "LEFT",
+      "text": "The email never goes out. The office is quiet again, the way it was quiet before she typed the first word. I look at her across the desk and I don't hate her. The machine doesn't need me to hate her.",
+      "nextNodeId": "office_resolve"
+    },
+    {
+      "id": "office_resolve",
+      "speakerId": "narrator",
+      "side": "CENTER_NARRATOR",
+      "text": "By midnight the box truck is packed. Jodie's folder is on the passenger seat. The keys to the Colorado slot hang off the visor. The gas pump in the lavender light hums like the whole state is holding its breath.",
+      "nextNodeId": "squeeze_conclusion"
+    },
+    {
+      "id": "squeeze_conclusion",
+      "speakerId": "narrator",
+      "side": "CENTER_NARRATOR",
+      "text": "End of Act One. Todd is pointed east on I-70, one state line away from a brand-new store, a brand-new boss, and the slow realization that the machine you left runs on the people you're about to become. Colorado. Lamar. The squeeze is just getting started.",
+      "setFlagOnEnter": "game_completed"
+    }
+  ]
+}

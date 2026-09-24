@@ -57,6 +57,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.voicerpg.engine.content.GameContent
 import com.voicerpg.engine.model.DialogueChoice
 import com.voicerpg.engine.model.DialogueNode
 import com.voicerpg.engine.model.DialogueSpeaker
@@ -93,8 +94,9 @@ fun StoryScreen(
     val backgroundBitmap = remember(storyState.currentScene.backgroundAsset) {
         StoryAssetLoader.loadBitmap(context, storyState.currentScene.backgroundAsset)
     }
-    val aethelBitmap = remember {
-        StoryAssetLoader.loadBitmap(context, "portraits/aethel.jpg")
+    val heroSpeaker = GameContent.heroCharacter?.speaker
+    val heroBitmap = remember(heroSpeaker?.portraitAsset) {
+        heroSpeaker?.portraitAsset?.let { StoryAssetLoader.loadBitmap(context, it) }
     }
 
     val currentNode = storyState.currentNode
@@ -107,45 +109,21 @@ fun StoryScreen(
         narratorAsset?.let { StoryAssetLoader.loadBitmap(context, it) }
     }
 
-    val leftSpeaker = if (isNarratorSpeaking) DialogueSpeaker.NARRATOR else DialogueSpeaker.AETHEL
-    val leftBitmap = if (isNarratorSpeaking) narratorBitmap else aethelBitmap
-    val isLeftSpeaking = if (isNarratorSpeaking) true else (currentNode.speaker == DialogueSpeaker.AETHEL || currentNode.side == SpeakerSide.LEFT)
+    val leftSpeaker = if (isNarratorSpeaking) DialogueSpeaker.NARRATOR else (heroSpeaker ?: DialogueSpeaker.NARRATOR)
+    val leftBitmap = if (isNarratorSpeaking) narratorBitmap else (heroBitmap ?: narratorBitmap)
+    val isLeftSpeaking = if (isNarratorSpeaking) true else (currentNode.speaker == heroSpeaker || currentNode.side == SpeakerSide.LEFT)
 
-    val rightSpeaker: DialogueSpeaker? = remember(currentNode.id, currentNode.speaker.id, storyState.currentScene.name) {
+    val rightSpeaker: DialogueSpeaker? = remember(currentNode.id, currentNode.speaker.id) {
         when {
-            currentNode.speaker == DialogueSpeaker.NARRATOR -> {
+            isNarratorSpeaking || currentNode.speaker == heroSpeaker -> {
                 null
-            }
-            currentNode.speaker != DialogueSpeaker.AETHEL -> {
-                currentNode.speaker
-            }
-            storyState.currentScene.chapterTitle.contains("Prologue", ignoreCase = true) ||
-            storyState.currentScene.name.contains("Cottage", ignoreCase = true) -> {
-                null
-            }
-            currentNode.id.contains("lyra", ignoreCase = true) ||
-            storyState.partyStats.any { it.id == "lyra" } ||
-            storyState.currentScene.chapterTitle.contains("Chapter 5", ignoreCase = true) ||
-            storyState.currentScene.chapterTitle.contains("Chapter 6", ignoreCase = true) -> {
-                DialogueSpeaker.LYRA
-            }
-            currentNode.id.contains("zephyr", ignoreCase = true) ||
-            storyState.partyStats.any { it.id == "zephyr" } ||
-            storyState.currentScene.chapterTitle.contains("Chapter 7", ignoreCase = true) ||
-            storyState.currentScene.chapterTitle.contains("Chapter 8", ignoreCase = true) -> {
-                DialogueSpeaker.ZEPHYR
-            }
-            currentNode.id.contains("malakor", ignoreCase = true) ||
-            storyState.partyStats.any { it.id == "malakor" } ||
-            storyState.currentScene.chapterTitle.contains("Chapter 9", ignoreCase = true) ||
-            storyState.currentScene.chapterTitle.contains("Chapter 10", ignoreCase = true) -> {
-                DialogueSpeaker.MALAKOR
             }
             else -> {
-                DialogueSpeaker.CEDRIC
+                currentNode.speaker
             }
         }
     }
+    val isRightWisp = rightSpeaker?.id?.contains("wisp", ignoreCase = true) == true
 
     val rightSpeakerAsset = remember(rightSpeaker?.id) {
         rightSpeaker?.effectivePortraitAsset(currentNode.id)
@@ -462,7 +440,7 @@ fun StoryScreen(
 
                         // Right Character (Companion / NPC)
                         if (rightSpeaker != null) {
-                            if (rightSpeaker == DialogueSpeaker.SHADOW_WISP) {
+                            if (isRightWisp) {
                                 ShadowWispBust(
                                     bitmap = rightBitmap,
                                     isSpeaking = isRightSpeaking,
@@ -565,7 +543,7 @@ fun StoryScreen(
 
                 // Right Flank: Companion / NPC Bust standing on the right
                 if (rightSpeaker != null) {
-                    if (rightSpeaker == DialogueSpeaker.SHADOW_WISP) {
+                    if (isRightWisp) {
                         ShadowWispBust(
                             bitmap = rightBitmap,
                             isSpeaking = isRightSpeaking,

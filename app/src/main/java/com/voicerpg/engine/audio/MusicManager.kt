@@ -18,8 +18,10 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
 /**
- * Background Music (BGM) Manager for VoiceRPG: Echoes of the Logos.
- * Provides continuous, seamlessly looping ambient soundtracks per Act and combat arena.
+ * Background Music (BGM) Manager for the VoiceRPG Engine.
+ * Provides continuous, seamlessly looping ambient soundtracks per story scene and combat arena.
+ * Scene tracks are declared per scene in story data files (musicAsset); the engine ships
+ * template tracks (title / exploration / combat) under assets/audio/music/.
  *
  * Audio Architecture & Routing:
  * - Uses [AudioAttributes.USAGE_MEDIA] and [AudioAttributes.CONTENT_TYPE_MUSIC]
@@ -35,10 +37,7 @@ class MusicManager(
     companion object {
         private const val TAG = "MusicManager"
         const val TRACK_TITLE = "audio/music/bgm_title.ogg"
-        const val TRACK_ACT1_FOREST = "audio/music/bgm_act1_forest.ogg"
-        const val TRACK_ACT2_MARSH = "audio/music/bgm_act2_marsh.ogg"
-        const val TRACK_ACT3_BASTION = "audio/music/bgm_act3_bastion.ogg"
-        const val TRACK_ACT4_CELESTIAL = "audio/music/bgm_act4_celestial.ogg"
+        const val TRACK_EXPLORATION = "audio/music/bgm_exploration.ogg"
         const val TRACK_COMBAT = "audio/music/bgm_combat.ogg"
 
         const val DUCK_RATIO = 0.22f
@@ -193,7 +192,7 @@ class MusicManager(
         if (_isMusicEnabled.value == enabled) return
         _isMusicEnabled.value = enabled
         if (enabled) {
-            val track = _currentTrack.value ?: TRACK_ACT1_FOREST
+            val track = _currentTrack.value ?: TRACK_EXPLORATION
             startTrackPlayback(track)
         } else {
             mediaPlayer?.pause()

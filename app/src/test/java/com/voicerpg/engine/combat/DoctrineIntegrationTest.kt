@@ -1,6 +1,7 @@
 package com.voicerpg.engine.combat
 
-import com.voicerpg.engine.engine.StoryEncounters
+import com.voicerpg.engine.content.GameContent
+import com.voicerpg.engine.model.EncounterDefinition
 import com.voicerpg.engine.model.SpellSchool
 import kotlin.math.roundToInt
 import kotlin.random.Random
@@ -38,27 +39,38 @@ class ProgressionTest {
 
     @Test
     fun `class keys map to real growth rows`() {
-        assertEquals("cedric/templar", Progression.classKey("cedric", "Templar"))
-        assertEquals("lyra/warden", Progression.classKey("lyra", "Grove Warden"))
-        assertEquals("zephyr/shadowblade", Progression.classKey("zephyr", "Shadowblade"))
-        assertEquals("hero/battlemage", Progression.classKey("hero", "Battlemage"))
+        // Hero keys by declared hero class id and resolves to that class's growth curve.
+        val heroClassId = GameContent.classes.first().id
+        val heroKey = Progression.classKey("hero", heroClassId)
+        assertEquals("hero/$heroClassId", heroKey)
+        val expectedHeroGrowth = GameContent.classes.first { it.id == heroClassId }.growth
+        assertEquals(expectedHeroGrowth, Progression.growthFor(heroKey))
+
+        // Companions key by their own character id and resolve to the character's growth.
+        assertEquals("cedric", Progression.classKey("cedric", null))
+        val heroCharGrowth = GameContent.heroCharacter?.combat?.growth
+        if (heroCharGrowth != null) {
+            assertEquals(heroCharGrowth, Progression.growthFor("hero"))
+        }
+        // Unknown members still resolve to the engine default growth, never a crash.
+        assertTrue("unknown members resolve to the engine default growth", Progression.growthFor("lyra") == Progression.DEFAULT_GROWTH)
     }
 }
 
 class EnemyBrainTest {
 
-    private val ouros = MovesetTable.movesetFor("boss_ouros")!!
+    private val boss = MovesetTable.movesetFor("boss_template")!!
 
     @Test
     fun `enemies are never one-note - full movesets with variety`() {
-        assertTrue("ouros must carry multiple moves", ouros.moves.size >= 2)
+        assertTrue("boss must carry multiple moves", boss.moves.size >= 2)
     }
 
     @Test
     fun `moves respect cooldowns`() {
-        val heavy = ouros.moves.firstOrNull { it.cooldownTurns > 0 } ?: ouros.moves.first()
+        val heavy = boss.moves.firstOrNull { it.cooldownTurns > 0 } ?: boss.moves.first()
         val withCd = mapOf(heavy.name to 2)
-        val available = EnemyBrain.availableMoves(ouros, 1.0f, withCd)
+        val available = EnemyBrain.availableMoves(boss, 1.0f, withCd)
         assertTrue("cooling move must be excluded", available.none { it.name == heavy.name })
         assertTrue("some move must always remain", available.isNotEmpty())
     }
@@ -74,35 +86,26 @@ class EnemyBrainTest {
 
     @Test
     fun `every enemy in the campaign resolves to a real moveset`() {
-        val allEnemyNames = StoryEncounters.ALL_ENCOUNTERS.flatMap { it.enemies.map { e -> e.name } }
-        allEnemyNames.distinct().forEach { name ->
-            val key = EnemyCodex.movesetOf(name)
-            assertTrue("'$name' must resolve to a moveset", key.isNotEmpty() && MovesetTable.movesetFor(key) != null)
-        }
+        GameContent.encounters.values
+            .flatMap { encounter -> encounter.enemies }
+            .distinctBy { it.name }
+            .forEach { enemy ->
+                val key = enemy.movesetId
+                assertTrue(
+                    "'${enemy.name}' must resolve to a moveset",
+                    key.isNotEmpty() && MovesetTable.movesetFor(key) != null
+                )
+            }
     }
 }
 
 class NoUselessAllyDoctrineTest {
 
-    private val kits: Map<String, List<SpellSchool>> = mapOf(
-        "hero" to listOf(SpellSchool.PYROMANCY, SpellSchool.CRYOMANCY, SpellSchool.ELECTROMANCY),
-        "cedric" to listOf(SpellSchool.HOLY, SpellSchool.PHYSICAL),
-        "lyra" to listOf(SpellSchool.NATURE),
-        "zephyr" to listOf(SpellSchool.SHADOW)
-    )
+    private fun band(encounter: EncounterDefinition): List<String> =
+        encounter.initialParty?.map { it.id } ?: listOf("hero")
 
-    private fun band(encounterId: String): List<String> = when {
-        encounterId.contains("prologue") -> listOf("hero")
-        encounterId in setOf(
-            "forest_ambush", "dungeon_descent", "castle_horde", "cave_broodmother",
-            "marsh_rescue", "blight_trackers", "ch3_sentinels"
-        ) -> listOf("hero", "cedric")
-        encounterId in setOf("swamp_behemoth", "ch7_mire_wyrm", "ch8_executioner_ambush") -> listOf("hero", "cedric", "lyra")
-        else -> listOf("hero", "cedric", "lyra", "zephyr")
-    }
-
-    private fun stripVariant(name: String): String =
-        name.replace(Regex("\\s+(Alpha|Beta|Gamma|IV|III|II|I|A|B|C)$"), "").trim()
+    private fun memberSchools(memberId: String): List<SpellSchool> =
+        GameContent.heroSpellsFor(memberId).map { it.school }.distinct()
 
     @Test
     fun `system floor guarantees no wall - even against a hypothetical perfect-resist family every kit does at least 80 percent`() {
@@ -117,14 +120,15 @@ class NoUselessAllyDoctrineTest {
     @Test
     fun `every mandatory member contributes meaningfully in every legal encounter`() {
         val violations = mutableListOf<String>()
-        for (encounter in StoryEncounters.ALL_ENCOUNTERS) {
-            val roster = band(encounter.id)
-            val families = encounter.enemies.map { EnemyCodex.familyOf(stripVariant(it.name)) }
+        for (encounter in GameContent.encounters.values) {
+            val roster = band(encounter)
+            val families = encounter.enemies
+                .map { EnemyFamily.fromNameOrNull(it.family) ?: EnemyFamily.FLESH }
             for (member in roster) {
                 val memberFamilies = families.ifEmpty { listOf(EnemyFamily.FLESH) }
                 // (1) DAMAGE FLOOR (I-2): even the worst target for the member's best school is 0.8x.
                 val worstAny = memberFamilies.minOf { fam ->
-                    kits.getValue(member).maxOf { school ->
+                    memberSchools(member).maxOf { school ->
                         AffinityTable.effectiveness(School.valueOf(school.name), fam, null)
                     }
                 }
@@ -134,13 +138,7 @@ class NoUselessAllyDoctrineTest {
                 if (0.8f * 2.0f <= 1.0f) violations += "resisted master chant must beat basic neutral"
                 // (3) ALWAYS-RELEVANT LANE: every mandatory member's kit carries a status/utility
                 // effect that resists-only degrades and can never be blocked (heal/root/jam/etc).
-                val kitSpells = when (member) {
-                    "hero" -> StoryEncounters.aethelSpells
-                    "cedric" -> StoryEncounters.cedricSpells
-                    "lyra" -> StoryEncounters.lyraSpells
-                    "zephyr" -> StoryEncounters.zephyrSpells
-                    else -> emptyList()
-                }
+                val kitSpells = GameContent.heroSpellsFor(member)
                 val hasUtility = kitSpells.any { it.isHeal || it.isGuard || it.lifesteal || it.status != null }
                 if (!hasUtility) violations += "${encounter.id}: $member has no affinity-immune lane"
             }

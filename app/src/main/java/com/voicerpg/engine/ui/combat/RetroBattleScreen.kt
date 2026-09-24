@@ -42,7 +42,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlin.math.roundToInt
 import com.voicerpg.engine.BuildConfig
-import com.voicerpg.engine.engine.StoryEncounters
+import com.voicerpg.engine.content.GameContent
 import com.voicerpg.engine.model.CombatPhase
 import com.voicerpg.engine.model.FloatingCombatText
 import com.voicerpg.engine.ui.environment.BattleEnvironmentCanvas
@@ -158,9 +158,9 @@ fun RetroBattleScreen(
                         onSelectEncounter = { viewModel.startEncounter(it) },
                         onSummonMinion = {
                             val minionNum = (state.enemies.size + 1)
-                            val minion = StoryEncounters.createMinion(
+                            val minion = GameContent.createMinion(
                                 idSuffix = "$minionNum",
-                                name = "Blighted Minion $minionNum",
+                                name = "Template Minion $minionNum",
                                 hp = 180
                             )
                             viewModel.summonReinforcements(listOf(minion))

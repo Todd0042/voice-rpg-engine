@@ -1,0 +1,12 @@
+{
+  "_doc": "Game manifest: top-level metadata the engine pulls at boot. 'The Squeeze' is a gritty retail-management memoir set inside a fictional megastore chain (Wally's World). All content is drop-in JSON; the engine itself remains genre-neutral.",
+  "gameTitle": "The Squeeze",
+  "gameSubtitle": "A Wally's World Memoir",
+  "initialSceneId": "scene_utah_trench",
+  "initialNodeId": "squeeze_intro",
+  "defaultEncounterId": "trench_unload",
+  "startingAchievementId": "QUEST_BEGUN",
+  "titleBackgroundAsset": "story/squeeze_title.jpg",
+  "victoryLine": "Shift complete. You held the line.",
+  "defeatLine": "The night takes you. Clock out — the machine grinds on without you."
+}

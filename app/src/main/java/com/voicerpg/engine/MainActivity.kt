@@ -10,8 +10,6 @@ import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.core.app.ActivityCompat
-import androidx.core.content.ContextCompat
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -47,6 +45,7 @@ import com.voicerpg.engine.ui.tutorial.TutorialBattleScreen
 import com.voicerpg.engine.viewmodel.CombatViewModel
 import com.voicerpg.engine.viewmodel.StoryViewModel
 import com.voicerpg.engine.viewmodel.TutorialBattleViewModel
+import com.voicerpg.engine.content.GameContent
 
 class MainActivity : ComponentActivity() {
 
@@ -68,7 +67,7 @@ class MainActivity : ComponentActivity() {
                 combatViewModel.startVoiceListening()
             }
         } else {
-            val shouldShow = ActivityCompat.shouldShowRequestPermissionRationale(this, Manifest.permission.RECORD_AUDIO)
+            val shouldShow = shouldShowRequestPermissionRationale(Manifest.permission.RECORD_AUDIO)
             if (!shouldShow) {
                 isPermanentlyDeniedState.value = true
             }
@@ -77,6 +76,12 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // Load the drop-in game content pack from Android assets BEFORE constructing any
+        // ViewModel. On-device there is no filesystem pack (that path is for tests/CI), so
+        // without this the engine would fall back to the empty EmergencyFallback and every
+        // battle/tutorial/story screen would crash on boot. Content stays JSON + assets only.
+        GameContent.initialize(applicationContext)
 
         speechManager = SpeechManager(this)
         combatNarrator = CombatNarrator(this)
@@ -133,7 +138,7 @@ class MainActivity : ComponentActivity() {
             val combatState by combatViewModel.state.collectAsState()
 
             var showMicRationale by remember {
-                mutableStateOf(ContextCompat.checkSelfPermission(this@MainActivity, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED)
+                mutableStateOf(checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED)
             }
             val isPermanentlyDenied by isPermanentlyDeniedState
 
@@ -202,6 +207,15 @@ class MainActivity : ComponentActivity() {
                 combatViewModel.setPureStoryMode(storyState.isPureStoryMode)
             }
 
+            LaunchedEffect(storyState.gameScreen) {
+                if (storyState.gameScreen != GameScreen.COMBAT_ARENA) {
+                    combatViewModel.pauseAtb()
+                }
+                if (storyState.gameScreen == GameScreen.TUTORIAL) {
+                    tutorialBattleViewModel.startTutorial()
+                }
+            }
+
             LaunchedEffect(storyState.currentScene.id, storyState.gameScreen) {
                 if (storyState.gameScreen == GameScreen.COMBAT_ARENA) {
                     musicManager.playCombatMusic()
@@ -210,7 +224,7 @@ class MainActivity : ComponentActivity() {
                 } else if (storyState.gameScreen == GameScreen.TITLE || storyState.gameScreen == GameScreen.TUTORIAL) {
                     musicManager.playTrack(MusicManager.TRACK_TITLE)
                 } else {
-                    musicManager.playTrack(MusicManager.TRACK_ACT1_FOREST)
+                    musicManager.playTrack(MusicManager.TRACK_EXPLORATION)
                 }
             }
 
@@ -245,7 +259,8 @@ class MainActivity : ComponentActivity() {
                                         onResult = { storyViewModel.handleStoryVoiceInput(it) }
                                     )
                                 },
-                                onStopListening = { speechManager.stopListening() }
+                                onStopListening = { speechManager.stopListening() },
+                                manifest = com.voicerpg.engine.content.GameContent.manifest
                             )
                         }
                         GameScreen.TUTORIAL -> {
@@ -541,7 +556,7 @@ class MainActivity : ComponentActivity() {
                         MicPermissionRationaleDialog(
                             isPermanentlyDenied = isPermanentlyDenied,
                             onRequestPermission = {
-                                val shouldShow = ActivityCompat.shouldShowRequestPermissionRationale(this@MainActivity, Manifest.permission.RECORD_AUDIO)
+                                val shouldShow = shouldShowRequestPermissionRationale(Manifest.permission.RECORD_AUDIO)
                                 if (!shouldShow && isPermanentlyDenied) {
                                     val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
                                         data = Uri.fromParts("package", packageName, null)

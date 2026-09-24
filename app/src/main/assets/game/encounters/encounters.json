@@ -1,0 +1,57 @@
+{
+  "_doc": "ENCOUNTERS for The Squeeze. 'party' lists character ids from characters/ (empty = use the active campaign party). 'enemies' instantiate templates from enemies/enemies.json with per-instance overrides. bossPhases fire once when the referenced enemy drops below hpBelow. Balance targets baseline (no-resonance) damage: a fresh hero with ~300 HP and 3-4 starter abilities can win each fight on baseline damage alone.",
+  "encounters": [
+    {
+      "id": "trench_unload",
+      "name": "The 4 AM Unload",
+      "description": "Forty-eight feet of freight in a dead building. You versus the wall, with the ballast hum grinding in your ears.",
+      "environment": "CAVE",
+      "party": ["hero"],
+      "enemies": [
+        { "templateId": "freight_wall", "id": "freight_wall_a", "name": "The Freight Wall", "isTargeted": true, "atbGauge": 0.35 },
+        { "templateId": "fluorescent_hum", "id": "hum_a", "name": "The Fluorescent Hum", "atbGauge": 0.2 }
+      ]
+    },
+    {
+      "id": "floor_war",
+      "name": "Front-End Storm",
+      "description": "The hour-occupancy dashboard is red, and management's pet is running the paging wand. Hold the floor.",
+      "environment": "DUNGEON",
+      "party": ["hero"],
+      "enemies": [
+        { "templateId": "metrics_dashboard", "id": "dashboard_a", "name": "The Dashboard", "isTargeted": true, "atbGauge": 0.35 },
+        { "templateId": "the_ringer", "id": "ringer_a", "name": "The Ringer", "atbGauge": 0.3 },
+        { "templateId": "fluorescent_hum", "id": "hum_b", "name": "The Fluorescent Hum", "hp": 70, "attack": 18, "atbGauge": 0.2 }
+      ]
+    },
+    {
+      "id": "mattie_t_showdown",
+      "name": "The Manager's Office",
+      "description": "The poisoned email, CC'd to everyone, and the woman who sent it, smiling behind the desk. Everything you built this act is on the line.",
+      "environment": "CASTLE",
+      "party": ["hero"],
+      "enemies": [
+        { "templateId": "mattie_t_enemy", "id": "mattie_boss", "name": "Mattie-T", "isTargeted": true, "atbGauge": 0.4 },
+        { "templateId": "poisoned_email", "id": "email_a", "name": "The Poisoned Email", "atbGauge": 0.25 }
+      ],
+      "bossPhases": [
+        {
+          "enemyId": "mattie_boss",
+          "hpBelow": 0.66,
+          "bannerText": "MATTIE-T PIVOTS — THE EMAIL GOES WIDE",
+          "narrationText": "Mattie-T keys three sentences and hits send. A fresh copy of the poisoned email slithers onto the floor.",
+          "summonEnemyId": "poisoned_email",
+          "summonCount": 1
+        },
+        {
+          "enemyId": "mattie_boss",
+          "hpBelow": 0.33,
+          "bannerText": "THE SQUEEZE CLAMPS DOWN",
+          "narrationText": "The quarterly squeeze hits the store: hours slashed mid-shift, the crew scattered, and the board demanding blood. The building itself leans on you.",
+          "reducePartyToHpPct": 0.4,
+          "executeBelowHpPct": 0.2
+        }
+      ]
+    }
+  ]
+}

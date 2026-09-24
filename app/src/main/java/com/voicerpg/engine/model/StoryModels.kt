@@ -1,11 +1,7 @@
 package com.voicerpg.engine.model
 
 import androidx.compose.ui.graphics.Color
-import com.voicerpg.engine.ui.theme.FrostCyan
-import com.voicerpg.engine.ui.theme.HolyYellow
-import com.voicerpg.engine.ui.theme.LogosGold
-import com.voicerpg.engine.ui.theme.ShadowPurple
-import kotlin.random.Random
+import com.voicerpg.engine.content.GameContent
 
 enum class SpeakerSide {
     LEFT,
@@ -13,148 +9,41 @@ enum class SpeakerSide {
     CENTER_NARRATOR
 }
 
+/**
+ * A dialogue speaker bound to a character data file (assets/game/characters/<name>.json).
+ * The engine never hardcodes game characters: every speaker is resolved from content
+ * files by id (story nodes reference speakerId, saves store per-speaker voice assignments,
+ * and the audio setup screen binds installed TTS voices to these ids).
+ */
 data class DialogueSpeaker(
     val id: String,
     val name: String,
     val title: String,
     val portraitAsset: String?,
     val themeColor: Color,
-    val ttsPitch: Float = 1.0f
+    val ttsPitch: Float = 1.0f,
+    val samplePhrase: String? = null
 ) {
     companion object {
-        val AETHEL = DialogueSpeaker(
-            id = "aethel",
-            name = "Aethel",
-            title = "Elemental Invocator",
-            portraitAsset = "portraits/aethel.jpg",
-            themeColor = FrostCyan,
-            ttsPitch = 1.15f
-        )
-
-        val CEDRIC = DialogueSpeaker(
-            id = "cedric",
-            name = "Sir Cedric",
-            title = "Oathkeeper Templar",
-            portraitAsset = "portraits/cedric.jpg",
-            themeColor = HolyYellow,
-            ttsPitch = 0.85f
-        )
-
+        /**
+         * Engine built-in fallback narrator, used only until the active game's content
+         * files are loaded. Games should ship their own narrator definition in
+         * assets/game/characters/narrator.json.
+         */
         val NARRATOR = DialogueSpeaker(
             id = "narrator",
             name = "Narrator",
             title = "Chronicle",
-            portraitAsset = "portraits/narrator.jpg",
-            themeColor = LogosGold,
-            ttsPitch = 1.0f
-        )
-
-        val SHADOW_WISP = DialogueSpeaker(
-            id = "shadow_wisp",
-            name = "Corrupted Wisp",
-            title = "Blighted Husk",
-            portraitAsset = "portraits/shadow_wisp.jpg",
-            themeColor = ShadowPurple,
-            ttsPitch = 0.70f
-        )
-
-        val LYRA = DialogueSpeaker(
-            id = "lyra",
-            name = "Lyra",
-            title = "Grove Warden",
-            portraitAsset = "portraits/lyra.jpg",
-            themeColor = Color(0xFFA5D6A7),
-            ttsPitch = 1.20f
-        )
-
-        val ZEPHYR = DialogueSpeaker(
-            id = "zephyr",
-            name = "Zephyr",
-            title = "Shadowblade",
-            portraitAsset = "portraits/zephyr.jpg",
-            themeColor = Color(0xFFCE93D8),
-            ttsPitch = 0.95f
-        )
-
-        val MALAKOR = DialogueSpeaker(
-            id = "malakor",
-            name = "Grand Inquisitor Malakor",
-            title = "The Mute Sovereign",
-            portraitAsset = "portraits/malakor.jpg",
-            themeColor = Color(0xFFEF5350),
-            ttsPitch = 0.60f
-        )
-
-        val VAELOR = DialogueSpeaker(
-            id = "vaelor",
-            name = "Commander Vaelor",
-            title = "The Voice-Thief",
-            portraitAsset = "portraits/vaelor.jpg",
-            themeColor = Color(0xFFB0BEC5),
-            ttsPitch = 0.75f
-        )
-
-        val GALAHAULT = DialogueSpeaker(
-            id = "galahault",
-            name = "Sir Galahault",
-            title = "The Obsidian Grandmaster",
-            portraitAsset = "portraits/galahault.jpg",
-            themeColor = HolyYellow,
-            ttsPitch = 0.78f
-        )
-
-        val NOCTURNE = DialogueSpeaker(
-            id = "nocturne",
-            name = "Master Nocturne",
-            title = "Spymaster of the Mute",
-            portraitAsset = "portraits/nocturne.jpg",
-            themeColor = ShadowPurple,
-            ttsPitch = 0.70f
-        )
-
-        val OUROS = DialogueSpeaker(
-            id = "ouros",
-            name = "Clockwork Warmaster Ouros",
-            title = "Iron Bastion Sovereign",
-            portraitAsset = "portraits/ouros.jpg",
-            themeColor = Color(0xFFFFB74D),
-            ttsPitch = 0.65f
-        )
-
-        val DRYAD_MATRON = DialogueSpeaker(
-            id = "dryad_matron",
-            name = "The Elder Dryad",
-            title = "Voice of the Emerald Choir",
-            portraitAsset = "portraits/dryad_matron.jpg",
-            themeColor = Color(0xFF66BB6A),
-            ttsPitch = 1.05f
-        )
-
-        val VOICE_MOTE = DialogueSpeaker(
-            id = "voice_mote",
-            name = "A Freed Voice Mote",
-            title = "Echo of the Reservoir",
-            portraitAsset = "portraits/voice_mote.jpg",
-            themeColor = Color(0xFF80DEEA),
-            ttsPitch = 1.30f
+            portraitAsset = "portraits/template_narrator.jpg",
+            themeColor = Color(0xFFFFD700),
+            ttsPitch = 1.0f,
+            samplePhrase = "The chronicle unfolds with every step."
         )
     }
 
-    /**
-     * The Chronicle occasionally breaks the fourth wall with a rare alternate portrait.
-     * Roughly 1 in every 100 narrator displays picks the easter-egg art; otherwise the
-     * standard chronicle portrait is used. Non-narrator speakers always use their fixed art.
-     */
-    fun effectivePortraitAsset(seed: Any? = null): String? {
-        if (this != NARRATOR || portraitAsset == null) return portraitAsset
-        val roll = if (seed != null) {
-            val h = (seed.hashCode() xor 0x5deece66d.toInt())
-            (h and 0x7fffffff) % 100
-        } else {
-            Random.nextInt(100)
-        }
-        return if (roll == 0) "portraits/narrator1.jpg" else portraitAsset
-    }
+    val isNarrator: Boolean get() = id == NARRATOR.id
+
+    fun effectivePortraitAsset(seed: Any? = null): String? = portraitAsset
 }
 
 data class DialogueChoice(
@@ -163,6 +52,15 @@ data class DialogueChoice(
     val voiceKeywords: List<String>,
     val nextNodeId: String,
     val completionFlag: String? = null
+)
+
+/**
+ * Generic hub auto-redirect: when every flag in [requiredFlags] is set, entering the
+ * hub node transparently reroutes to [redirectToNodeId] (choice-elimination endgame).
+ */
+data class HubCompletion(
+    val requiredFlags: List<String>,
+    val redirectToNodeId: String
 )
 
 data class DialogueNode(
@@ -174,7 +72,10 @@ data class DialogueNode(
     val nextNodeId: String? = null,
     val triggerBattleEncounterId: String? = null,
     val changeSceneId: String? = null,
-    val setFlagOnEnter: String? = null
+    val setFlagOnEnter: String? = null,
+    val hubCompletion: HubCompletion? = null,
+    /** "half" or "full": restores party HP/MP when the node is entered. */
+    val healPartyOnEnter: String? = null
 )
 
 data class StoryScene(
@@ -184,7 +85,16 @@ data class StoryScene(
     val backgroundAsset: String,
     val initialNodeId: String,
     val ambientDescription: String,
-    val musicAsset: String = "audio/music/bgm_act1_forest.ogg"
+    val musicAsset: String = "audio/music/bgm_exploration.ogg",
+    // --- Recap / chapter-warp metadata (data-driven; no engine hardcoding) ---
+    val chapterIndex: Int = 0,
+    val actNumber: Int = 1,
+    val actTitle: String = "Act I",
+    val milestoneTitle: String = "",
+    val milestoneLocation: String = "",
+    val milestoneSummary: String = "",
+    val milestoneIcon: String = "✨",
+    val defaultObjective: String = ""
 )
 
 enum class GameScreen {
@@ -223,40 +133,11 @@ data class DialogueLogEntry(
     val timestamp: Long = System.currentTimeMillis()
 ) {
     fun speakerThemeColor(): Color {
-        return when (speakerId) {
-            "aethel" -> DialogueSpeaker.AETHEL.themeColor
-            "cedric" -> DialogueSpeaker.CEDRIC.themeColor
-            "lyra" -> DialogueSpeaker.LYRA.themeColor
-            "zephyr" -> DialogueSpeaker.ZEPHYR.themeColor
-            "malakor" -> DialogueSpeaker.MALAKOR.themeColor
-            "shadow_wisp" -> DialogueSpeaker.SHADOW_WISP.themeColor
-            "vaelor" -> DialogueSpeaker.VAELOR.themeColor
-            "galahault" -> DialogueSpeaker.GALAHAULT.themeColor
-            "nocturne" -> DialogueSpeaker.NOCTURNE.themeColor
-            "ouros" -> DialogueSpeaker.OUROS.themeColor
-            "dryad_matron" -> DialogueSpeaker.DRYAD_MATRON.themeColor
-            "voice_mote" -> DialogueSpeaker.VOICE_MOTE.themeColor
-            else -> if (isNarrator) LogosGold else Color.White
-        }
+        val speaker = GameContent.speakerById(speakerId)
+        return speaker?.themeColor ?: if (isNarrator) Color(0xFFFFD700) else Color.White
     }
 
     fun speakerPortraitAsset(): String? {
-        return when (speakerId) {
-            "aethel" -> DialogueSpeaker.AETHEL.portraitAsset
-            "cedric" -> DialogueSpeaker.CEDRIC.portraitAsset
-            "lyra" -> DialogueSpeaker.LYRA.portraitAsset
-            "zephyr" -> DialogueSpeaker.ZEPHYR.portraitAsset
-            "malakor" -> DialogueSpeaker.MALAKOR.portraitAsset
-            "shadow_wisp" -> DialogueSpeaker.SHADOW_WISP.portraitAsset
-            "vaelor" -> DialogueSpeaker.VAELOR.portraitAsset
-            "galahault" -> DialogueSpeaker.GALAHAULT.portraitAsset
-            "nocturne" -> DialogueSpeaker.NOCTURNE.portraitAsset
-            "ouros" -> DialogueSpeaker.OUROS.portraitAsset
-            "dryad_matron" -> DialogueSpeaker.DRYAD_MATRON.portraitAsset
-            "voice_mote" -> DialogueSpeaker.VOICE_MOTE.portraitAsset
-            "narrator" -> DialogueSpeaker.NARRATOR.portraitAsset
-            else -> null
-        }
+        return GameContent.speakerById(speakerId)?.portraitAsset
     }
 }
-

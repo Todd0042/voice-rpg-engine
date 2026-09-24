@@ -1,0 +1,15 @@
+{
+  "_doc": "HERO CLASS — the Service Steward: the one who stays behind the desk and keeps the crew standing.",
+  "id": "service_steward",
+  "title": "Service Steward",
+  "subtitle": "The One Behind the Desk",
+  "description": "Mends crews, soothes floors, and turns listening into a weapon. More resolve, less raw force.",
+  "startingHp": 290,
+  "startingMp": 120,
+  "startingSpeed": 60,
+  "startingBaseAttack": 26,
+  "preferredSchool": "HOLY",
+  "starterSpellIds": ["mend_crew", "soothe_crew", "steady_hands", "calm_floor", "breathe"],
+  "voiceKeywords": ["service steward", "steward", "service", "people person", "holy", "care"],
+  "growth": { "maxHp": 12, "maxMp": 12, "speed": 1, "defense": 1, "potencyPct": 0.035 }
+}

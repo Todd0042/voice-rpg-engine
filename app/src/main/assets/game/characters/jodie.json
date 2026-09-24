@@ -1,0 +1,13 @@
+{
+  "_doc": "Jodie — the friendly people-services rep who carries the folder. Dialogue-only support character in Act 1.",
+  "id": "jodie",
+  "role": "npc",
+  "name": "Jodie",
+  "title": "People Services",
+  "portraitAsset": "portraits/jodie.jpg",
+  "themeColor": "#64B5F6",
+  "ttsPitch": 1.05,
+  "samplePhrase": "I'm not supposed to say this out loud, Todd.",
+  "preferredVoiceId": null,
+  "voiceAliases": ["jodie", "people services", "hr", "the folder", "paperwork"]
+}

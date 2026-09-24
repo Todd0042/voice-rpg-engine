@@ -1,15 +1,14 @@
 package com.voicerpg.engine
 
+import androidx.compose.ui.graphics.Color
 import com.voicerpg.engine.audio.CombatNarrator
 import com.voicerpg.engine.audio.SpeechManager
 import com.voicerpg.engine.audio.SpeechState
+import com.voicerpg.engine.content.GameContent
 import com.voicerpg.engine.engine.IntentParser
 import com.voicerpg.engine.engine.SaveManager
-import com.voicerpg.engine.engine.StoryEncounters
-import com.voicerpg.engine.engine.StoryScript
 import com.voicerpg.engine.model.DialogueChoice
 import com.voicerpg.engine.model.DialogueSpeaker
-import com.voicerpg.engine.model.GameSaveData
 import com.voicerpg.engine.model.GameScreen
 import com.voicerpg.engine.model.MetaCommand
 import com.voicerpg.engine.model.PlayerCustomization
@@ -24,6 +23,42 @@ import org.junit.Before
 import org.junit.Test
 
 class NarrationAndOptionsTest {
+
+    private val alphaFixture = DialogueSpeaker(
+        id = "alpha",
+        name = "Alpha Scout",
+        title = "Field Operative",
+        portraitAsset = null,
+        themeColor = Color(0xFFFFD54F)
+    )
+    private val betaFixture = DialogueSpeaker(
+        id = "beta",
+        name = "Beta Mage",
+        title = "Elemental Adept",
+        portraitAsset = null,
+        themeColor = Color(0xFF4FC3F7)
+    )
+    private val gammaFixture = DialogueSpeaker(
+        id = "gamma",
+        name = "Gamma Warden",
+        title = "Grove Sentinel",
+        portraitAsset = null,
+        themeColor = Color(0xFFA5D6A7)
+    )
+    private val deltaFixture = DialogueSpeaker(
+        id = "delta",
+        name = "Delta Blade",
+        title = "Shadow Operative",
+        portraitAsset = null,
+        themeColor = Color(0xFFCE93D8)
+    )
+    private val epsilonFixture = DialogueSpeaker(
+        id = "epsilon",
+        name = "Epsilon Inquisitor",
+        title = "The Quiet Crown",
+        portraitAsset = null,
+        themeColor = Color(0xFFEF5350)
+    )
 
     @org.junit.Test
     fun speakerAttributionToggleMetaCommandRecognized() {
@@ -104,68 +139,72 @@ class NarrationAndOptionsTest {
         assertEquals(0, narrator.availableVoiceCount.value)
 
         // Verifying speaker voice mapping getters return gracefully without throwing
-        val cedricVoice = narrator.getVoiceForSpeaker(DialogueSpeaker.CEDRIC)
-        val aethelVoice = narrator.getVoiceForSpeaker(DialogueSpeaker.AETHEL)
+        val alphaVoice = narrator.getVoiceForSpeaker(alphaFixture)
+        val betaVoice = narrator.getVoiceForSpeaker(betaFixture)
         val narratorVoice = narrator.getVoiceForSpeaker(DialogueSpeaker.NARRATOR)
 
         // Without hardware TTS engine, speaker voices are null
-        assertEquals(null, cedricVoice)
-        assertEquals(null, aethelVoice)
+        assertEquals(null, alphaVoice)
+        assertEquals(null, betaVoice)
         assertEquals(null, narratorVoice)
     }
 
     @Test
     fun testCombatNarratorPreferredVoiceIdsConfiguredForAllSpeakers() {
         val preferred = CombatNarrator.PREFERRED_VOICE_IDS
-        assertEquals(6, preferred.size)
-        assertEquals("en-gb-x-gbd-local", preferred[DialogueSpeaker.CEDRIC.id]) // Sir Cedric
-        assertEquals("en-gb-x-gba-local", preferred[DialogueSpeaker.AETHEL.id]) // Aethel the Invocator
-        assertEquals("en-us-x-tpf-local", preferred[DialogueSpeaker.LYRA.id]) // Lyra the Grove Warden
-        assertEquals("en-us-x-tpc-local", preferred[DialogueSpeaker.ZEPHYR.id]) // Zephyr the Shadowblade
-        assertEquals("en-us-x-tpd-local", preferred[DialogueSpeaker.MALAKOR.id]) // Grand Inquisitor Malakor
-        assertEquals("en-gb-x-rjs-local", preferred[DialogueSpeaker.NARRATOR.id]) // The Chronicle
+        assertEquals(GameContent.preferredVoiceIds, preferred)
+        assertEquals("en-gb-x-rjs-local", preferred["narrator"])
+        for (speaker in GameContent.allSpeakers) {
+            assertEquals(
+                speaker.id,
+                GameContent.characterById(speaker.id)?.preferredVoiceId,
+                preferred[speaker.id]
+            )
+        }
     }
 
     @Test
     fun testResolvePreferredVoiceNameRespectsPersistedThenPreferredThenHeuristic() {
+        val speakerId = "fixture_speaker"
+        val preferred = mapOf(speakerId to "voice-preferred-local")
         val installed = setOf(
-            "en-gb-x-gbd-local", "en-us-x-tpf-local", "en-gb-x-rjs-local",
-            "en-us-x-tpc-local", "en-us-x-tpd-local", "en-gb-x-gba-local", "en-us-x-iob-local"
+            "voice-preferred-local",
+            "voice-persisted-local",
+            "voice-heuristic-local"
         )
-        val preferredDefault = CombatNarrator.PREFERRED_VOICE_IDS
 
         // Heuristic alone is used when neither a persisted override nor the preferred pack is installed
         assertEquals(
-            "en-us-x-iob-local",
+            "voice-heuristic-local",
             CombatNarrator.resolvePreferredVoiceName(
-                DialogueSpeaker.CEDRIC.id, "en-us-x-iob-local",
-                setOf("en-us-x-iob-local", "en-gb-x-rjs-local"), emptyMap(), preferredDefault
+                speakerId, "voice-heuristic-local",
+                setOf("voice-heuristic-local"), emptyMap(), preferred
             )
         )
 
         // First-try preferred pack overrides the heuristic when its voice model is installed
         assertEquals(
-            "en-gb-x-gbd-local",
+            "voice-preferred-local",
             CombatNarrator.resolvePreferredVoiceName(
-                DialogueSpeaker.CEDRIC.id, "en-us-x-iob-local", installed, emptyMap(), preferredDefault
+                speakerId, "voice-heuristic-local", installed, emptyMap(), preferred
             )
         )
 
         // Persisted player override wins over both when its voice is still installed
         assertEquals(
-            "en-us-x-iob-local",
+            "voice-persisted-local",
             CombatNarrator.resolvePreferredVoiceName(
-                DialogueSpeaker.CEDRIC.id, "en-us-x-iob-local", installed,
-                mapOf(DialogueSpeaker.CEDRIC.id to "en-us-x-iob-local"), preferredDefault
+                speakerId, "voice-heuristic-local", installed,
+                mapOf(speakerId to "voice-persisted-local"), preferred
             )
         )
 
         // Persisted override to a no-longer-installed voice falls back to the preferred pack
         assertEquals(
-            "en-gb-x-gbd-local",
+            "voice-preferred-local",
             CombatNarrator.resolvePreferredVoiceName(
-                DialogueSpeaker.CEDRIC.id, "en-us-x-iob-local", installed,
-                mapOf(DialogueSpeaker.CEDRIC.id to "en-us-x-gone-local"), preferredDefault
+                speakerId, "voice-heuristic-local", installed,
+                mapOf(speakerId to "voice-gone-local"), preferred
             )
         )
     }
@@ -175,11 +214,11 @@ class NarrationAndOptionsTest {
         // Headless JVM has no TTS engine: assignments are held in reserve for onInit/refresh,
         // and the snapped assignments map is empty because no real voice models exist.
         val assignments = mapOf(
-            DialogueSpeaker.CEDRIC.id to "en-gb-x-gbd-local",
-            DialogueSpeaker.AETHEL.id to "en-gb-x-gba-local",
-            DialogueSpeaker.LYRA.id to "en-us-x-tpf-local",
-            DialogueSpeaker.ZEPHYR.id to "en-us-x-tpc-local",
-            DialogueSpeaker.MALAKOR.id to "en-us-x-tpd-local",
+            alphaFixture.id to "en-gb-x-gbd-local",
+            betaFixture.id to "en-gb-x-gba-local",
+            gammaFixture.id to "en-us-x-tpf-local",
+            deltaFixture.id to "en-us-x-tpc-local",
+            epsilonFixture.id to "en-us-x-tpd-local",
             DialogueSpeaker.NARRATOR.id to "en-gb-x-rjs-local"
         )
         narrator.setVoiceAssignments(assignments)
@@ -203,7 +242,7 @@ class NarrationAndOptionsTest {
         val testChoices = listOf(
             DialogueChoice("1", "Look outside", emptyList(), "next_node")
         )
-        narrator.narrateDialogue(DialogueSpeaker.CEDRIC, "Halt!", testChoices) {
+        narrator.narrateDialogue(alphaFixture, "Halt!", testChoices) {
             completed = true
         }
 
@@ -249,296 +288,8 @@ class NarrationAndOptionsTest {
     }
 
     @Test
-    fun testCampSubStoriesProgressionEliminationAndChapter3Transition() {
-        // Jump directly to campfire transition
-        val campTransNode = StoryScript.ALL_NODES["crossroads_camp_trans"]!!
-        storyViewModel.selectChoice(DialogueChoice("test", "test", emptyList(), campTransNode.id))
-        storyViewModel.advanceDialogue()
-
-        assertEquals("camp_intro", storyViewModel.state.value.currentNode.id)
-        assertEquals(3, storyViewModel.state.value.currentNode.choices.size)
-
-        // --- SUB-STORY X: Blight Trackers Scouting & Combat ---
-        val scoutChoice = storyViewModel.state.value.currentNode.choices.first { it.id == "c_lore" }
-        assertEquals("substory_blight_complete", scoutChoice.completionFlag)
-        storyViewModel.selectChoice(scoutChoice)
-        assertEquals("camp_scout_entry", storyViewModel.state.value.currentNode.id)
-
-        // Choose to cast azure spark
-        val sparkChoice = storyViewModel.state.value.currentNode.choices.first { it.id == "c_scout_tracks" }
-        storyViewModel.selectChoice(sparkChoice)
-        assertEquals("camp_scout_tracks", storyViewModel.state.value.currentNode.id)
-
-        // Advance to ambush battle trigger
-        storyViewModel.advanceDialogue()
-        assertEquals("camp_scout_ambush", storyViewModel.state.value.currentNode.id)
-        assertEquals("blight_trackers", storyViewModel.state.value.currentNode.triggerBattleEncounterId)
-
-        // Trigger battle
-        storyViewModel.advanceDialogue()
-        assertEquals(GameScreen.COMBAT_ARENA, storyViewModel.state.value.gameScreen)
-        assertEquals("blight_trackers", storyViewModel.state.value.activeEncounter?.id)
-
-        // Win battle -> transitions to camp_scout_victory and sets substory_blight_complete flag
-        storyViewModel.onCombatVictory()
-        assertEquals(GameScreen.STORY_EXPLORATION, storyViewModel.state.value.gameScreen)
-        assertEquals("camp_scout_victory", storyViewModel.state.value.currentNode.id)
-        assertTrue(storyViewModel.state.value.narrativeFlags["substory_blight_complete"] == true)
-
-        // Advance back to camp
-        storyViewModel.advanceDialogue() // to camp_return_hub
-        assertEquals("camp_return_hub", storyViewModel.state.value.currentNode.id)
-        storyViewModel.advanceDialogue() // back to camp_intro
-        assertEquals("camp_intro", storyViewModel.state.value.currentNode.id)
-
-        // Verify trying to select the completed scout choice is blocked
-        val completedScoutChoice = storyViewModel.state.value.currentNode.choices.first { it.id == "c_lore" }
-        storyViewModel.selectChoice(completedScoutChoice)
-        assertEquals("camp_intro", storyViewModel.state.value.currentNode.id) // stays at camp_intro
-
-        // Verify voice attempt on completed choice is blocked
-        storyViewModel.handleStoryVoiceInput("scout the woods for trackers")
-        assertEquals("camp_intro", storyViewModel.state.value.currentNode.id) // stays at camp_intro
-
-        // --- SUB-STORY Y: Sun Shrine Lore & Echo Chime Relic ---
-        val shrineChoice = storyViewModel.state.value.currentNode.choices.first { it.id == "c_towers" }
-        assertEquals("substory_towers_complete", shrineChoice.completionFlag)
-        storyViewModel.selectChoice(shrineChoice)
-        assertEquals("camp_shrine_entry", storyViewModel.state.value.currentNode.id)
-
-        // Align astrological dial
-        val dialChoice = storyViewModel.state.value.currentNode.choices.first { it.id == "c_shrine_dial" }
-        storyViewModel.selectChoice(dialChoice)
-        assertEquals("camp_shrine_dial", storyViewModel.state.value.currentNode.id)
-
-        // Advance to relic reveal
-        storyViewModel.advanceDialogue()
-        assertEquals("camp_shrine_relic", storyViewModel.state.value.currentNode.id)
-
-        // Advance to lore explanation which sets substory_towers_complete
-        storyViewModel.advanceDialogue()
-        assertEquals("camp_shrine_lore", storyViewModel.state.value.currentNode.id)
-        assertTrue(storyViewModel.state.value.narrativeFlags["substory_towers_complete"] == true)
-
-        // Return to camp
-        storyViewModel.advanceDialogue() // camp_return_hub
-        storyViewModel.advanceDialogue() // camp_intro
-        assertEquals("camp_intro", storyViewModel.state.value.currentNode.id)
-
-        // --- SUB-STORY Z: Midnight Vigil & Full Party Restoration ---
-        // Damage party member first to test restoration
-        val damagedMember = storyViewModel.state.value.partyStats.first()
-        val damagedParty = listOf(damagedMember.copy(currentHp = 10, currentMp = 5))
-        storyViewModel.updatePartyStatsFromCombat(damagedParty.map { saved ->
-            com.voicerpg.engine.model.PartyMember(
-                id = saved.id,
-                name = saved.name,
-                loreClass = saved.loreClass,
-                currentHp = 10,
-                maxHp = saved.maxHp,
-                currentMp = 5,
-                maxMp = saved.maxMp,
-                speed = saved.speed,
-                spells = emptyList()
-            )
-        })
-        assertEquals(10, storyViewModel.state.value.partyStats.first().currentHp)
-
-        val restChoice = storyViewModel.state.value.currentNode.choices.first { it.id == "c_rest" }
-        assertEquals("substory_rest_complete", restChoice.completionFlag)
-        storyViewModel.selectChoice(restChoice)
-        assertEquals("camp_vigil_entry", storyViewModel.state.value.currentNode.id)
-
-        // Choose meditation
-        val meditateChoice = storyViewModel.state.value.currentNode.choices.first { it.id == "c_vigil_meditate" }
-        storyViewModel.selectChoice(meditateChoice)
-        assertEquals("camp_vigil_meditate", storyViewModel.state.value.currentNode.id)
-
-        // Advance to restored state (which sets substory_rest_complete and restores HP/MP)
-        storyViewModel.advanceDialogue()
-        assertEquals("camp_vigil_restored", storyViewModel.state.value.currentNode.id)
-        assertTrue(storyViewModel.state.value.narrativeFlags["substory_rest_complete"] == true)
-        val restoredMember = storyViewModel.state.value.partyStats.first()
-        assertEquals(restoredMember.maxHp, restoredMember.currentHp)
-        assertEquals(restoredMember.maxMp, restoredMember.currentMp)
-
-        // --- ALL 3 SUB-STORIES COMPLETE: Automatic Chapter 3 Commencement ---
-        storyViewModel.advanceDialogue() // to camp_return_hub
-        assertEquals("camp_return_hub", storyViewModel.state.value.currentNode.id)
-
-        // Advancing from camp_return_hub towards camp_intro automatically redirects to camp_all_completed!
-        storyViewModel.advanceDialogue()
-        assertEquals("camp_all_completed", storyViewModel.state.value.currentNode.id)
-        assertTrue(storyViewModel.state.value.currentNode.text.contains("preparations are complete"))
-
-        // Advance into Chapter 3!
-        storyViewModel.advanceDialogue()
-        assertEquals("chapter3_intro", storyViewModel.state.value.currentNode.id)
-        assertEquals("The Aqueducts of Solaria", storyViewModel.state.value.currentScene.name)
-        assertTrue(storyViewModel.state.value.currentNode.text.contains("CHAPTER 3: THE ASCENT OF SOLARIA"))
-
-        // Advance past Cedric's initial assessment to ch3_hub
-        storyViewModel.advanceDialogue()
-        assertEquals("ch3_cedric_assessment", storyViewModel.state.value.currentNode.id)
-        storyViewModel.advanceDialogue()
-        assertEquals("ch3_hub", storyViewModel.state.value.currentNode.id)
-        assertEquals(2, storyViewModel.state.value.currentNode.choices.size)
-
-        // --- CHAPTER 3 / OBJECTIVE 1: Scout Sentinels & Discover Acoustic Flaw ---
-        val scoutSentinelsChoice = storyViewModel.state.value.currentNode.choices.first { it.id == "ch3_scout" }
-        assertEquals("ch3_sentinels_complete", scoutSentinelsChoice.completionFlag)
-        storyViewModel.selectChoice(scoutSentinelsChoice)
-        assertEquals("ch3_scout_approach", storyViewModel.state.value.currentNode.id)
-
-        // Listen from shadows
-        val listenChoice = storyViewModel.state.value.currentNode.choices.first { it.id == "c_scout_listen" }
-        storyViewModel.selectChoice(listenChoice)
-        assertEquals("ch3_scout_listen", storyViewModel.state.value.currentNode.id)
-
-        // Advance to sentinel ambush
-        storyViewModel.advanceDialogue()
-        assertEquals("ch3_scout_ambush", storyViewModel.state.value.currentNode.id)
-        assertEquals("ch3_sentinels", storyViewModel.state.value.currentNode.triggerBattleEncounterId)
-
-        // Battle and defeat sentinels
-        storyViewModel.advanceDialogue()
-        assertEquals(GameScreen.COMBAT_ARENA, storyViewModel.state.value.gameScreen)
-        assertEquals("ch3_sentinels", storyViewModel.state.value.activeEncounter?.id)
-        storyViewModel.onCombatVictory()
-
-        assertEquals(GameScreen.STORY_EXPLORATION, storyViewModel.state.value.gameScreen)
-        assertEquals("ch3_sentinels_victory", storyViewModel.state.value.currentNode.id)
-        assertTrue(storyViewModel.state.value.narrativeFlags["ch3_sentinels_complete"] == true)
-
-        // Return to hub
-        storyViewModel.advanceDialogue() // to ch3_return_hub
-        assertEquals("ch3_return_hub", storyViewModel.state.value.currentNode.id)
-        storyViewModel.advanceDialogue() // back to ch3_hub
-        assertEquals("ch3_hub", storyViewModel.state.value.currentNode.id)
-
-        // Verify that completed sentinels choice is blocked from selection
-        val completedScoutChoice2 = storyViewModel.state.value.currentNode.choices.first { it.id == "ch3_scout" }
-        storyViewModel.selectChoice(completedScoutChoice2)
-        assertEquals("ch3_hub", storyViewModel.state.value.currentNode.id)
-
-        // --- CHAPTER 3 / OBJECTIVE 2: Channel Echo Chime & Shatter Death Wards ---
-        val chimeGateChoice = storyViewModel.state.value.currentNode.choices.first { it.id == "ch3_chime" }
-        assertEquals("ch3_chime_complete", chimeGateChoice.completionFlag)
-        storyViewModel.selectChoice(chimeGateChoice)
-        assertEquals("ch3_chime_approach", storyViewModel.state.value.currentNode.id)
-
-        // Align chime
-        val alignChoice = storyViewModel.state.value.currentNode.choices.first { it.id == "c_chime_align" }
-        storyViewModel.selectChoice(alignChoice)
-        assertEquals("ch3_chime_align", storyViewModel.state.value.currentNode.id)
-
-        // Advance through ward shattering
-        storyViewModel.advanceDialogue()
-        assertEquals("ch3_chime_shatter", storyViewModel.state.value.currentNode.id)
-        storyViewModel.advanceDialogue()
-        assertEquals("ch3_chime_complete_node", storyViewModel.state.value.currentNode.id)
-        assertTrue(storyViewModel.state.value.narrativeFlags["ch3_chime_complete"] == true)
-
-        // Advance to return hub
-        storyViewModel.advanceDialogue()
-        assertEquals("ch3_return_hub", storyViewModel.state.value.currentNode.id)
-
-        // --- BOTH CHAPTER 3 OBJECTIVES COMPLETE: Automatic Grand Breach & Boss Battle ---
-        storyViewModel.advanceDialogue()
-        assertEquals("ch3_all_completed", storyViewModel.state.value.currentNode.id)
-        assertTrue(storyViewModel.state.value.currentNode.text.contains("queen descends"))
-
-        // Advance to Broodmother boss fight
-        storyViewModel.advanceDialogue()
-        assertEquals("ch3_aqueduct_boss_trigger", storyViewModel.state.value.currentNode.id)
-        assertEquals("cave_broodmother", storyViewModel.state.value.currentNode.triggerBattleEncounterId)
-
-        // Engage boss in arena and win
-        storyViewModel.advanceDialogue()
-        assertEquals(GameScreen.COMBAT_ARENA, storyViewModel.state.value.gameScreen)
-        storyViewModel.onCombatVictory()
-
-        assertEquals(GameScreen.STORY_EXPLORATION, storyViewModel.state.value.gameScreen)
-        assertEquals("ch3_boss_victory", storyViewModel.state.value.currentNode.id)
-
-        // Advance to Chapter 4 transition
-        storyViewModel.advanceDialogue()
-        assertEquals("ch3_to_ch4", storyViewModel.state.value.currentNode.id)
-        storyViewModel.advanceDialogue()
-
-        // --- CHAPTER 4: Ascent of Solaria Bell Tower ---
-        assertEquals("chapter4_intro", storyViewModel.state.value.currentNode.id)
-        assertEquals("scene_dungeon", storyViewModel.state.value.currentScene.id)
-        assertEquals("Crypt of the Foundation", storyViewModel.state.value.currentScene.name)
-
-        // Investigate crypt and confront Bone Acolyte
-        val investChoice = storyViewModel.state.value.currentNode.choices.first { it.id == "ch4_investigate" }
-        storyViewModel.selectChoice(investChoice)
-        assertEquals("ch4_crypt_cedric", storyViewModel.state.value.currentNode.id)
-
-        val confrontChoice = storyViewModel.state.value.currentNode.choices.first { it.id == "ch4_confront_acolyte" }
-        storyViewModel.selectChoice(confrontChoice)
-        assertEquals("ch4_crypt_confront", storyViewModel.state.value.currentNode.id)
-
-        // Battle Bone Acolyte and crypt guards
-        storyViewModel.advanceDialogue()
-        assertEquals("ch4_crypt_battle_trigger", storyViewModel.state.value.currentNode.id)
-        assertEquals("dungeon_descent", storyViewModel.state.value.currentNode.triggerBattleEncounterId)
-
-        storyViewModel.advanceDialogue()
-        assertEquals(GameScreen.COMBAT_ARENA, storyViewModel.state.value.gameScreen)
-        storyViewModel.onCombatVictory()
-
-        assertEquals("ch4_crypt_victory", storyViewModel.state.value.currentNode.id)
-        assertTrue(storyViewModel.state.value.currentNode.text.contains("Sun-Iron Bell Clapper"))
-
-        // Ascend to high Bell Chamber (castle scene)
-        storyViewModel.advanceDialogue()
-        assertEquals("ch4_tower_ascent", storyViewModel.state.value.currentNode.id)
-        storyViewModel.advanceDialogue()
-        assertEquals("ch4_chamber_confrontation", storyViewModel.state.value.currentNode.id)
-        assertEquals("scene_tower", storyViewModel.state.value.currentScene.id)
-        assertEquals("The Solaria Bell Chamber", storyViewModel.state.value.currentScene.name)
-
-        // Confront castle vanguard
-        val challengeChoice = storyViewModel.state.value.currentNode.choices.first { it.id == "ch4_vanguard_challenge" }
-        storyViewModel.selectChoice(challengeChoice)
-        assertEquals("ch4_vanguard_charge", storyViewModel.state.value.currentNode.id)
-
-        // Battle garrison horde
-        storyViewModel.advanceDialogue()
-        assertEquals("ch4_tower_battle_trigger", storyViewModel.state.value.currentNode.id)
-        assertEquals("castle_horde", storyViewModel.state.value.currentNode.triggerBattleEncounterId)
-
-        storyViewModel.advanceDialogue()
-        assertEquals(GameScreen.COMBAT_ARENA, storyViewModel.state.value.gameScreen)
-        storyViewModel.onCombatVictory()
-
-        assertEquals("ch4_tower_victory", storyViewModel.state.value.currentNode.id)
-
-        // Climax: Ring the First Great Bell of Solaria!
-        storyViewModel.advanceDialogue()
-        assertEquals("ch4_bell_climax", storyViewModel.state.value.currentNode.id)
-        storyViewModel.advanceDialogue()
-        assertEquals("ch4_bell_ringing", storyViewModel.state.value.currentNode.id)
-        assertTrue(storyViewModel.state.value.currentNode.text.contains("BONGGGGGG"))
-
-        // Epilogue
-        storyViewModel.advanceDialogue()
-        assertEquals("ch4_epilogue", storyViewModel.state.value.currentNode.id)
-        val reflectChoice = storyViewModel.state.value.currentNode.choices.first { it.id == "ch4_reflect" }
-        storyViewModel.selectChoice(reflectChoice)
-        assertEquals("ch4_reflect_dialogue", storyViewModel.state.value.currentNode.id)
-
-        // Final completion screen
-        storyViewModel.advanceDialogue()
-        assertEquals("ch4_act1_complete", storyViewModel.state.value.currentNode.id)
-        assertTrue(storyViewModel.state.value.currentNode.text.contains("ACT I CONCLUDED"))
-    }
-
-    @Test
     fun testNarrationSettingsPersistenceRoundTrip() {
-        val custom = PlayerCustomization(name = "Lyra")
+        val custom = PlayerCustomization(name = "Rowan")
         val initialSave = saveManager.createInitialSave(custom)
 
         val updatedSave = initialSave.copy(
@@ -585,7 +336,7 @@ class NarrationAndOptionsTest {
     fun testCombatNarratorDialoguePreservesVoiceAndUtteranceTracking() {
         var callbackFired = false
         narrator.narrateDialogue(
-            speaker = DialogueSpeaker.CEDRIC,
+            speaker = alphaFixture,
             text = "By the holy light, we stand firm!",
             choices = emptyList()
         ) {
@@ -611,9 +362,9 @@ class NarrationAndOptionsTest {
         assertEquals(0, narrator.installedVoiceCount.value)
 
         // Verify speaker mapping returns null safely without throwing
-        assertEquals(null, narrator.getVoiceForSpeaker(DialogueSpeaker.ZEPHYR))
-        assertEquals(null, narrator.getVoiceForSpeaker(DialogueSpeaker.MALAKOR))
-        assertEquals(null, narrator.getVoiceForSpeaker(DialogueSpeaker.LYRA))
+        assertEquals(null, narrator.getVoiceForSpeaker(deltaFixture))
+        assertEquals(null, narrator.getVoiceForSpeaker(epsilonFixture))
+        assertEquals(null, narrator.getVoiceForSpeaker(gammaFixture))
 
         // Verify fresh story state begins at TITLE
         val freshVm = StoryViewModel(

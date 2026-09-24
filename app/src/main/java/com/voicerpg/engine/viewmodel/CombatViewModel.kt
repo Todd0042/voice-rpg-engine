@@ -21,10 +21,9 @@ import com.voicerpg.engine.combat.StatusSystem
 import com.voicerpg.engine.audio.CombatNarrator
 import com.voicerpg.engine.audio.SfxManager
 import com.voicerpg.engine.audio.SpeechManager
-import com.voicerpg.engine.engine.ClassSpellLibrary
+import com.voicerpg.engine.content.GameContent
 import com.voicerpg.engine.engine.IntentParser
 import com.voicerpg.engine.engine.ResonanceEngine
-import com.voicerpg.engine.engine.StoryEncounters
 import com.voicerpg.engine.model.BattleEnvironment
 import com.voicerpg.engine.model.CharacterStance
 import com.voicerpg.engine.model.CombatantFaction
@@ -92,12 +91,6 @@ class CombatViewModel(
 
     private val activeScope: CoroutineScope
         get() = scopeOverride ?: viewModelScope
-
-    // Party spell sets - single source of truth in StoryEncounters (mirrors docs/combat-design/data/spells.json)
-    private val aethelSpells = StoryEncounters.aethelSpells
-    private val cedricSpells = StoryEncounters.cedricSpells
-    private val lyraSpells = StoryEncounters.lyraSpells
-    private val zephyrSpells = StoryEncounters.zephyrSpells
 
     private val _state = MutableStateFlow(createInitialState())
     val state: StateFlow<CombatState> = _state.asStateFlow()
@@ -233,27 +226,11 @@ class CombatViewModel(
         }
     }
 
-    init {
-        startAtbLoop()
-    }
-
     private fun createInitialState(): CombatState {
-        // Party members with Speed ratings and starting battle wear (Cedric pre-damaged)
-        val initialParty = listOf(
-            PartyMember("hero", "Aethel", "Elementalist", currentHp = 240, maxHp = 240, currentMp = 140, maxMp = 140, spells = aethelSpells, avatarTint = Color(0xFF90CAF9), speed = 70, atbGauge = 0.45f),
-            PartyMember("cedric", "Sir Cedric", "Templar", currentHp = 310, maxHp = 420, currentMp = 80, maxMp = 80, spells = StoryEncounters.cedricStarterSpells, avatarTint = Color(0xFFFFD54F), speed = 55, atbGauge = 0.30f)
-        )
-
-        val initialEnemies = listOf(
-            Enemy("orc", "Blighted Orc", "Vanguard", currentHp = 340, maxHp = 340, baseAttack = 22, isTargeted = false, spriteTint = Color(0xFFEF5350), speed = 50, atbGauge = 0.35f),
-            Enemy("archer", "Corrupted Archer", "Sniper", currentHp = 240, maxHp = 240, baseAttack = 25, isTargeted = true, spriteTint = Color(0xFFAB47BC), speed = 65, atbGauge = 0.45f),
-            Enemy("shaman", "Void Shaman", "Occultist", currentHp = 280, maxHp = 280, baseAttack = 20, isTargeted = false, spriteTint = Color(0xFF5C6BC0), speed = 55, atbGauge = 0.30f)
-        )
-
         return CombatState(
-            phase = CombatPhase.ATB_WAITING,
-            party = initialParty,
-            enemies = initialEnemies
+            phase = CombatPhase.INACTIVE,
+            party = GameContent.createDuoParty(),
+            enemies = emptyList()
         )
     }
 
@@ -273,6 +250,9 @@ class CombatViewModel(
     }
 
     internal fun tickAtb() {
+        if (_state.value.phase != CombatPhase.ATB_WAITING || _state.value.enemies.isEmpty()) {
+            return
+        }
         // 1. Advance gauges strictly for ALIVE combatants (atomic recompute-from-current:
         // mid-tick summons/attacks can never be lost to a stale snapshot write).
         // Statuses modulate ATB speed (chill slows, root nearly halts, overload crawls, bless quickens).
@@ -543,7 +523,7 @@ class CombatViewModel(
                 }
                 _state.value = _state.value.copy(enemies = updatedEnemies)
                 val minions = (0 until move.summonCount.coerceAtLeast(1)).map { i ->
-                    StoryEncounters.createMinion(
+                    GameContent.createMinion(
                         idSuffix = "${System.currentTimeMillis() % 1000}_$i",
                         name = move.summon ?: "Blighted Minion",
                         subtitle = "Minion",
@@ -819,6 +799,7 @@ class CombatViewModel(
             activeScope.launch {
                 delay(3000)
                 if (_state.value.phase == CombatPhase.BATTLE_WON && _state.value.isPureStoryMode) {
+                    pauseAtb()
                     onContinueStory?.invoke()
                 }
             }
@@ -828,6 +809,7 @@ class CombatViewModel(
                 activeScope.launch {
                     delay(1200)
                     if (_state.value.phase == CombatPhase.BATTLE_WON && _state.value.isPureStoryMode) {
+                        pauseAtb()
                         onContinueStory?.invoke()
                     }
                 }
@@ -996,7 +978,7 @@ class CombatViewModel(
     fun recruitZephyrMidBattle() {
         if (isZephyrRecruitedMidBattle || _state.value.party.any { it.id == "zephyr" }) return
         isZephyrRecruitedMidBattle = true
-        val zephyr = StoryEncounters.createZephyrMember()
+        val zephyr = GameContent.companionMember("zephyr") ?: return
         val updatedParty = _state.value.party + zephyr
         val fct = FloatingCombatText(
             text = "Zephyr Defects to the Fellowship!",
@@ -1267,35 +1249,66 @@ class CombatViewModel(
         _state.value = _state.value.copy(isPureStoryMode = enabled)
     }
 
-    fun triggerAutoHeroAction(hero: PartyMember) {
-        if (_state.value.phase != CombatPhase.PLAYER_INPUT) return
+    fun triggerAutoHeroAction(hero: PartyMember): Spell? {
+        if (_state.value.phase != CombatPhase.PLAYER_INPUT) return null
         val affordableSpells = hero.spells.filter { it.mpCost <= hero.currentMp }
+        val aliveEnemies = _state.value.enemies.filter { it.isAlive }
         val chosenSpell = if (affordableSpells.isNotEmpty()) {
             val lowestAlly = _state.value.party.filter { it.isAlive }.minByOrNull { it.currentHp.toFloat() / it.maxHp }
             val healSpell = affordableSpells.firstOrNull { it.isHeal }
             if (lowestAlly != null && (lowestAlly.currentHp.toFloat() / lowestAlly.maxHp) < 0.5f && healSpell != null) {
-                healSpell
+                val woundedCount = _state.value.party.count { it.isAlive && (it.currentHp.toFloat() / it.maxHp) < 0.7f }
+                if (woundedCount >= 2) {
+                    affordableSpells.firstOrNull { it.isHeal && it.hitsAll } ?: healSpell
+                } else {
+                    healSpell
+                }
             } else {
-                affordableSpells.filter { !it.isHeal }.maxByOrNull { it.basePower } ?: affordableSpells.random()
+                val offensiveSpells = affordableSpells.filter { !it.isHeal && it.manaRestorePct == 0f }
+                val aoeSpells = offensiveSpells.filter { it.hitsAll }
+
+                if (aliveEnemies.size >= 2 && aoeSpells.isNotEmpty()) {
+                    // Prefer casting AOE spells anytime there are 2 or more enemies alive on field
+                    aoeSpells.maxByOrNull { it.basePower } ?: aoeSpells.first()
+                } else if (offensiveSpells.isNotEmpty()) {
+                    offensiveSpells.maxByOrNull { it.basePower } ?: offensiveSpells.first()
+                } else {
+                    affordableSpells.maxByOrNull { it.basePower } ?: affordableSpells.first()
+                }
             }
         } else {
-            hero.spells.firstOrNull { it.mpCost == 0 } ?: hero.spells.firstOrNull()
+            val zeroCostAoe = hero.spells.filter { it.mpCost == 0 && it.hitsAll && !it.isHeal }
+            if (aliveEnemies.size >= 2 && zeroCostAoe.isNotEmpty()) {
+                zeroCostAoe.maxByOrNull { it.basePower } ?: zeroCostAoe.first()
+            } else {
+                hero.spells.firstOrNull { it.mpCost == 0 } ?: hero.spells.firstOrNull()
+            }
         }
 
         if (chosenSpell != null) {
-            val aliveEnemy = _state.value.enemies.firstOrNull { it.isAlive }
+            val aliveEnemy = _state.value.enemies.firstOrNull { it.isAlive && it.isTargeted }
+                ?: _state.value.enemies.firstOrNull { it.isAlive }
             val chant = if (chosenSpell.manaRestorePct > 0f) {
                 "attune"
             } else if (chosenSpell.isHeal) {
                 val lowestAlly = _state.value.party.filter { it.isAlive }.minByOrNull { it.currentHp.toFloat() / it.maxHp }
-                if (lowestAlly != null) "${chosenSpell.name} ${lowestAlly.name}" else chosenSpell.name
-            } else if (aliveEnemy != null && !chosenSpell.hitsAll) {
+                if (chosenSpell.hitsAll) {
+                    "${chosenSpell.name} party"
+                } else if (lowestAlly != null) {
+                    "${chosenSpell.name} ${lowestAlly.name}"
+                } else {
+                    chosenSpell.name
+                }
+            } else if (chosenSpell.hitsAll) {
+                "${chosenSpell.name} all"
+            } else if (aliveEnemy != null) {
                 "${chosenSpell.name} ${aliveEnemy.name}"
             } else {
                 chosenSpell.name
             }
             submitTypedChant(chant)
         }
+        return chosenSpell
     }
 
     fun openOptions() {
@@ -1655,13 +1668,13 @@ class CombatViewModel(
             val switchTarget = aliveParty.firstOrNull { member ->
                 val nameMatch = member.name.isNotBlank() && lower.contains(member.name.lowercase())
                 val classMatch = member.loreClass.isNotBlank() && lower.contains(member.loreClass.lowercase())
-                nameMatch || classMatch || when (member.id) {
-                    "hero" -> lower.contains("aethel") || lower.contains("elementalist") || lower.contains("mage")
-                    "cedric" -> lower.contains("cedric") || lower.contains("templar") || lower.contains("paladin") || lower.contains("knight")
-                    "lyra" -> lower.contains("lyra") || lower.contains("warden") || lower.contains("druid")
-                    "zephyr" -> lower.contains("zephyr") || lower.contains("shadowblade") || lower.contains("assassin") || lower.contains("rogue")
-                    else -> false
+                // Content-agnostic alias lookup: characters declare their spoken aliases in JSON
+                // (e.g. the hero's file lists the aliases they can be addressed by). Never hardcode
+                // campaign-specific names/titles in the engine.
+                val aliasMatch = GameContent.voiceAliasesFor(member.id).any { alias ->
+                    alias.isNotBlank() && lower.contains(alias.lowercase())
                 }
+                nameMatch || classMatch || aliasMatch
             }
             if (switchTarget != null) {
                 if (switchTarget.id == activeHero.id) {
@@ -1714,18 +1727,17 @@ class CombatViewModel(
         // 3. Strict Turn Enforcement: Only the active hero whose ATB turn is ready may act!
         val otherHeroes = aliveParty.filter { it.id != activeHero.id }
 
-        // Check if an inactive hero is explicitly invoked to take an action
-        val invokedOtherHero = otherHeroes.firstOrNull { member ->
-            val matchesCustomName = member.name.isNotBlank() && lower.contains(member.name.lowercase())
-            val matchesClassTitle = member.loreClass.isNotBlank() && lower.contains(member.loreClass.lowercase())
-            matchesCustomName || matchesClassTitle || when (member.id) {
-                "hero" -> lower.contains("aethel") || lower.contains("elementalist") || (lower.contains("mage") && !lower.contains("shaman"))
-                "cedric" -> lower.contains("cedric") || lower.contains("templar") || lower.contains("paladin") || lower.contains("knight")
-                "lyra" -> lower.contains("lyra") || lower.contains("warden") || lower.contains("druid")
-                "zephyr" -> lower.contains("zephyr") || lower.contains("shadowblade") || lower.contains("assassin") || lower.contains("rogue")
-                else -> false
-            }
+        // Spoken aliases are content-declared per character (assets/game/characters/*.json);
+        // the engine only ever matches display names, lore titles, and those JSON aliases.
+        fun memberInvokedByUtterance(member: PartyMember): Boolean {
+            val nameMatch = member.name.isNotBlank() && lower.contains(member.name.lowercase())
+            val classMatch = member.loreClass.isNotBlank() && lower.contains(member.loreClass.lowercase())
+            val aliasMatch = GameContent.voiceAliasesFor(member.id).any { it.isNotBlank() && lower.contains(it.lowercase()) }
+            return nameMatch || classMatch || aliasMatch
         }
+
+        // Check if an inactive hero is explicitly invoked to take an action
+        val invokedOtherHero = otherHeroes.firstOrNull { memberInvokedByUtterance(it) }
 
         val hasHealSupportKeyword = lower.contains("heal") || lower.contains("mend") || lower.contains("restore") ||
                 lower.contains("cure") || lower.contains("protect") || lower.contains("shield") ||
@@ -1739,43 +1751,41 @@ class CombatViewModel(
         )
         val isBreathUtterance = BREATH_KEYWORDS.any { lower.contains(it) }
 
-        // Check if the utterance matches a spell of the active hero
-        val activeHeroSpellMatch = isBreathUtterance || activeHero.spells.any { spell ->
-            spell.manaRestorePct == 0f && (
-                lower.contains(spell.name.lowercase()) ||
+        fun spellMatchesUtterance(spell: Spell): Boolean {
+            if (spell.manaRestorePct != 0f) return false
+            return lower.contains(spell.name.lowercase()) ||
                 spell.aliases.any { alias -> alias.length >= 4 && lower.contains(alias.lowercase()) } ||
                 spell.name.lowercase().split(" ").any { word -> word.length >= 5 && lower.contains(word) }
-            )
         }
+
+        // Check if the utterance matches a spell of the active hero
+        val activeHeroSpellMatch = isBreathUtterance || activeHero.spells.any { spellMatchesUtterance(it) }
 
         // Check if another hero owns a spell that matches this utterance
         val otherHeroWithSpell = if (isBreathUtterance || activeHeroSpellMatch) null else otherHeroes.firstOrNull { member ->
-            member.spells.any { spell ->
-                spell.manaRestorePct == 0f && (
-                    lower.contains(spell.name.lowercase()) ||
-                    spell.aliases.any { alias -> alias.length >= 4 && lower.contains(alias.lowercase()) } ||
-                    spell.name.lowercase().split(" ").any { word -> word.length >= 5 && lower.contains(word) }
-                )
-            }
+            member.spells.any { spellMatchesUtterance(it) }
         }
 
-        // Check if utterance invokes an exclusive school of another hero that the active hero does not possess
-        val otherHeroBySchool = if (isBreathUtterance || activeHeroSpellMatch || otherHeroWithSpell != null) null else otherHeroes.firstOrNull { member ->
-            val matchesSchool = when (member.id) {
-                "hero" -> lower.contains("fire") || lower.contains("frost") || lower.contains("ice") || lower.contains("lightning") || lower.contains("tempest") || lower.contains("blaze") || lower.contains("cinder") || lower.contains("inferno")
-                "cedric" -> lower.contains("smite") || lower.contains("aegis") || lower.contains("shield wall") || lower.contains("dawn") || lower.contains("morning star") || lower.contains("seraph")
-                "lyra" -> lower.contains("soothing") || lower.contains("rain") || lower.contains("briar") || lower.contains("entangle") || lower.contains("grove") || lower.contains("cataclysm") || lower.contains("verdant") || lower.contains("thorn") || lower.contains("vine")
-                "zephyr" -> lower.contains("shadow strike") || lower.contains("venom") || lower.contains("flurry") || lower.contains("dagger") || lower.contains("poison") || lower.contains("oblivion")
-                else -> false
-            }
-            val activeHeroHasSchool = when (member.id) {
-                "hero" -> activeHero.spells.any { it.school in listOf(SpellSchool.PYROMANCY, SpellSchool.CRYOMANCY, SpellSchool.ELECTROMANCY) }
-                "cedric" -> activeHero.spells.any { it.school == SpellSchool.HOLY }
-                "lyra" -> activeHero.spells.any { it.school == SpellSchool.NATURE }
-                "zephyr" -> activeHero.spells.any { it.school == SpellSchool.SHADOW }
-                else -> false
-            }
-            matchesSchool && !activeHeroHasSchool
+        // Check if the utterance evokes a school the active hero does NOT command while another
+        // hero does. Vocabulary is generic engine-level school wording (never campaign-specific),
+        // and any utterance that already matches the active hero's own kit is exempt.
+        val activeSchools = activeHero.spells.map { it.school }.toSet()
+        val genericSchoolHints = mapOf(
+            SpellSchool.PYROMANCY to listOf("fire", "flame", "blaze", "scorch", "cinder", "inferno", "heat"),
+            SpellSchool.CRYOMANCY to listOf("frost", "ice", "freeze", "chill", "glacier", "snow"),
+            SpellSchool.ELECTROMANCY to listOf("lightning", "thunder", "voltage", "shock", "static", "storm"),
+            SpellSchool.HOLY to listOf("smite", "aegis", "dawn", "radiant", "seraph", "consecrate"),
+            SpellSchool.NATURE to listOf("briar", "entangle", "grove", "verdant", "thorn", "vine", "bloom"),
+            SpellSchool.SHADOW to listOf("venom", "flurry", "dagger", "poison", "dread", "oblivion", "night")
+        )
+        val hintedSchools = genericSchoolHints
+            .filterKeys { it !in activeSchools }
+            .filterValues { hints -> hints.any { hint -> hint.length >= 4 && lower.contains(hint) } }
+            .keys
+        val otherHeroBySchool = if (isBreathUtterance || activeHeroSpellMatch || otherHeroWithSpell != null || hintedSchools.isEmpty()) {
+            null
+        } else {
+            otherHeroes.firstOrNull { member -> member.spells.any { it.school in hintedSchools } }
         }
 
         val outOfTurnHero = when {
@@ -2120,10 +2130,6 @@ class CombatViewModel(
                 val matched = currentParty.filter { it.id == targetHeroId && it.isAlive }
                 if (matched.isNotEmpty()) matched else listOfNotNull(currentParty.filter { it.isAlive }.minByOrNull { it.hpRatio })
             }
-            target == TargetSelection.CEDRIC -> currentParty.filter { it.id == "cedric" && it.isAlive }
-            target == TargetSelection.LYRA -> currentParty.filter { it.id == "lyra" && it.isAlive }
-            target == TargetSelection.ZEPHYR -> currentParty.filter { it.id == "zephyr" && it.isAlive }
-            target == TargetSelection.HERO -> currentParty.filter { it.id == "hero" && it.isAlive }
             target == TargetSelection.SELF -> listOf(caster)
             else -> {
                 // Heal lowest HP percentage hero
@@ -2149,18 +2155,6 @@ class CombatViewModel(
                     if (marked != null) listOf(marked)
                     else listOfNotNull(currentEnemies.firstOrNull { it.isAlive })
                 }
-            }
-            target == TargetSelection.ORC -> {
-                val matched = currentEnemies.filter { it.id == "orc" && it.isAlive }
-                if (matched.isNotEmpty()) matched else listOfNotNull(currentEnemies.firstOrNull { it.isAlive })
-            }
-            target == TargetSelection.ARCHER -> {
-                val matched = currentEnemies.filter { it.id == "archer" && it.isAlive }
-                if (matched.isNotEmpty()) matched else listOfNotNull(currentEnemies.firstOrNull { it.isAlive })
-            }
-            target == TargetSelection.SHAMAN -> {
-                val matched = currentEnemies.filter { it.id == "shaman" && it.isAlive }
-                if (matched.isNotEmpty()) matched else listOfNotNull(currentEnemies.firstOrNull { it.isAlive })
             }
             else -> {
                 val marked = currentEnemies.firstOrNull { it.isTargeted && it.isAlive }
@@ -2446,6 +2440,8 @@ class CombatViewModel(
     fun pauseAtb() {
         atbJob?.cancel()
         atbJob = null
+        combatNarrator.setCombatActive(false)
+        _state.update { it.copy(phase = CombatPhase.INACTIVE) }
     }
 
     fun spawnEnemy(enemy: Enemy): Boolean = summonReinforcements(listOf(enemy)) > 0
@@ -2458,7 +2454,7 @@ class CombatViewModel(
         savedStats: List<SavedCharacterStats> = emptyList()
     ) {
         activeCustomization = customization
-        val spells = ClassSpellLibrary.getSpellsForClass(customization.heroClass)
+        val spells = GameContent.spellsForClass(customization.heroClass.id)
         val heroStats = savedStats.firstOrNull { it.id == "hero" }
         val hp = heroStats?.currentHp ?: customization.heroClass.startingHp
         val maxHp = heroStats?.maxHp ?: customization.heroClass.startingHp
@@ -2481,7 +2477,7 @@ class CombatViewModel(
             spells = spells,
             avatarTint = tint,
             speed = heroStats?.speed ?: customization.heroClass.startingSpeed,
-            atbGauge = 0.45f,
+            atbGauge = if (_state.value.phase == CombatPhase.INACTIVE) 0f else (_state.value.party.firstOrNull { it.id == "hero" }?.atbGauge ?: 0f),
             level = heroStats?.level ?: 1,
             xp = heroStats?.xp ?: 0
         )
@@ -2493,7 +2489,11 @@ class CombatViewModel(
         _state.value = _state.value.copy(party = updatedParty)
     }
 
+    var lastEncounterDefinition: EncounterDefinition? = null
+        internal set
+
     fun startEncounter(encounter: EncounterDefinition) {
+        lastEncounterDefinition = encounter
         currentEncounterId = encounter.id
         isZephyrRecruitedMidBattle = false
         isMalakorUltimateCast = false
@@ -2511,13 +2511,13 @@ class CombatViewModel(
                 )
             }
         } else {
-            StoryEncounters.createDuoParty()
+            GameContent.createDuoParty()
         }
 
         // Apply active player customization (custom name, class, starter spells, aura color) to the hero
         val partyToUse = applyImportedProgression(baseParty.map { member ->
             if (member.id == "hero") {
-                val spells = ClassSpellLibrary.getSpellsForClass(activeCustomization.heroClass)
+                val spells = GameContent.spellsForClass(activeCustomization.heroClass.id)
                 val tint = try {
                     Color(android.graphics.Color.parseColor(activeCustomization.auraColor.hexColor))
                 } catch (_: Exception) {
@@ -2545,13 +2545,8 @@ class CombatViewModel(
 
             // Resolve companion spells from saved stats if available
             val updatedSpells = if (member.id != "hero" && saved.spellIds.isNotEmpty()) {
-                val companionSpells = saved.spellIds.mapNotNull { StoryEncounters.ALL_COMPANION_SPELLS[it] }
-                val breath = when (member.id) {
-                    "cedric" -> StoryEncounters.steadyBreathSpell
-                    "lyra" -> StoryEncounters.deepRootSpell
-                    "zephyr" -> StoryEncounters.quietLungsSpell
-                    else -> null
-                }
+                val companionSpells = saved.spellIds.mapNotNull { GameContent.spellById(it) }
+                val breath = GameContent.breathSpellFor(member.id)
                 if (companionSpells.isNotEmpty()) {
                     (companionSpells.filter { it.manaRestorePct == 0f } + listOfNotNull(breath)).distinctBy { it.id }
                 } else member.spells
@@ -2589,6 +2584,7 @@ class CombatViewModel(
         lastActedHeroId = null
         lastActedFaction = CombatantFaction.NONE
         musicManager?.playCombatMusic()
+        combatNarrator.setCombatActive(true)
 
         _state.value = CombatState(
             phase = CombatPhase.ATB_WAITING,
@@ -2602,18 +2598,35 @@ class CombatViewModel(
     }
 
     fun restartBattle() {
+        val lastDef = lastEncounterDefinition
+        if (lastDef != null) {
+            startEncounter(lastDef)
+            return
+        }
         val currentEnv = _state.value.currentEnvironment
         turnsTakenInRound = 0
         lastActedHeroId = null
         lastActedFaction = CombatantFaction.NONE
-        _state.value = createInitialState().copy(
-            currentEnvironment = currentEnv,
-            isPureStoryMode = _state.value.isPureStoryMode
-        )
         _combatantPositions.clear()
         particleEmitter.clear()
         spellVfxEngine.projectiles.clear()
         resonanceEngine.noveltyCache.clear()
+        val initialParty = GameContent.createDuoParty()
+        val fallbackEnemies = GameContent.enemyTemplates.values.take(3)
+            .mapIndexed { index, template ->
+                template.toEnemy(
+                    isTargeted = index == 1,
+                    atbGauge = (0.30f + 0.15f * index).coerceAtMost(0.45f)
+                )
+            }
+        combatNarrator.setCombatActive(true)
+        _state.value = CombatState(
+            phase = CombatPhase.ATB_WAITING,
+            party = initialParty,
+            enemies = fallbackEnemies,
+            currentEnvironment = currentEnv,
+            isPureStoryMode = _state.value.isPureStoryMode
+        )
         startAtbLoop()
     }
 
