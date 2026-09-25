@@ -13,6 +13,14 @@ enum class SpellSchool(val displayName: String, val themeColor: Color) {
     PHYSICAL("Martial", Color(0xFFCFD8DC))
 }
 
+data class SpellGraphics(
+    val effectType: String = "PROJECTILE", // PROJECTILE, SLASH, PILLAR, BURST, WAVE
+    val primaryColor: String? = null,
+    val secondaryColor: String? = null,
+    val particleCount: Int = 16,
+    val screenShake: Float = 0f
+)
+
 data class Spell(
     val id: String,
     val name: String,
@@ -27,7 +35,8 @@ data class Spell(
     val lifesteal: Boolean = false,
     val isGuard: Boolean = false,
     val manaRestorePct: Float = 0f,
-    val aliases: List<String> = emptyList()
+    val aliases: List<String> = emptyList(),
+    val graphics: SpellGraphics? = null
 )
 
 enum class CharacterStance {
@@ -75,6 +84,7 @@ data class Enemy(
     val isTargeted: Boolean = false,
     val isDamagedFlash: Boolean = false,
     val spriteTint: Color = Color(0xFFE57373),
+    val spriteId: String = "",
     val speed: Int = 50,
     val atbGauge: Float = 0f,
     val family: String = "FLESH",
@@ -94,17 +104,10 @@ data class Enemy(
 enum class TargetSelection {
     FIRST_ALIVE_ENEMY,
     SPECIFIC_ENEMY,
-    ORC,
-    ARCHER,
-    SHAMAN,
     ALL_ENEMIES,
     PARTY_LOWEST,
     SELF,
-    SPECIFIC_HERO,
-    HERO,
-    CEDRIC,
-    LYRA,
-    ZEPHYR
+    SPECIFIC_HERO
 }
 
 enum class MetaCommand {
@@ -144,13 +147,42 @@ data class ParsedIntent(
     val metaCommand: MetaCommand = MetaCommand.NONE
 )
 
+/**
+ * One-shot scripted boss phase, declared per encounter in data files. When the
+ * referenced enemy's HP ratio drops below [hpBelow] (and the rule has not fired
+ * yet), the engine announces [bannerText]/[narrationText], optionally crushes the
+ * party toward [reducePartyToHpPct] (executing anyone under [executeBelowHpPct]),
+ * and optionally summons [summonCount] instances of [summonEnemyId].
+ */
+data class BossPhaseRule(
+    val enemyId: String,
+    val hpBelow: Float,
+    val bannerText: String = "",
+    val narrationText: String = "",
+    val reducePartyToHpPct: Float? = null,
+    val executeBelowHpPct: Float? = null,
+    val summonEnemyId: String? = null,
+    val summonCount: Int = 0
+)
+
+/** Scripted mid-battle party addition, declared per encounter in data files. */
+data class MidBattleJoin(
+    val characterId: String,
+    val bannerText: String = "",
+    val announcementText: String = "",
+    val afterEnemyActions: Int = 1
+)
+
 data class EncounterDefinition(
     val id: String,
     val name: String,
     val description: String = "",
     val environment: BattleEnvironment,
+    val environmentId: String = "",
     val enemies: List<Enemy>,
-    val initialParty: List<PartyMember>? = null
+    val initialParty: List<PartyMember>? = null,
+    val bossPhases: List<BossPhaseRule> = emptyList(),
+    val midBattleJoin: MidBattleJoin? = null
 )
 
 data class FloatingCombatText(
@@ -170,6 +202,7 @@ enum class CombatantFaction {
 }
 
 enum class CombatPhase {
+    INACTIVE,
     ATB_WAITING,
     PLAYER_INPUT,
     INCANTATION_RESOLVING,

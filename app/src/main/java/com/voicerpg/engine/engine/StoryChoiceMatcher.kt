@@ -19,13 +19,13 @@ object StoryChoiceMatcher {
     private val SEARCH_CLUSTER = setOf(
         "examine", "inspect", "investigate", "study", "look", "search", "explore",
         "scout", "check", "peer", "observe", "view", "watch", "scan", "read",
-        "gaze", "survey", "find", "tracks", "trail", "vaults", "ruins", "shrine", "stones"
+        "gaze", "survey", "find", "tracks", "trail", "ruins", "stones"
     )
 
     private val COMBAT_CLUSTER = setOf(
         "attack", "fight", "strike", "charge", "assault", "battle", "slay", "destroy",
-        "kill", "smite", "blast", "fireball", "confront", "rush", "breach", "clash",
-        "rend", "combat", "draw", "weapon", "blade", "challenge", "phalanx", "behemoth"
+        "kill", "smite", "blast", "confront", "rush", "breach", "clash",
+        "rend", "combat", "draw", "weapon", "blade", "challenge"
     )
 
     private val TALK_CLUSTER = setOf(
@@ -36,7 +36,7 @@ object StoryChoiceMatcher {
     private val MAGIC_CLUSTER = setOf(
         "chant", "cast", "sing", "incantation", "spell", "prayer", "radiance", "harmonic",
         "mana", "flame", "spark", "magic", "holy", "sacred", "resonate", "resonance",
-        "chime", "bell", "dial", "toll", "dawn", "elemental"
+        "elemental"
     )
 
     private val REST_CLUSTER = setOf(
@@ -63,10 +63,13 @@ object StoryChoiceMatcher {
         REST_CLUSTER, MOVE_CLUSTER, RESCUE_CLUSTER, HARVEST_CLUSTER
     )
 
-    private val PROPER_NOUN_BOOST = setOf(
-        "lyra", "cedric", "malakor", "solaria", "zephyr", "behemoth", "willow",
-        "acolyte", "bell", "chime", "fireball", "phalanx", "briar", "fane", "aethel"
-    )
+    /**
+     * Landmark boost: distinctive multi-syllable tokens that also appear verbatim in a
+     * choice's text or keywords score extra. Derived dynamically from content — no
+     * hardcoded proper nouns.
+     */
+    private fun isProperNounToken(token: String): Boolean =
+        token.length >= 5 && token !in STOP_WORDS
 
     /**
      * Scores all available choices against the spoken utterance and returns the best matching
@@ -125,8 +128,8 @@ object StoryChoiceMatcher {
                     score += 30
                 }
 
-                // 3. Proper noun or thematic landmark boost
-                if (token in PROPER_NOUN_BOOST && (choiceWords.contains(token) || keywordWords.contains(token))) {
+                // 3. Distinctive landmark token boost
+                if (isProperNounToken(token) && (choiceWords.contains(token) || keywordWords.contains(token))) {
                     score += 45
                 }
 
@@ -170,7 +173,7 @@ object StoryChoiceMatcher {
 
         if (progressionPhrases.any { lower.contains(it) }) return true
 
-        // Roleplay utterances in a progression node (e.g. "We must be careful", "The blight will pay")
+        // Roleplay utterances in a progression node (e.g. "We must be careful", "Onward, friends")
         val words = lower.split(Regex("[^a-zA-Z0-9]+")).filter { it.isNotBlank() }
         val isNonMetaRoleplay = words.size >= 2 && !lower.contains("options") && !lower.contains("settings") &&
                 !lower.contains("status") && !lower.contains("help") && !lower.contains("menu")

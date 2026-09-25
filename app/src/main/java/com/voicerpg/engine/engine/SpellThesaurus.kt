@@ -1,5 +1,6 @@
 package com.voicerpg.engine.engine
 
+import com.voicerpg.engine.content.GameContent
 import com.voicerpg.engine.model.SpellSchool
 
 object SpellThesaurus {
@@ -8,7 +9,10 @@ object SpellThesaurus {
         "cinder", "inferno", "ash", "blaze", "blazing", "ignite", "scorching",
         "incandescent", "solar", "phoenix", "wrath", "embers", "consume",
         "flame", "flames", "fire", "fireball", "burn", "combustion",
-        "conflagration", "pyre", "hellfire", "searing", "flare", "magma"
+        "conflagration", "pyre", "hellfire", "searing", "flare", "magma",
+        "resonant",
+        // Generic labor lexicon (genre-neutral additions for workplace-flavored games)
+        "heat"
     )
 
     private val CRYOMANCY_ROOTS = setOf(
@@ -22,43 +26,61 @@ object SpellThesaurus {
         "tempest", "thunderclap", "galvanic", "arc", "storm", "fulgur",
         "lightning", "volt", "voltage", "flash", "strike", "spark", "sparks",
         "thunder", "thunderbolt", "shock", "discharge", "surge", "electrify",
-        "static", "plasma"
+        "static", "plasma", "stasis",
+        // Generic labor lexicon (genre-neutral additions for workplace-flavored games)
+        "charge"
     )
 
     private val HOLY_ROOTS = setOf(
         "radiance", "radiant", "divine", "seraph", "celestial", "dawn",
         "sanctify", "blessing", "blessed", "mend", "mending", "aegis",
-        "purity", "pure", "heal", "healing", "grace", "light", "halo",
-        "restorative", "prayer", "cure", "sanctuary", "smite", "soothing"
+        "purity", "pure", "heal", "healing", "grace", "light", "halo", "cadence",
+        "restorative", "prayer", "cure", "sanctuary", "smite", "soothing",
+        // Generic care/labor lexicon (genre-neutral additions for workplace-flavored games)
+        "steady", "calm", "soothe", "listen"
     )
 
     private val NATURE_ROOTS = setOf(
         "grove", "briar", "thorns", "thorn", "vines", "vine", "rain", "nature",
         "rejuvenate", "verdant", "root", "roots", "canopy", "bloom", "petal",
         "moss", "fern", "blossom", "undergrowth", "bark", "seed", "sprout",
-        "wildwood", "pollen", "bramble", "nettle", "willow", "oaken", "earthen"
+        "wildwood", "pollen", "bramble", "nettle", "willow", "oaken", "earthen",
+        // Generic growth lexicon (genre-neutral additions for workplace-flavored games)
+        "grow"
     )
 
     private val SHADOW_ROOTS = setOf(
         "umbra", "abyss", "abyssal", "venom", "venomous", "phantom", "whisper",
         "shroud", "eclipse", "silent", "silence", "strike", "hollow", "dark",
         "darkness", "shade", "shadow", "void", "backstab", "stealth", "dread",
-        "nocturnal", "creeping", "siphon", "mend", "drain"
+        "nocturnal", "creeping", "siphon", "mend", "drain",
+        // Generic labor lexicon (genre-neutral additions for workplace-flavored games)
+        "night"
     )
 
     private val MARTIAL_ROOTS = setOf(
         "blade", "cleave", "rend", "slash", "steel", "shatter", "strike",
-        "vanguard", "shield", "smash", "pulverize", "bash", "crush", "charge"
+        "vanguard", "shield", "smash", "pulverize", "bash", "crush", "charge",
+        "aegis", "barrier", "attune",
+        // Generic labor lexicon (genre-neutral additions for workplace-flavored games):
+        // the line, the dock, the freight, the grind.
+        "breathe", "push", "hold", "haul", "clear", "grind", "line"
     )
 
-    fun getKeywordsForSchool(school: SpellSchool): Set<String> = when (school) {
-        SpellSchool.PYROMANCY -> PYROMANCY_ROOTS
-        SpellSchool.CRYOMANCY -> CRYOMANCY_ROOTS
-        SpellSchool.ELECTROMANCY -> ELECTROMANCY_ROOTS
-        SpellSchool.NATURE -> NATURE_ROOTS
-        SpellSchool.HOLY -> HOLY_ROOTS
-        SpellSchool.SHADOW -> SHADOW_ROOTS
-        SpellSchool.PHYSICAL -> MARTIAL_ROOTS
+    fun getKeywordsForSchool(school: SpellSchool): Set<String> {
+        val loaded = GameContent.thesaurusRoots[school]
+        if (!loaded.isNullOrEmpty()) {
+            return loaded.toSet()
+        }
+        return when (school) {
+            SpellSchool.PYROMANCY -> PYROMANCY_ROOTS
+            SpellSchool.CRYOMANCY -> CRYOMANCY_ROOTS
+            SpellSchool.ELECTROMANCY -> ELECTROMANCY_ROOTS
+            SpellSchool.NATURE -> NATURE_ROOTS
+            SpellSchool.HOLY -> HOLY_ROOTS
+            SpellSchool.SHADOW -> SHADOW_ROOTS
+            SpellSchool.PHYSICAL -> MARTIAL_ROOTS
+        }
     }
 
     /**

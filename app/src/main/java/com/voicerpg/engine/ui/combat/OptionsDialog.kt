@@ -304,7 +304,7 @@ fun OptionsDialog(
                 // Toggle: Character Voice Pitch Modulation
                 OptionToggleRow(
                     title = "🎭 Character Voice Pitch",
-                    subtitle = "Modulates pitch per character (Cedric deep knight, Aethel spirited, Wisps raspy).",
+                    subtitle = "Modulates pitch per character to create distinctive vocal profiles.",
                     voiceHint = "Dynamic pitch shifting",
                     checked = isCharacterPitchEnabled,
                     activeColor = Color(0xFFCE93D8),
@@ -316,7 +316,7 @@ fun OptionsDialog(
                 // Toggle: Speaker Name Attribution
                 OptionToggleRow(
                     title = "🗣️ Speaker Names Aloud",
-                    subtitle = "Narrator announces who is talking (\"Sir Cedric says...\"). Off keeps each character's distinct voice, just without the name.",
+                    subtitle = "Narrator announces who is talking aloud. Off keeps each character's distinct voice, just without the name.",
                     voiceHint = "Voice command: \"Speaker names\" or \"Who is speaking\"",
                     checked = isSpeakerAttributionEnabled,
                     activeColor = Color(0xFFFFB74D),
@@ -425,7 +425,7 @@ fun OptionsDialog(
                         ) {
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    text = "🎙️ Install Companion Voices",
+                                    text = "🎙️ Install Character Voices",
                                     color = LogosGold,
                                     fontSize = 12.sp,
                                     fontWeight = FontWeight.Bold,
@@ -433,7 +433,7 @@ fun OptionsDialog(
                                 )
                                 Spacer(modifier = Modifier.height(2.dp))
                                 Text(
-                                    text = "Open system Text-to-Speech settings to download additional English voices for Sir Cedric, Lyra, Zephyr, and Malakor.",
+                                    text = "Open system Text-to-Speech settings to download additional English voices for your story characters and adversaries.",
                                     color = Color.LightGray,
                                     fontSize = 10.sp,
                                     lineHeight = 13.sp,
@@ -470,7 +470,7 @@ fun OptionsDialog(
                         ) {
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    text = "🎭 Assign & Customize Companion Voices",
+                                    text = "🎭 Assign & Customize Character Voices",
                                     color = Color(0xFF90CAF9),
                                     fontSize = 12.sp,
                                     fontWeight = FontWeight.Bold,
@@ -478,7 +478,7 @@ fun OptionsDialog(
                                 )
                                 Spacer(modifier = Modifier.height(2.dp))
                                 Text(
-                                    text = "Audition character quotes, cycle voice models for Sir Cedric, Lyra, Zephyr, and others without restarting your game.",
+                                    text = "Audition character quotes, cycle voice models for characters and adversaries without restarting your game.",
                                     color = Color.LightGray,
                                     fontSize = 10.sp,
                                     lineHeight = 13.sp,
@@ -691,8 +691,8 @@ fun OptionsDialog(
                         VoiceCommandItem(command = "🛡️ \"Party\" / \"Allies\"", desc = "Checks health & state of fellowship")
                         VoiceCommandItem(command = "🎧 \"Pocket Mode\"", desc = "Toggles audio-guided combat")
                         VoiceCommandItem(command = "👂 \"Auto Listen\"", desc = "Toggles hands-free turn mic on/off")
-                        VoiceCommandItem(command = "🎭 \"Assign Voices\"", desc = "Opens companion voice customization screen")
-                        VoiceCommandItem(command = "🗣️ \"Speaker Names\"", desc = "Toggles \"Sir Cedric says...\" announcements")
+                        VoiceCommandItem(command = "🎭 \"Assign Voices\"", desc = "Opens character voice customization screen")
+                        VoiceCommandItem(command = "🗣️ \"Speaker Names\"", desc = "Toggles spoken speaker name announcements")
                         VoiceCommandItem(command = "🎵 \"Music\" / \"Toggle Music\"", desc = "Toggles ambient background music on/off")
                         VoiceCommandItem(command = "🏠 \"Title Screen\" / \"Main Menu\"", desc = "Saves and returns to Title Screen")
                         VoiceCommandItem(command = "⚙️ \"Options\" / \"Close\"", desc = "Opens or closes this settings screen")

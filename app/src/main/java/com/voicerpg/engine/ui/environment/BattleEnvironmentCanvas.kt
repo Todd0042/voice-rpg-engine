@@ -21,6 +21,7 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.IntSize
+import com.voicerpg.engine.content.GameContent
 import com.voicerpg.engine.model.BattleEnvironment
 import kotlin.math.sin
 
@@ -35,14 +36,19 @@ import kotlin.math.sin
  */
 @Composable
 fun BattleEnvironmentCanvas(
-    environment: BattleEnvironment,
+    environment: BattleEnvironment = BattleEnvironment.FOREST,
+    environmentId: String? = null,
+    isPortrait: Boolean = false,
     partyCount: Int = 4,
     enemyCount: Int = 3,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
-    val backgroundBitmap = remember(environment) {
-        EnvironmentAssetLoader.getOrLoad(context, environment)
+    val envDef = remember(environmentId, environment) {
+        GameContent.environmentById(environmentId) ?: GameContent.environmentById(environment.name)
+    }
+    val backgroundBitmap = remember(environmentId, environment, isPortrait) {
+        EnvironmentAssetLoader.getOrLoad(context, environmentId, environment, isPortrait)
     }
 
     // 4-frame continuous loop: 400ms per frame (1600ms full cycle)
@@ -58,6 +64,10 @@ fun BattleEnvironmentCanvas(
     )
     val frameIndex = cycleProgress.toInt().coerceIn(0, 3)
 
+    val overlayEnv = remember(envDef, environment) {
+        envDef?.let { runCatching { BattleEnvironment.valueOf(it.overlayType) }.getOrNull() } ?: environment
+    }
+
     Canvas(modifier = modifier.fillMaxSize()) {
         val w = size.width
         val h = size.height
@@ -71,7 +81,7 @@ fun BattleEnvironmentCanvas(
             )
 
             // 2. Layer Dynamic 4-Frame Living Environmental Animation
-            when (environment) {
+            when (overlayEnv) {
                 BattleEnvironment.FOREST -> drawForestAnimationOverlay(w, h, horizonY, frameIndex)
                 BattleEnvironment.CASTLE -> drawCastleAnimationOverlay(w, h, horizonY, frameIndex)
                 BattleEnvironment.DUNGEON -> drawDungeonAnimationOverlay(w, h, horizonY, frameIndex)
@@ -80,7 +90,7 @@ fun BattleEnvironmentCanvas(
             }
         } else {
             // Procedural fallback if bitmap fails to load
-            when (environment) {
+            when (overlayEnv) {
                 BattleEnvironment.FOREST -> drawForestScene(w, h, horizonY, frameIndex)
                 BattleEnvironment.CASTLE -> drawCastleScene(w, h, horizonY, frameIndex)
                 BattleEnvironment.DUNGEON -> drawDungeonScene(w, h, horizonY, frameIndex)

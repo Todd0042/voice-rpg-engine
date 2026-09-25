@@ -9,7 +9,12 @@ android {
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.voicerpg.engine"
+        // APPLICATION IDENTITY RULE (see AGENTS.md §8): `applicationId` is the Android
+        // install identity — two APKs with the same id overwrite each other on a device.
+        // This value is RESERVED for the engine's own reference app and must never be
+        // shipped as a game. Every game built from this engine MUST set its own unique
+        // `applicationId` before building/installing a release (e.g. com.yourstudio.yourgame).
+        applicationId = "com.voicerpg.engine.reference"
         minSdk = 26
         targetSdk = 35
         versionCode = 1

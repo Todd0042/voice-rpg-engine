@@ -19,7 +19,9 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
 import com.voicerpg.engine.model.ResonanceTier
+import com.voicerpg.engine.model.SpellGraphics
 import com.voicerpg.engine.model.SpellSchool
+import com.voicerpg.engine.content.parseHexColor
 import kotlin.math.cos
 import kotlin.math.sin
 import kotlin.random.Random
@@ -35,6 +37,7 @@ data class ActiveSpellProjectile(
     val bonusPercent: Int = 0,
     val tier: ResonanceTier = ResonanceTier.BASIC,
     var progress: Float = 0f,
+    val graphics: SpellGraphics? = null,
     val onImpact: () -> Unit
 )
 
@@ -50,6 +53,7 @@ class SpellVfxEngine {
         isHeal: Boolean,
         bonusPercent: Int = 0,
         tier: ResonanceTier = ResonanceTier.BASIC,
+        graphics: SpellGraphics? = null,
         onImpact: () -> Unit
     ) {
         projectiles.add(
@@ -62,6 +66,7 @@ class SpellVfxEngine {
                 isHeal = isHeal,
                 bonusPercent = bonusPercent,
                 tier = tier,
+                graphics = graphics,
                 onImpact = onImpact
             )
         )
@@ -112,20 +117,25 @@ private fun DrawScope.renderProjectile(p: ActiveSpellProjectile) {
     val isTranscendental = p.bonusPercent >= 155
     val sizeScale = 1.0f + 1.5f * (p.bonusPercent / 200.0f)
 
-    if (p.isHeal) {
-        // Celestial Cathedral Pillar of Light
+    val customPrimary = p.graphics?.primaryColor?.let { parseHexColor(it) }
+    val customSecondary = p.graphics?.secondaryColor?.let { parseHexColor(it) }
+    val effectType = p.graphics?.effectType?.uppercase() ?: if (p.isHeal) "PILLAR" else "PROJECTILE"
+
+    if (p.isHeal || effectType == "PILLAR") {
+        val primary = customPrimary ?: Color(0x44FFD700)
+        val secondary = customSecondary ?: Color(0xAA69F0AE)
         val pillarWidth = if (isTranscendental) 150f else if (isSuper) 110f else 70f
         val pillarHeight = size.height * t
 
-        // Outer holy radiance
+        // Outer radiance
         drawRect(
-            color = Color(0x44FFD700),
+            color = primary.copy(alpha = 0.4f),
             topLeft = Offset(p.targetX - pillarWidth / 2f, 0f),
             size = Size(pillarWidth, pillarHeight)
         )
-        // Inner divine green/white shaft
+        // Inner shaft
         drawRect(
-            color = Color(0xAA69F0AE),
+            color = secondary.copy(alpha = 0.75f),
             topLeft = Offset(p.targetX - pillarWidth / 4f, 0f),
             size = Size(pillarWidth / 2f, pillarHeight)
         )
@@ -134,7 +144,7 @@ private fun DrawScope.renderProjectile(p: ActiveSpellProjectile) {
         if (isSuper) {
             val haloY = pillarHeight * 0.85f
             drawOval(
-                color = Color(0xFFFFD54F),
+                color = primary,
                 topLeft = Offset(p.targetX - pillarWidth * 0.45f, haloY - 12f),
                 size = Size(pillarWidth * 0.9f, 24f),
                 style = Stroke(width = 4f)
@@ -145,12 +155,55 @@ private fun DrawScope.renderProjectile(p: ActiveSpellProjectile) {
 
     // Projectile coordinates along trajectory
     val curX = p.startX + (p.targetX - p.startX) * t
-    val arcHeight = if (p.school == SpellSchool.PYROMANCY) -120f * sin(t * Math.PI.toFloat()) else 0f
+    val arcHeight = if (p.school == SpellSchool.PYROMANCY || effectType == "WAVE") -120f * sin(t * Math.PI.toFloat()) else 0f
     val curY = p.startY + (p.targetY - p.startY) * t + arcHeight
 
     val dx = p.targetX - p.startX
     val dy = p.targetY - p.startY
     val angleDeg = Math.toDegrees(kotlin.math.atan2(dy.toDouble(), dx.toDouble())).toFloat()
+
+    if (effectType == "SLASH") {
+        val slashColor = customPrimary ?: Color(0xFFECEFF1)
+        val accentColor = customSecondary ?: Color(0xFFFF5252)
+        val length = 32f * sizeScale
+        val height = 8f * sizeScale
+        rotate(degrees = angleDeg + 45f * sin(t * Math.PI.toFloat()), pivot = Offset(curX, curY)) {
+            drawRect(color = slashColor, topLeft = Offset(curX - length / 2f, curY - height / 2f), size = Size(length, height))
+            drawRect(color = accentColor, topLeft = Offset(curX - length / 4f, curY - height / 4f), size = Size(length / 2f, height / 2f))
+        }
+        for (i in 1..4) {
+            val trailT = (t - i * 0.04f).coerceAtLeast(0f)
+            val trailX = p.startX + (p.targetX - p.startX) * trailT
+            val trailY = p.startY + (p.targetY - p.startY) * trailT
+            drawCircle(slashColor.copy(alpha = (0.7f - i * 0.15f).coerceAtLeast(0.1f)), radius = 7f * sizeScale - i, center = Offset(trailX, trailY))
+        }
+        return
+    }
+
+    if (effectType == "BURST") {
+        val burstColor = customPrimary ?: p.school.themeColor
+        val coreColor = customSecondary ?: Color.White
+        val radius = (18f + 25f * sin(t * Math.PI.toFloat())) * sizeScale
+        drawCircle(color = burstColor.copy(alpha = (1f - t * 0.5f).coerceIn(0.2f, 0.85f)), radius = radius, center = Offset(curX, curY))
+        drawCircle(color = coreColor, radius = radius * 0.5f, center = Offset(curX, curY))
+        drawCircle(color = Color.White, radius = radius * 0.25f, center = Offset(curX, curY))
+        return
+    }
+
+    if (effectType == "WAVE") {
+        val waveColor = customPrimary ?: p.school.themeColor
+        val waveWidth = 36f * sizeScale
+        val waveHeight = 16f * sizeScale
+        rotate(degrees = angleDeg, pivot = Offset(curX, curY)) {
+            drawOval(
+                color = waveColor.copy(alpha = 0.85f),
+                topLeft = Offset(curX - waveWidth / 2f, curY - waveHeight / 2f),
+                size = Size(waveWidth, waveHeight),
+                style = Stroke(width = 3.5f * sizeScale)
+            )
+        }
+        return
+    }
 
     when (p.school) {
         SpellSchool.PYROMANCY -> {

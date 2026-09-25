@@ -1,7 +1,6 @@
 package com.voicerpg.engine.engine
 
 import android.content.Context
-import androidx.core.util.AtomicFile
 import com.google.gson.Gson
 import com.google.gson.GsonBuilder
 import com.voicerpg.engine.model.GameSaveData
@@ -69,16 +68,26 @@ class SaveManager(private val context: Context? = null) {
     }
 
     private fun writeAtomic(file: File, content: String) {
-        val atomicFile = AtomicFile(file)
+        val parentDir = file.parentFile
+        if (parentDir != null && !parentDir.exists()) {
+            parentDir.mkdirs()
+        }
+        val tempFile = File(parentDir, "${file.name}.tmp")
         var stream: FileOutputStream? = null
         try {
-            stream = atomicFile.startWrite()
+            stream = FileOutputStream(tempFile)
             stream.write(content.toByteArray(Charsets.UTF_8))
-            atomicFile.finishWrite(stream)
+            stream.flush()
+            stream.close()
+            stream = null
+            if (!tempFile.renameTo(file)) {
+                throw Exception("Failed to rename temp file to target")
+            }
         } catch (e: Exception) {
             if (stream != null) {
-                atomicFile.failWrite(stream)
+                try { stream.close() } catch (_: Exception) {}
             }
+            tempFile.delete()
             throw e
         }
     }
@@ -86,9 +95,7 @@ class SaveManager(private val context: Context? = null) {
     private fun readAtomic(file: File): String? {
         if (!file.exists()) return null
         return try {
-            val atomicFile = AtomicFile(file)
-            val bytes = atomicFile.readFully()
-            String(bytes, Charsets.UTF_8)
+            file.readText()
         } catch (e: Exception) {
             e.printStackTrace()
             null
@@ -146,8 +153,7 @@ class SaveManager(private val context: Context? = null) {
         inMemorySlots.remove(validSlot)
         val file = getSaveFile(validSlot)
         return if (file != null) {
-            val atomic = AtomicFile(file)
-            atomic.delete()
+            file.delete()
             true
         } else {
             true
@@ -156,11 +162,12 @@ class SaveManager(private val context: Context? = null) {
 
     fun getSlotSummary(slot: Int): SaveSummary? {
         val data = load(slot) ?: return null
-        val scene = StoryScript.ALL_SCENES[data.currentSceneId] ?: StoryScript.SCENE_COTTAGE
+        val scene = StoryScript.ALL_SCENES[data.currentSceneId] ?: StoryScript.INITIAL_SCENE
+        val heroClass = com.voicerpg.engine.content.GameContent.classById(data.player.heroClassId)
         return SaveSummary(
             slotIndex = slot,
             heroName = data.player.name,
-            heroClassTitle = data.player.heroClass.title,
+            heroClassTitle = heroClass.title,
             chapterTitle = scene.chapterTitle,
             sceneName = scene.name,
             partySize = data.partyStats.size.coerceAtLeast(1),
@@ -179,8 +186,9 @@ class SaveManager(private val context: Context? = null) {
 
     fun createInitialSave(customization: PlayerCustomization, slot: Int = currentSlot): GameSaveData {
         val validSlot = sanitizeSlot(slot)
-        val heroClass = customization.heroClass
-        val starterSpells = ClassSpellLibrary.getSpellsForClass(heroClass)
+        val heroClass = com.voicerpg.engine.content.GameContent.classById(customization.heroClassId)
+        val starterSpells = com.voicerpg.engine.content.GameContent.spellsForClass(heroClass.id)
+        val manifest = com.voicerpg.engine.content.GameContent.manifest
 
         val initialHeroStats = SavedCharacterStats(
             id = "hero",
@@ -198,13 +206,13 @@ class SaveManager(private val context: Context? = null) {
 
         val newSave = GameSaveData(
             player = customization,
-            currentSceneId = "scene_cottage",
-            currentNodeId = "cottage_intro",
+            currentSceneId = manifest.initialSceneId,
+            currentNodeId = manifest.initialNodeId,
             decisionsMade = emptyList(),
             partyStats = listOf(initialHeroStats),
             defeatedEncounters = emptyList(),
             unlockedCompanions = listOf("hero"),
-            achievements = listOf("AWAKENED_THE_LOGOS")
+            achievements = listOf(manifest.startingAchievementId)
         )
 
         save(newSave, validSlot)

@@ -61,6 +61,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.voicerpg.engine.audio.MusicManager
+import com.voicerpg.engine.content.GameContent
 import com.voicerpg.engine.engine.TutorialBattleContent
 import com.voicerpg.engine.engine.TutorialBattleStep
 import com.voicerpg.engine.model.BattleEnvironment
@@ -147,7 +148,9 @@ fun TutorialBattleScreen(
                 ) {
                     // Living Environmental Background Canvas
                     BattleEnvironmentCanvas(
-                        environment = BattleEnvironment.CASTLE,
+                        environment = GameContent.defaultEncounter?.environment ?: BattleEnvironment.CASTLE,
+                        environmentId = GameContent.defaultEncounter?.environmentId,
+                        isPortrait = !isLandscape,
                         partyCount = state.party.size,
                         enemyCount = state.enemies.size,
                         modifier = Modifier.fillMaxSize()
@@ -1031,7 +1034,7 @@ private fun TutorialFloatingNumberItem(ft: TutorialFloatingText) {
         modifier = Modifier
             .offset {
                 // If it's damage to enemy dummy, place it on the right side; if heal/damage to hero, place it on left
-                val isHeroTarget = ft.targetId == "aethel" || ft.targetId == "cedric" || ft.targetId == "lyra" || ft.targetId == "zephyr"
+                val isHeroTarget = !ft.targetId.startsWith("dummy") && !ft.targetId.startsWith("enemy")
                 val baseX = if (isHeroTarget) 120 else 600
                 val baseY = if (ft.targetId.contains("beta")) 380 else if (ft.targetId.contains("gamma")) 460 else 300
                 IntOffset(

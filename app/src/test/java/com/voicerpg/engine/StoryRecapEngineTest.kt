@@ -1,94 +1,97 @@
 package com.voicerpg.engine
 
+import com.voicerpg.engine.content.GameContent
 import com.voicerpg.engine.engine.StoryRecapEngine
-import com.voicerpg.engine.engine.StoryScript
 import com.voicerpg.engine.model.SavedCharacterStats
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class StoryRecapEngineTest {
 
-    @Test
-    fun testPrologueRecap() {
-        val scene = StoryScript.SCENE_COTTAGE
-        val node = StoryScript.ALL_NODES["cottage_intro"]!!
-        val flags = emptyMap<String, Boolean>()
-        val party = listOf(
-            SavedCharacterStats(id = "hero", name = "Aethel", loreClass = "Invocator", currentHp = 240, maxHp = 240, currentMp = 160, maxMp = 160, speed = 70)
+    private fun scene(id: String) = GameContent.scenes.getValue(id)
+    private fun node(id: String) = GameContent.nodes.getValue(id)
+
+    private val heroParty = listOf(
+        SavedCharacterStats(
+            id = "hero",
+            name = "Template Hero",
+            loreClass = "Spellblade",
+            currentHp = 240,
+            maxHp = 240,
+            currentMp = 140,
+            maxMp = 140,
+            speed = 70
         )
+    )
 
-        val recap = StoryRecapEngine.buildRecap(scene, node, flags, party)
+    @Test
+    fun testCurrentSceneRecapSpansAllScenesInChapterOrder() {
+        val recap = StoryRecapEngine.buildRecap(scene("scene_echo_hall"), node("hall_intro"), emptyMap(), heroParty)
 
-        assertEquals("Act I: The Silenced Bells", recap.currentActTitle)
-        assertEquals("Prologue: The Morning Without Echo", recap.currentChapterTitle)
-        assertEquals("Aethel's Cottage", recap.currentSceneName)
+        assertEquals(2, recap.milestones.size)
+        assertEquals(0, recap.milestones[0].chapterIndex)
+        assertEquals(1, recap.milestones[1].chapterIndex)
+        assertFalse(recap.milestones[0].isCurrent)
+        assertTrue(recap.milestones[1].isCurrent)
+        assertEquals("The Proving Grounds", recap.milestones[0].location)
+        assertEquals("The Echo Hall", recap.milestones[1].location)
+    }
+
+    @Test
+    fun testFirstSceneRecapMarksItsOnlyMilestoneCurrent() {
+        val recap = StoryRecapEngine.buildRecap(scene("scene_proving_grounds"), node("template_intro"), emptyMap(), heroParty)
+
+        assertEquals("Act I: The Template Sandbox", recap.currentActTitle)
+        assertEquals("Sandbox: The Voice Sanctuary", recap.currentChapterTitle)
+        assertEquals("The Proving Grounds", recap.currentSceneName)
         assertEquals(1, recap.milestones.size)
-        assertTrue(recap.milestones.first().isCurrent)
-        assertTrue(recap.activeObjective.contains("cottage"))
-        assertTrue(recap.spokenRecap.contains("Aethel's Cottage"))
+        assertTrue(recap.milestones[0].isCurrent)
+        assertEquals(
+            "Speak with the chronicle, learn the mechanics, and run the combat trials.",
+            recap.activeObjective
+        )
     }
 
     @Test
-    fun testChapter4RecapHasPriorMilestonesCompleted() {
-        val scene = StoryScript.SCENE_TOWER
-        val node = StoryScript.ALL_NODES["ch4_tower_ascent"]!!
-        val flags = mapOf("cedric_recruited" to true)
-        val party = listOf(
-            SavedCharacterStats(id = "hero", name = "Aethel", loreClass = "Invocator", currentHp = 240, maxHp = 240, currentMp = 160, maxMp = 160, speed = 70),
-            SavedCharacterStats(id = "cedric", name = "Sir Cedric", loreClass = "Templar", currentHp = 300, maxHp = 300, currentMp = 80, maxMp = 80, speed = 55)
-        )
+    fun testFellowshipRosterAndSpeakersContainHeroAndNarrator() {
+        assertEquals(listOf("Template Hero (Spellblade)"), StoryRecapEngine.getPartyRoster(heroParty))
+        assertEquals(listOf("Template Hero (Spellblade)"), StoryRecapEngine.getPartyRoster(emptyList()))
 
-        val recap = StoryRecapEngine.buildRecap(scene, node, flags, party)
+        assertTrue(GameContent.allSpeakers.any { it.id == "narrator" })
+        assertTrue(GameContent.allSpeakers.any { it.id == "hero" })
 
-        assertEquals("Act I: The Silenced Bells", recap.currentActTitle)
-        // Milestones: Prologue (0), Ch 1 (1), Ch 2 (2), Ch 3 (3), Ch 4 (4) = 5 milestones
-        assertEquals(5, recap.milestones.size)
-
-        // Prior 4 milestones must be marked completed
-        for (i in 0..3) {
-            assertFalse(recap.milestones[i].isCurrent)
-        }
-        // Chapter 4 milestone must be marked current
-        assertTrue(recap.milestones[4].isCurrent)
-        assertEquals(4, recap.milestones[4].chapterIndex)
-
-        // Fellowship should list Cedric
-        assertTrue(recap.fellowshipRoster.any { it.contains("Cedric") })
-
-        // Spoken recap should reference Solaria and current goal
-        assertTrue(recap.spokenRecap.contains("Solaria"))
-        assertTrue(recap.spokenRecap.contains("Current objective:"))
+        val recap = StoryRecapEngine.buildRecap(scene("scene_echo_hall"), node("hall_intro"), emptyMap(), heroParty)
+        assertEquals(listOf("Template Hero (Spellblade)"), recap.partyRoster)
+        assertEquals(recap.partyRoster, recap.fellowshipRoster)
+        assertFalse(recap.partyRoster.any { it.contains("Narrator") })
     }
 
     @Test
-    fun testChapter8RecapIncludesZephyrAndLyra() {
-        val scene = StoryScript.SCENE_SHADOWED_CRAGS
-        val node = StoryScript.ALL_NODES["ch8_intro"]!!
-        val flags = mapOf("lyra_recruited" to true, "ch7_wyrm_defeated" to true)
-        val party = listOf(
-            SavedCharacterStats(id = "hero", name = "Aethel", loreClass = "Invocator", currentHp = 240, maxHp = 240, currentMp = 160, maxMp = 160, speed = 70),
-            SavedCharacterStats(id = "cedric", name = "Sir Cedric", loreClass = "Templar", currentHp = 300, maxHp = 300, currentMp = 80, maxMp = 80, speed = 55),
-            SavedCharacterStats(id = "lyra", name = "Lyra", loreClass = "Grove Warden", currentHp = 240, maxHp = 240, currentMp = 120, maxMp = 120, speed = 65)
+    fun testSpokenRecapForCurrentSceneContainsChapterTitleAndObjective() {
+        val recap = StoryRecapEngine.buildRecap(scene("scene_echo_hall"), node("hall_intro"), emptyMap(), heroParty)
+
+        assertTrue(recap.spokenRecap.contains("Chronicle recap."))
+        assertTrue(recap.spokenRecap.contains("Chapter 1: The Guardian Trial"))
+        assertTrue(recap.spokenRecap.contains("at The Echo Hall"))
+        assertTrue(
+            recap.spokenRecap.contains(
+                "Current objective: Rest to restore the party, then defeat the Proving Guardian."
+            )
         )
+        assertTrue(recap.spokenRecap.contains("What is your command?"))
+        assertTrue(recap.activeObjective.contains("Proving Guardian"))
+    }
 
-        val recap = StoryRecapEngine.buildRecap(scene, node, flags, party)
+    @Test
+    fun testSpokenRecapCountsPreviousMilestoneAsPreviouslyOnYourQuest() {
+        val hallRecap = StoryRecapEngine.buildRecap(scene("scene_echo_hall"), node("hall_intro"), emptyMap(), heroParty)
+        assertTrue(hallRecap.spokenRecap.contains("Previously on your quest:"))
+        assertTrue(hallRecap.spokenRecap.contains("learned to speak commands aloud"))
 
-        assertEquals("Act II: The Weeping Fen", recap.currentActTitle)
-        // Chapter 8 has 9 milestones (0..8)
-        assertEquals(9, recap.milestones.size)
-        assertTrue(recap.milestones.last().isCurrent)
-        assertEquals(8, recap.milestones.last().chapterIndex)
-
-        // Milestone 7 (Ch 7) summary should mention Mire Wyrm or Veridian Chime
-        val ch7Milestone = recap.milestones[7]
-        assertTrue(ch7Milestone.summary.contains("Mire Wyrm") || ch7Milestone.summary.contains("Veridian"))
-
-        // Spoken recap should recount the previous milestone
-        assertTrue(recap.spokenRecap.contains("Previously on your quest:"))
-        assertTrue(recap.spokenRecap.contains("Sir Cedric"))
-        assertTrue(recap.spokenRecap.contains("Lyra"))
+        val introRecap = StoryRecapEngine.buildRecap(scene("scene_proving_grounds"), node("template_intro"), emptyMap(), heroParty)
+        assertTrue(introRecap.spokenRecap.contains("Your quest has just begun."))
+        assertFalse(introRecap.spokenRecap.contains("Previously on your quest:"))
     }
 }

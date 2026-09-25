@@ -1,170 +1,133 @@
-# VoiceRPG Android: Game Design & Technical Architecture Specification
+# VoiceRPG Engine: Technical Architecture & Design Specification
 
-**Title:** *Echoes of the Logos*  
-**Platform:** Android Native (Kotlin, Jetpack Compose Canvas, Android Speech & TTS APIs)  
+**Platform:** Android Native (Kotlin, Jetpack Compose Canvas, Android Speech & TTS APIs)
 **Target Architecture:** Offline-first, 100% on-device speech processing, screenless/pocket accessibility, high-performance 60 FPS retro graphics.
+**Content Model:** 100% data-driven. Every game ships as a set of **JSON content packs + asset files** under `app/src/main/assets/game/`; the engine classes themselves contain **zero game content**.
 
 ---
 
-## 1. Executive Summary & Vision
+## 1. Data-Driven Content Architecture
 
-*Echoes of the Logos* is a retro-inspired JRPG designed natively for Android. It marries **first-person world and dungeon exploration** with **side-view tactical party combat** (in the vein of 16-bit *Final Fantasy VI* and *Chrono Trigger*), completely commandable through natural spoken voice or touch.
-
-In addition to traditional screen play, the game is engineered as an **audio-first experience (Screenless / Pocket Mode)**, allowing gamers to play while walking with their phone in their pocket, or offering an uncompromised experience for blind and visually impaired players.
-
----
-
-## 2. Core Architectural Pillars
-
-### Pillar I: Screenless / Pocket Mode & Multi-Voice Narration
-1. **Audio-First Design:**
-   * Every game state, battle action, hero turn, enemy reinforcement, and narrative choice can be read aloud via Text-To-Speech.
-   * Hands-free mic auto-listen continuously re-arms speech recognition after narration completes.
-2. **Multi-Voice TTS Engine (`android.speech.tts.Voice`):**
-   * Rather than relying solely on pitch shifting or a single system voice, the engine enumerates installed on-device voices and dynamically binds physical voice models to distinct characters:
-     * **Sir Cedric:** Installed deep male baritone model.
-     * **Aethel (Hero):** Heroic female / invocator voice model.
-     * **Lyra:** Druidic nature warden voice model.
-     * **Narrator:** Objective chronicle storyteller model.
-   * Pitch modulation ($0.70\text{x}$ to $1.20\text{x}$) and speech rate adjustments serve as secondary expressive layers.
-3. **Voice Meta-Commands:**
-   * Players can speak system and status commands at any time:
-     * *"Status"*, *"Enemies"*, *"Fellowship"*, *"Help"*
-     * *"Toggle narration"*, *"Read choices"*, *"Pocket mode"*, *"Auto listen"*, *"Open options"*, *"Close options"*
-
----
-
-### Pillar II: Narrative Hubs & Completed Option Elimination
-1. **Non-Looping Progression Pattern:**
-   * Exploration hubs (Camp, Aqueducts, Belfry, Drowned Fane) present multiple sub-story branches.
-   * Each explored sub-story sets a persistent narrative completion flag (e.g. `substory_blight_complete`).
-   * Upon returning to the hub, completed options are eliminated from the choice list.
-   * When all sub-story options in a hub are completed, the hub node automatically transitions to the chapter milestone.
-2. **16-Bit JRPG Visual Presentation:**
-   * Left and right character portraits with subtle bobbing speech animations.
-   * Ornate retro stone/parchment dialogue bubbles displaying speaker names, titles, and rich narrative prose.
-   * High-atmosphere background art representing the current story location.
-
----
-
-### Pillar III: Combat Party Fidelity & Dynamic Scalability
-1. **Story-Grounded Party Rosters:**
-   * Characters only appear in combat if they have joined the active party in the story:
-     * **Act I (Chapters 1–4):** Strictly the **Duo Fellowship** (**Aethel** + **Sir Cedric**). Lyra does NOT appear in combat.
-     * **Act II Chapter 5:** Strictly the **Duo Fellowship** on a rescue operation.
-     * **Act II Chapter 6:** **Trio Fellowship** (**Aethel**, **Sir Cedric**, and **Lyra the Grove Warden**).
-     * **Later Acts:** Expanding up to a full 4-hero party (recruiting Vane and Zephyr).
-2. **Dynamic 4v6 Battle Arena:**
-   * Up to 4 heroes on the right flank facing left.
-   * Up to 6 enemies arranged in tactical **Front Row** (indices 0, 2, 4) and **Back Row** (indices 1, 3, 5).
-   * **Mid-Battle Reinforcements:** Bosses and summoners can call minions mid-fight up to the hard 6-enemy field cap.
-   * **Voice Targeting:** Supports targeting by name (*"Fireball the bog ironclad"*), title (*"Strike the gate captain"*), or ordinal index (*"Frost spike enemy 2"*).
-
----
-
-### Pillar IV: The Incantation Resonance Engine
-1. **Dual-Stream Speech Analysis:**
-   * Evaluates spoken incantations across 5 mathematical pillars:
-     1. **Thematic Vocabulary Density** (Pyromancy, Cryomancy, Electromancy, Holy, Shadow roots — up to $+45\%$).
-     2. **Lexical Richness & Syllabic Cadence** (multi-clause syntax, poetic invocations — up to $+45\%$).
-     3. **Acoustic Vocal Volume & Projection** (real-time decibel RMS — up to $+40\%$).
-     4. **Vocal Inflection & Dynamic Crescendo** (pitch variance $\Delta F_0$ and volume swelling — up to $+40\%$).
-     5. **Anti-Repetition Novelty Cache** (rewards fresh chants, penalizes spamming — up to $+30\%$).
-2. **Resonance Multipliers & Visual Scaling:**
-   * Bonus points yield damage/healing multipliers from **$1.0\times$ up to $3.0\times$ ($+200\%$)**.
-   * Particle emitters scale dynamically from 40 basic embers up to 450+ cataclysmic swirling storm particles with screen shake and chromatic aberration.
-
----
-
-### Pillar V: Character Creation & Persistent State
-1. **Initial Loadout:**
-   * Hero name, class selection (*Elementalist, Templar, Grove Warden, Shadowblade*), and starter aesthetic aura colors.
-2. **JSON State Serialization (`SaveManager`):**
-   * Persists all decisions made, narrative flags, completed encounters, party stats, and user audio preferences to `saves/active_game.json`.
-   * Automatically restored on application launch.
-
----
-
-## 3. Narrative Architecture: Chapter Roadmap
-
-```mermaid
-flowchart TD
-    subgraph Act1 ["Act I: The Falling Silence Shattered (Chapters 1-4)"]
-        Prologue["Prologue: Whispering Pines (Solo Aethel)"] --> Ch1["Chapter 1: The Old Way Shrine (Duo: Aethel + Cedric)"]
-        Ch1 --> Ch2["Chapter 2: The Campfire & Petrified Village (Duo)"]
-        Ch2 --> Ch3["Chapter 3: The Solaria Aqueduct & Tuning Fork (Duo)"]
-        Ch3 --> Ch4["Chapter 4: The Sun-Tower Belfry & First Bell of Solaria (Duo)"]
-    end
-
-    subgraph Act2 ["Act II: The Severed Resonance (Chapters 5-8)"]
-        Ch4 --> Ch5["Chapter 5: The Rotting Marsh & The Briar Cage Rescue (Duo Mission)"]
-        Ch5 --> Ch6["Chapter 6: The Warden's Oath & The Weeping Willow (Trio: Lyra Joins!)"]
-        Ch6 --> Ch7["Chapter 7: Tuning the Veridian Chime (Trio vs. Ancient Mire Wyrm)"]
-        Ch7 --> Ch8["Chapter 8: The Shadowed Crags & Zephyr's Defection (Option A: Mid-Battle Defection!)"]
-    end
-
-    subgraph Act3 ["Act III: The Crucible of Oaths — Required Companion Trials (Chapters 9-11)"]
-        Ch8 --> Ch9["Chapter 9: The Broken Vow of Dawn (Cedric vs. Grandmaster Galahault -> Unlocks Aegis of the Dawn)"]
-        Ch9 --> Ch10["Chapter 10: The Song of the Mute Grove (Lyra vs. Blighted Broodmother -> Unlocks Verdant Cataclysm)"]
-        Ch10 --> Ch11["Chapter 11: The Silent Blade's Reckoning (Zephyr vs. Master Nocturne -> Unlocks Umbral Oblivion)"]
-    end
-
-    subgraph Act4 ["Act IV: Ascent of the Monolith (Chapters 12-14)"]
-        Ch11 --> Ch12["Chapter 12: Awakening the Third Bell (Clockwork Bastion vs. Warmaster Ouros)"]
-        Ch12 --> Ch13["Chapter 13: Breach of the Silent Citadel (Black Glass Gates vs. Commander Vaelor)"]
-        Ch13 --> Ch14["Chapter 14: The Void Reservoir (Liquid Silence vs. Abyssal Leviathan)"]
-    end
-
-    subgraph Act5 ["Act V & Epilogue: The Primordial Syllable & The Great Awakening (Chapters 15-16 & Epilogue)"]
-        Ch14 --> Ch15["Chapter 15: Ascent of the Celestial Spire (Ribbon Stair vs. Archon Custodians)"]
-        Ch15 --> Ch16["Chapter 16: The Primordial Syllable (Final Summit vs. Malakor; Phase 3 'Death of Voice' Mute Cut -> Primordial Syllable Unison)"]
-        Ch16 --> Epilogue["Epilogue: The Great Awakening (Four Great Bells in Harmony; Whispering Pines Restored; Final Credits)"]
-    end
+### 1.1 Layout
 ```
+app/src/main/assets/game/
+├── manifest.json              # Identity: title, initial scene/node, default encounter, victory/defeat lines
+├── characters/*.json          # Speakers + combatants: dialogue identity, voice, and combat stats/growth
+├── classes/*.json             # Character-creation classes: stats, starter spells, growth, voice keywords
+├── spells/spells.json         # The full voice-chantable spell library (single source of truth)
+├── enemies/enemies.json       # Reusable enemy templates (moveset, family, sprite)
+├── encounters/encounters.json # Combat encounters incl. boss phases, summons, mid-battle joins
+└── story/
+    ├── scenes.json            # Scene = background + music + entry node + chapter/milestone metadata
+    └── nodes.json             # The branching dialogue/state-machine graph
+```
+Plus runtime assets referenced by those files: `assets/portraits/*`, `assets/story/*`, `assets/audio/*`, `assets/sprites/*`.
 
-### Detailed Acts III–V & Epilogue Breakdown:
-* **Chapter 8: The Shadowed Crags & Zephyr's Defection (Option A Mid-Battle Defection):**
-  * **Setting:** *The Shadowed Crags*.
-  * **Plot:** Grand Executioner Kaelen ambushes the trio. Mid-battle, the Inquisition's top assassin—Zephyr the Shadowblade—defects to the fellowship, turning his twin daggers against Kaelen and forging the 4-hero party!
-* **Chapter 9: The Broken Vow of Dawn (Cedric's Required Trial):**
-  * **Setting:** *The Mausoleum of the Sun*.
-  * **Plot & Combat:** Cedric confronts his fallen mentor, Grandmaster Galahault. Resolves Cedric's shame over opening the gates to save orphans, unlocking the Master Chant: *Aegis of the Dawn*.
-* **Chapter 10: The Song of the Mute Grove (Lyra's Required Trial):**
-  * **Setting:** *The Emerald Choir*.
-  * **Plot & Combat:** Lyra confronts the Blighted Broodmother corrupting the sacred spring, awakening 30 petrified singing dryads and unlocking the Master Chant: *Verdant Cataclysm*.
-* **Chapter 11: The Silent Blade's Reckoning (Zephyr's Required Trial):**
-  * **Setting:** *The Blind Gorge*.
-  * **Plot & Combat:** Zephyr disarms sonic mines and slays Master Nocturne, shattering the Black Guild of the Mute and unlocking the Master Chant: *Umbral Oblivion*.
-* **Chapter 12: Awakening the Third Bell:**
-  * **Setting:** *The Clockwork Bastion of Ouros*.
-  * **Combat:** Clashing against 10-foot automaton Warmaster Ouros and steam arbalests. Tolling the Third Great Bell raises the cosmic sky bridge to the floating capital of Sol-Aethel!
-* **Chapter 13: Breach of the Silent Citadel:**
-  * **Setting:** *The Gates of Sol-Aethel*.
-  * **Combat:** Shattering the black glass portcullis and defeating Commander Vaelor wielding the dreaded Void Horn.
-* **Chapter 14: The Void Reservoir:**
-  * **Setting:** *The Lake of Liquid Silence*.
-  * **Combat:** Defeating the gargantuan Abyssal Leviathan and its Muffle Aura, releasing millions of captive voice motes that construct the Ribbon Stair.
-* **Chapter 15: Ascent of the Celestial Spire:**
-  * **Setting:** *The Ribbon Stair & Celestial Belfry Landing*.
-  * **Plot:** Emotional fellowship vigils with Cedric, Lyra, and Zephyr on the threshold of eternity. Defeating the Archon Custodians to open the final belfry doors.
-* **Chapter 16: The Primordial Syllable (Grand Finale):**
-  * **Setting:** *The Celestial Belfry Summit*.
-  * **Boss Encounter:** Grand Inquisitor Malakor (The Mute Sovereign) + 4 Echo Nullifiers.
-  * **Phase 3 ("The Death of Voice"):** At $\le 450$ HP, all game audio drops dead silent (`sfxManager.mute(true)`), evoking the prologue's opening morning of silence. The player speaks the 4-line Primordial Incantation in unison with all 4 companions, instantly unmuting audio, detonating 120 cosmic particles, granting $+200\%$ Transcendental Resonance, and redeeming Malakor!
-* **Epilogue: The Great Awakening:**
-  * **Setting:** *Aethelgard Restored & The Spire Overlook*.
-  * **Resolution:** All 4 Great Bells ring in cosmic harmony. The petrified citizens of Whispering Pines awaken. Companion epilogues and final credits.
+### 1.2 Resolution & Accessor Surface
+`GameContent` (the `content` package) parses the pack at boot into typed models and exposes map accessors by id: `scenes`, `nodes`, `characters`, `classes`, `spells`, `encounters`, `enemyTemplates`, `speakerById`, `characterById`, `classById`, `spellById`, `encounterById`, `enemyTemplateById`, `heroCharacter`, `heroSpellsFor`, `createDuoParty`, `createMinion`, `preferredVoiceIds`, `allSpeakers`. **Every cross-reference in content resolves through these maps; a dangling id fails the schema tests.**
 
 ---
 
-## 4. Technical Stack Summary
+## 2. The Audio-First Pillar (voice is primary, not flavor)
+
+### 2.1 Screenless / Pocket Mode
+- Every game state — dialogue, choices, battle actions, hero turns, enemy reinforcements, results — can be narrated via TTS.
+- Microphone auto-listen re-arms after each TTS cue for a continuous hands-free loop.
+- Meta-commands invoke system state anytime: *"Status"*, *"Enemies"*, *"Fellowship"*, *"Help"*, *"Options"*, *"Pocket mode"*, *"Auto listen"*, *"Toggle narration"*, *"Read choices"*.
+
+### 2.2 Multi-Voice TTS Binding
+- The engine enumerates installed `android.speech.tts.Voice` models and binds distinct physical voices to characters.
+- Characters declare `preferredVoiceId` (exact TTS voice) with `ttsPitch`/`samplePhrase` fallback modulation when a requested voice isn't installed.
+- `GameContent.preferredVoiceIds` / `CombatNarrator.PREFERRED_VOICE_IDS` is derived from content — only characters with a non-null `preferredVoiceId` appear.
+
+---
+
+## 3. The Story State Machine
+
+### 3.1 Scenes
+A scene binds `backgroundAsset` + `musicAsset` + `initialNodeId` and carries the metadata feeding the spoken Quest Recap and chapter-warp debug menu: `chapterIndex`, `actNumber`, `actTitle`, `milestoneTitle/Location/Summary/Icon`, `defaultObjective`.
+
+### 3.2 Nodes (the graph)
+Each node is one narrative beat:
+- `speakerId` → resolves to a character (portrait, title, color, pitch).
+- `nextNodeId` → continue.
+- `choices[]` → each has `text`, `voiceKeywords`, `nextNodeId`, optional `completionFlag`.
+- `setFlagOnEnter` → persists a story flag when the node is entered.
+- `triggerBattleEncounterId` + `nextNodeId` → pauses narrative, runs a combat encounter, resumes at `nextNodeId` on victory.
+- `changeSceneId` → swaps background/music and enters the target scene's `initialNodeId`.
+- `healPartyOnEnter` → `half` or `full` party restore.
+- `hubCompletion` (`requiredFlags` + `redirectToNodeId`) → auto-redirect once all required flags are set.
+
+### 3.3 Non-Looping Flow Contract
+1. Hub choices set a `completionFlag`; returning to the hub **eliminates completed options**.
+2. When every hub sub-story is complete, the hub **auto-redirects** via `hubCompletion`.
+3. The only terminal node is one that sets `game_completed`. Every other node continues via `nextNodeId`, `choices`, `hubCompletion`, or a battle trigger. **No dead ends.**
+
+---
+
+## 4. The Resonance Engine (the only skill multiplier)
+
+### 4.1 Scoring pillars (up to 200%)
+Incantations are scored on five mathematical pillars, dominated by acoustic + linguistic structure:
+
+| Pillar | Source | Ceiling |
+|---|---|---|
+| Thematic vocabulary density | `SpellThesaurus` per-school root lexicon | +45 |
+| Lexical richness & multi-clause syntax | word count | +45 |
+| Vocal volume & projection | `AcousticProfile.volumeScore` | +40 |
+| Inflection, pitch variance & crescendo | `AcousticProfile.inflectionScore` | +40 |
+| Anti-repetition novelty | `NoveltyCache` | +30 |
+
+### 4.2 Tier brackets
+`≥155` TRANSCENDENTAL (2.55x–3.0x), `≥100` MYTHIC (2.0x–2.5x), `≥55` MASTER (1.55x–1.95x), `≥20` ADEPT (1.2x–1.5x), else BASIC (1.0x–1.15x). Bonus computes the damage/heal multiplier; particle count and screen effects scale with score.
+
+### 4.3 Generic preset calibration
+For hands-free, simulator, and automated testing, `SpellChantPresets` builds a deterministic chant per tier from **any spell name alone**, paired with that tier's fixed `AcousticProfile`. Constraints:
+- BASIC ≈ 10, ADEPT ≈ 28, MASTER ≈ 75, MYTHIC ≈ 119, TRANSCENDENTAL ≈ 157 (landing inside their brackets).
+- This is **only sound if each spell name matches exactly one thematic root** — which is why the per-school thesaurus lexicon must stay complete and generic, and why `testAllSpellChantPresetsAcrossAllResonanceTiers` iterates the entire spell catalog (0-root names underflow TRANSCENDENTAL; 2-root names overflow BASIC).
+
+### 4.4 Hard invariant
+**Resonance is sacred.** It is the only 1.0x–3.0x multiplier in the game. Affinity modifiers and stats may never exceed or replace it.
+
+---
+
+## 5. Real-Time ATB Combat
+
+- **Initiative:** Agility-driven ATB gauges tick for heroes and enemies concurrently (pause/resume friendly). Gauge speed feeds the turn queue.
+- **Ordering:** Heroes on the left, up to 4; enemies in tactical front/back rows, up to 6; reinforcements appear mid-battle up to the hard field cap.
+- **Encounters (`encounters.json`):** `party` (character ids, or empty = active campaign party), `enemies` (template + per-instance overrides), `bossPhases` (threshold announcements, party-wide pressure via `reducePartyToHpPct`/`executeBelowHpPct`, summons), `midBattleJoin` (character joins after N enemy actions).
+- **Enemy AI:** `EnemyBrain` behavior trees (threat, health thresholds, status exploitation, roles) powered by per-template `movesetId`s from the generated `MovesetTable`.
+- **Affinity matrix:** 7 spell schools × 7 enemy families drive weak/resist/absorb with an impairment-only **0.8 floor on base damage** — nothing is ever blocked, and the resonance multiplier is never discounted.
+- **Statuses:** damage-over-time, crowd control, buffs/debuffs, shields; potency gated by tier (status resistance applies to potency/duration, never to the resonance multiplier).
+- **Progression:** XP → level → per-class growth (`classes/*.json` + character `growth`), spell unlocks via `starterSpellIds`/`spellGrants`.
+
+---
+
+## 6. Persistence & Save
+
+- `SaveManager` writes **multi-slot JSON** snapshots with `AtomicFile` semantics (crash-safe) and schema backward-compatibility.
+- Persisted state: story flags, current scene/node, party stats/levels/XP, defeated/completed encounters, and user audio/options preferences (narration speed, voice pitch, pocket settings).
+- Character ids are the durable keys — content edits that keep ids stable preserve saves.
+
+---
+
+## 7. Test Strategy (green against any content pack)
+
+The suite (`./gradlew testDebugUnitTest`) is content-agnostic:
+1. **Schema/invariant tests** iterate `GameContent` and validate the engine contract — every link resolves, no dead ends except `game_completed`, every choice has `voiceKeywords`, battle triggers resolve, flags are non-blank, hubs resolve, scene entries resolve, full node-reachability.
+2. **Engine-mechanics tests** exercise behavior on the template data — resonance calibration, tutorial flow, combat economy, intent/voice resolution, save round-trips, story state-machine walks (choice elimination, scene change, battle-trigger resume, `game_completed` termination).
+
+A valid new game = any content pack that satisfies the schema invariants; the engine's behavior guarantees are what the tests assert, never the fiction.
+
+---
+
+## 8. Technical Stack
 
 | Subsystem | Technology | Specifications |
 | :--- | :--- | :--- |
-| **Language & Tooling** | Kotlin 1.9+, Gradle 8.4+ | JDK 17, Min SDK 26, Compile/Target SDK 34 |
-| **UI Framework** | Jetpack Compose + Compose Canvas | 60 FPS hardware accelerated rendering |
-| **Speech Recognition** | `android.speech.SpeechRecognizer` | 100% on-device offline recognition (`EXTRA_PREFER_OFFLINE`) |
-| **Text-To-Speech** | `android.speech.tts.TextToSpeech` | Multi-voice selection via `tts.voices`, dynamic per-speaker binding |
-| **Persistence** | Custom JSON Engine (`SaveManager`) | Atomic file writes, schema backward-compatibility |
-| **Testing** | JUnit 4, Kotlin Coroutines Test | Headless test support, 100% unit-tested game mechanics |
-| **Deployment** | Android Debug Bridge (ADB) | Wi-Fi wireless debugging & automated GitHub release pipeline |
+| Language & tooling | Kotlin, Gradle, JDK 17 | Min SDK 26, Compile/Target SDK 34 |
+| UI | Jetpack Compose + Compose Canvas | 60 FPS hardware-accelerated retro rendering |
+| Speech recognition | `android.speech.SpeechRecognizer` | on-device offline recognition |
+| Text-to-speech | `android.speech.tts.TextToSpeech` | multi-voice via `tts.voices`, per-speaker binding |
+| Persistence | `SaveManager` | multi-slot AtomicFile JSON, backward-compatible |
+| Testing | JUnit 4 + kotlinx-coroutines-test | schema invariants + engine mechanics, no content coupling |

@@ -123,7 +123,7 @@ private fun EnemyCard(
     }
 
     PixelCharacterView(
-        characterId = enemy.id,
+        characterId = enemy.spriteId.ifBlank { enemy.id },
         name = enemy.name,
         subtitle = enemy.subtitle,
         hpRatio = enemy.hpRatio,

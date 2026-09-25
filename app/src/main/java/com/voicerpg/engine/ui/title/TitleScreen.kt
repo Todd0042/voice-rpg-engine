@@ -64,6 +64,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.voicerpg.engine.audio.SpeechState
+import com.voicerpg.engine.content.GameContent
+import com.voicerpg.engine.content.GameManifest
 import com.voicerpg.engine.model.SaveSlotInfo
 import com.voicerpg.engine.model.SaveSummary
 import com.voicerpg.engine.ui.story.StoryAssetLoader
@@ -78,7 +80,9 @@ import com.voicerpg.engine.ui.theme.RetroDeepSlate
 import com.voicerpg.engine.ui.theme.RetroPanel
 
 /**
- * Atmospheric Title & Main Menu Screen for VoiceRPG: Echoes of the Logos.
+ * Atmospheric Title & Main Menu Screen. Fully manifest-driven: the hero title, subtitle,
+ * and background artwork come from the game manifest (assets/game/manifest.json), so any
+ * VoiceRPG game title can re-skin this screen without touching engine code.
  * Provides hands-free voice command navigation, save summary preview, overwrite confirmation,
  * and immediate access to Audio Setup, Options, and Campaign Continue.
  */
@@ -103,6 +107,17 @@ fun TitleScreen(
     onPureStoryMode: (fresh: Boolean) -> Unit = {},
     onStartListening: () -> Unit,
     onStopListening: () -> Unit,
+    manifest: GameManifest = GameManifest(
+        gameTitle = "VOICE RPG",
+        gameSubtitle = "Template Voice-First RPG Adventure",
+        initialSceneId = "",
+        initialNodeId = "",
+        defaultEncounterId = "",
+        startingAchievementId = "QUEST_BEGUN",
+        victoryLine = "Victory! The battle is won.",
+        defeatLine = "Defeat. Your voice fades.",
+        titleBackgroundAsset = null
+    ),
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -111,8 +126,11 @@ fun TitleScreen(
     var showStoryModePromptDialog by remember { mutableStateOf(false) }
     var slotDialogIsNewGameMode by remember { mutableStateOf(false) }
 
-    val backgroundBitmap = remember {
-        StoryAssetLoader.loadBitmap(context, "backgrounds/bg_summit.jpg")
+    val backgroundBitmap = remember(manifest.titleBackgroundAsset) {
+        StoryAssetLoader.loadBitmap(
+            context,
+            manifest.titleBackgroundAsset ?: "backgrounds/bg_summit.jpg"
+        )
     }
 
     val infiniteTransition = rememberInfiniteTransition(label = "title_glow")
@@ -172,7 +190,7 @@ fun TitleScreen(
                 modifier = Modifier.padding(top = 16.dp)
             ) {
                 Text(
-                    text = "VOICE RPG",
+                    text = "VOICE-FIRST RPG",
                     color = LogosGold.copy(alpha = 0.9f),
                     fontSize = 13.sp,
                     fontWeight = FontWeight.Bold,
@@ -183,7 +201,7 @@ fun TitleScreen(
                 Spacer(modifier = Modifier.height(4.dp))
 
                 Text(
-                    text = "ECHOES OF THE LOGOS",
+                    text = manifest.gameTitle,
                     color = LogosGold,
                     fontSize = 24.sp,
                     fontWeight = FontWeight.Black,
@@ -209,12 +227,13 @@ fun TitleScreen(
                 Spacer(modifier = Modifier.height(8.dp))
 
                 Text(
-                    text = "A Voice-First High Fantasy Chronicle",
+                    text = manifest.gameSubtitle.ifBlank { "Voice-Commanded Storytelling RPG" },
                     color = Color.LightGray.copy(alpha = 0.85f),
                     fontSize = 11.sp,
                     fontFamily = FontFamily.Monospace,
                     textAlign = TextAlign.Center
                 )
+
             }
 
             Spacer(modifier = Modifier.height(24.dp))
@@ -587,7 +606,7 @@ fun TitleScreen(
                         )
 
                         Text(
-                            text = "An active journey for ${saveSummary?.heroName ?: "your Hero"} in ${saveSummary?.chapterTitle ?: "Aethelgard"} is currently saved.\n\nBeginning a new campaign will replace this save file. Are you certain you wish to proceed?",
+                            text = "An active journey for ${saveSummary?.heroName ?: "your Hero"} in ${saveSummary?.chapterTitle ?: GameContent.manifest.worldName} is currently saved.\n\nBeginning a new campaign will replace this save file. Are you certain you wish to proceed?",
                             color = Color.LightGray,
                             fontSize = 12.sp,
                             fontFamily = FontFamily.Monospace,

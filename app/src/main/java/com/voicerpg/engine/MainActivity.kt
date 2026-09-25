@@ -78,6 +78,12 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        // Load the drop-in game content pack from Android assets BEFORE constructing any
+        // ViewModel. On-device there is no filesystem pack (that path is for tests/CI), so
+        // without this the engine would fall back to the empty EmergencyFallback and every
+        // battle/tutorial/story screen would crash on boot. Content stays JSON + assets only.
+        com.voicerpg.engine.content.GameContent.initialize(applicationContext)
+
         speechManager = SpeechManager(this)
         combatNarrator = CombatNarrator(this)
         musicManager = MusicManager(this)
@@ -202,6 +208,15 @@ class MainActivity : ComponentActivity() {
                 combatViewModel.setPureStoryMode(storyState.isPureStoryMode)
             }
 
+            LaunchedEffect(storyState.gameScreen) {
+                if (storyState.gameScreen != GameScreen.COMBAT_ARENA) {
+                    combatViewModel.pauseAtb()
+                }
+                if (storyState.gameScreen == GameScreen.TUTORIAL) {
+                    tutorialBattleViewModel.startTutorial()
+                }
+            }
+
             LaunchedEffect(storyState.currentScene.id, storyState.gameScreen) {
                 if (storyState.gameScreen == GameScreen.COMBAT_ARENA) {
                     musicManager.playCombatMusic()
@@ -210,7 +225,7 @@ class MainActivity : ComponentActivity() {
                 } else if (storyState.gameScreen == GameScreen.TITLE || storyState.gameScreen == GameScreen.TUTORIAL) {
                     musicManager.playTrack(MusicManager.TRACK_TITLE)
                 } else {
-                    musicManager.playTrack(MusicManager.TRACK_ACT1_FOREST)
+                    musicManager.playTrack(MusicManager.TRACK_EXPLORATION)
                 }
             }
 

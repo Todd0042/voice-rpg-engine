@@ -17,10 +17,14 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.defaultMinSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -57,6 +61,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.voicerpg.engine.content.GameContent
 import com.voicerpg.engine.model.DialogueChoice
 import com.voicerpg.engine.model.DialogueNode
 import com.voicerpg.engine.model.DialogueSpeaker
@@ -90,11 +95,18 @@ fun StoryScreen(
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
 
-    val backgroundBitmap = remember(storyState.currentScene.backgroundAsset) {
-        StoryAssetLoader.loadBitmap(context, storyState.currentScene.backgroundAsset)
+    // Load orientation-aware background: portrait variant (_p.jpg) when in portrait mode,
+    // falling back to the landscape image when no portrait variant asset is present.
+    val backgroundBitmap = remember(storyState.currentScene.backgroundAsset, isLandscape) {
+        StoryAssetLoader.loadBackground(
+            context,
+            storyState.currentScene.backgroundAsset,
+            isPortrait = !isLandscape
+        )
     }
-    val aethelBitmap = remember {
-        StoryAssetLoader.loadBitmap(context, "portraits/aethel.jpg")
+    val heroSpeaker = GameContent.heroCharacter?.speaker
+    val heroBitmap = remember(heroSpeaker?.portraitAsset) {
+        heroSpeaker?.portraitAsset?.let { StoryAssetLoader.loadBitmap(context, it) }
     }
 
     val currentNode = storyState.currentNode
@@ -107,45 +119,21 @@ fun StoryScreen(
         narratorAsset?.let { StoryAssetLoader.loadBitmap(context, it) }
     }
 
-    val leftSpeaker = if (isNarratorSpeaking) DialogueSpeaker.NARRATOR else DialogueSpeaker.AETHEL
-    val leftBitmap = if (isNarratorSpeaking) narratorBitmap else aethelBitmap
-    val isLeftSpeaking = if (isNarratorSpeaking) true else (currentNode.speaker == DialogueSpeaker.AETHEL || currentNode.side == SpeakerSide.LEFT)
+    val leftSpeaker = if (isNarratorSpeaking) DialogueSpeaker.NARRATOR else (heroSpeaker ?: DialogueSpeaker.NARRATOR)
+    val leftBitmap = if (isNarratorSpeaking) narratorBitmap else (heroBitmap ?: narratorBitmap)
+    val isLeftSpeaking = if (isNarratorSpeaking) true else (currentNode.speaker == heroSpeaker || currentNode.side == SpeakerSide.LEFT)
 
-    val rightSpeaker: DialogueSpeaker? = remember(currentNode.id, currentNode.speaker.id, storyState.currentScene.name) {
+    val rightSpeaker: DialogueSpeaker? = remember(currentNode.id, currentNode.speaker.id) {
         when {
-            currentNode.speaker == DialogueSpeaker.NARRATOR -> {
+            isNarratorSpeaking || currentNode.speaker == heroSpeaker -> {
                 null
-            }
-            currentNode.speaker != DialogueSpeaker.AETHEL -> {
-                currentNode.speaker
-            }
-            storyState.currentScene.chapterTitle.contains("Prologue", ignoreCase = true) ||
-            storyState.currentScene.name.contains("Cottage", ignoreCase = true) -> {
-                null
-            }
-            currentNode.id.contains("lyra", ignoreCase = true) ||
-            storyState.partyStats.any { it.id == "lyra" } ||
-            storyState.currentScene.chapterTitle.contains("Chapter 5", ignoreCase = true) ||
-            storyState.currentScene.chapterTitle.contains("Chapter 6", ignoreCase = true) -> {
-                DialogueSpeaker.LYRA
-            }
-            currentNode.id.contains("zephyr", ignoreCase = true) ||
-            storyState.partyStats.any { it.id == "zephyr" } ||
-            storyState.currentScene.chapterTitle.contains("Chapter 7", ignoreCase = true) ||
-            storyState.currentScene.chapterTitle.contains("Chapter 8", ignoreCase = true) -> {
-                DialogueSpeaker.ZEPHYR
-            }
-            currentNode.id.contains("malakor", ignoreCase = true) ||
-            storyState.partyStats.any { it.id == "malakor" } ||
-            storyState.currentScene.chapterTitle.contains("Chapter 9", ignoreCase = true) ||
-            storyState.currentScene.chapterTitle.contains("Chapter 10", ignoreCase = true) -> {
-                DialogueSpeaker.MALAKOR
             }
             else -> {
-                DialogueSpeaker.CEDRIC
+                currentNode.speaker
             }
         }
     }
+    val isRightWisp = rightSpeaker?.id?.contains("wisp", ignoreCase = true) == true
 
     val rightSpeakerAsset = remember(rightSpeaker?.id) {
         rightSpeaker?.effectivePortraitAsset(currentNode.id)
@@ -187,12 +175,31 @@ fun StoryScreen(
                     } else Modifier
                 )
         ) {
-            // 1. Room / Exploration Scene Background Image (Widescreen 16:9)
+            // 1. Scene Background — orientation-aware scaling strategy:
+            //    • Landscape + 16:9 source  → ContentScale.Crop  (fills frame, minimal crop)
+            //    • Portrait  + 9:16 _p.jpg  → ContentScale.FillBounds (fills frame perfectly)
+            //    • Portrait  + 16:9 fallback → ContentScale.FillWidth  (pins width, avoids
+            //      severe horizontal crop; lower gradient vignette masks the letterbox naturally)
             if (backgroundBitmap != null) {
+                val bgScale = when {
+                    isLandscape -> ContentScale.Crop
+                    // If the bitmap is wider than tall it came from the landscape fallback;
+                    // pin width so the full horizontal composition stays visible.
+                    backgroundBitmap.width > backgroundBitmap.height -> ContentScale.FillWidth
+                    // Native portrait asset: fill the frame perfectly.
+                    else -> ContentScale.FillBounds
+                }
                 Image(
                     bitmap = backgroundBitmap,
                     contentDescription = storyState.currentScene.name,
-                    contentScale = ContentScale.Crop,
+                    contentScale = bgScale,
+                    alignment = if (!isLandscape && backgroundBitmap.width > backgroundBitmap.height) {
+                        // Align landscape-fallback image to the top so the most meaningful
+                        // part of the scene (storefront, faces) stays in the upper 2/3.
+                        Alignment.TopCenter
+                    } else {
+                        Alignment.Center
+                    },
                     modifier = Modifier.fillMaxSize()
                 )
             } else {
@@ -439,8 +446,10 @@ fun StoryScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .fillMaxHeight()
                         .align(Alignment.BottomCenter)
                         .padding(start = 12.dp, end = 12.dp, bottom = 8.dp, top = 80.dp),
+                    verticalArrangement = Arrangement.Bottom,
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     // Character Portraits Row (Resting cleanly right on top of the speech bubble)
@@ -451,7 +460,7 @@ fun StoryScreen(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.Bottom
                     ) {
-                        // Left Character (Aethel or Narrator)
+                        // Left Character (Hero or Narrator)
                         CharacterPortraitBust(
                             bitmap = leftBitmap,
                             speaker = leftSpeaker,
@@ -462,7 +471,7 @@ fun StoryScreen(
 
                         // Right Character (Companion / NPC)
                         if (rightSpeaker != null) {
-                            if (rightSpeaker == DialogueSpeaker.SHADOW_WISP) {
+                            if (isRightWisp) {
                                 ShadowWispBust(
                                     bitmap = rightBitmap,
                                     isSpeaking = isRightSpeaking,
@@ -504,19 +513,43 @@ fun StoryScreen(
                     // Choice Buttons (if node has branching choices)
                     if (currentNode.choices.isNotEmpty()) {
                         Spacer(modifier = Modifier.height(6.dp))
-                        Column(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        val choicesScrollState = rememberScrollState()
+                        LaunchedEffect(currentNode.id) {
+                            choicesScrollState.scrollTo(0)
+                        }
+
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .weight(1f, fill = false)
                         ) {
-                            currentNode.choices.forEachIndexed { index, choice ->
-                                val isCompleted = choice.completionFlag != null && storyState.narrativeFlags[choice.completionFlag] == true
-                                DialogueChoiceItem(
-                                    index = index + 1,
-                                    choice = choice,
-                                    isCompleted = isCompleted,
-                                    onSelect = { storyViewModel.selectChoice(choice) }
-                                )
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .verticalScroll(choicesScrollState),
+                                verticalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                currentNode.choices.forEachIndexed { index, choice ->
+                                    val isCompleted = choice.completionFlag != null && storyState.narrativeFlags[choice.completionFlag] == true
+                                    DialogueChoiceItem(
+                                        index = index + 1,
+                                        choice = choice,
+                                        isCompleted = isCompleted,
+                                        onSelect = { storyViewModel.selectChoice(choice) }
+                                    )
+                                }
                             }
+                        }
+
+                        if (choicesScrollState.canScrollForward) {
+                            Text(
+                                text = "▼ SCROLL FOR MORE OPTIONS ▼",
+                                color = LogosGold.copy(alpha = 0.85f),
+                                fontSize = 9.sp,
+                                fontFamily = FontFamily.Monospace,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(top = 2.dp)
+                            )
                         }
                     }
 
@@ -565,7 +598,7 @@ fun StoryScreen(
 
                 // Right Flank: Companion / NPC Bust standing on the right
                 if (rightSpeaker != null) {
-                    if (rightSpeaker == DialogueSpeaker.SHADOW_WISP) {
+                    if (isRightWisp) {
                         ShadowWispBust(
                             bitmap = rightBitmap,
                             isSpeaking = isRightSpeaking,
@@ -592,9 +625,11 @@ fun StoryScreen(
                 // Center Stage: Dialogue Bubble & Choices positioned neatly between characters
                 Column(
                     modifier = Modifier
-                        .padding(start = 130.dp, end = if (rightSpeaker != null) 130.dp else 16.dp, bottom = 6.dp)
+                        .fillMaxHeight()
+                        .padding(start = 130.dp, end = if (rightSpeaker != null) 130.dp else 16.dp, top = 48.dp, bottom = 6.dp)
                         .widthIn(max = 600.dp)
                         .align(Alignment.BottomCenter),
+                    verticalArrangement = Arrangement.Bottom,
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     // Retro Speech Bubble
@@ -612,72 +647,68 @@ fun StoryScreen(
                             .wrapContentHeight(Alignment.Top)
                     )
 
-                    // Choice Buttons in Landscape: Side-by-side or compact 2-row grid to preserve artwork space
+                    // Choice Buttons in Landscape: Side-by-side pairs in a vertically scrollable container
                     if (currentNode.choices.isNotEmpty()) {
                         Spacer(modifier = Modifier.height(4.dp))
-                        if (currentNode.choices.size == 2) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                currentNode.choices.forEachIndexed { index, choice ->
-                                    val isCompleted = choice.completionFlag != null && storyState.narrativeFlags[choice.completionFlag] == true
-                                    DialogueChoiceItem(
-                                        index = index + 1,
-                                        choice = choice,
-                                        isCompleted = isCompleted,
-                                        onSelect = { storyViewModel.selectChoice(choice) },
-                                        modifier = Modifier.weight(1f)
-                                    )
-                                }
-                            }
-                        } else if (currentNode.choices.size == 3) {
+                        val landscapeChoicesScrollState = rememberScrollState()
+                        LaunchedEffect(currentNode.id) {
+                            landscapeChoicesScrollState.scrollTo(0)
+                        }
+
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .weight(1f, fill = false)
+                        ) {
                             Column(
-                                modifier = Modifier.fillMaxWidth(),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .verticalScroll(landscapeChoicesScrollState),
                                 verticalArrangement = Arrangement.spacedBy(4.dp)
                             ) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                ) {
-                                    for (i in 0..1) {
-                                        val choice = currentNode.choices[i]
+                                currentNode.choices.chunked(2).forEachIndexed { rowIndex, rowChoices ->
+                                    if (rowChoices.size == 2) {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                        ) {
+                                            rowChoices.forEachIndexed { colIndex, choice ->
+                                                val originalIndex = rowIndex * 2 + colIndex
+                                                val isCompleted = choice.completionFlag != null && storyState.narrativeFlags[choice.completionFlag] == true
+                                                DialogueChoiceItem(
+                                                    index = originalIndex + 1,
+                                                    choice = choice,
+                                                    isCompleted = isCompleted,
+                                                    onSelect = { storyViewModel.selectChoice(choice) },
+                                                    modifier = Modifier.weight(1f)
+                                                )
+                                            }
+                                        }
+                                    } else {
+                                        val choice = rowChoices.first()
+                                        val originalIndex = rowIndex * 2
                                         val isCompleted = choice.completionFlag != null && storyState.narrativeFlags[choice.completionFlag] == true
                                         DialogueChoiceItem(
-                                            index = i + 1,
+                                            index = originalIndex + 1,
                                             choice = choice,
                                             isCompleted = isCompleted,
                                             onSelect = { storyViewModel.selectChoice(choice) },
-                                            modifier = Modifier.weight(1f)
+                                            modifier = Modifier.fillMaxWidth()
                                         )
                                     }
                                 }
-                                val choice3 = currentNode.choices[2]
-                                val isCompleted = choice3.completionFlag != null && storyState.narrativeFlags[choice3.completionFlag] == true
-                                DialogueChoiceItem(
-                                    index = 3,
-                                    choice = choice3,
-                                    isCompleted = isCompleted,
-                                    onSelect = { storyViewModel.selectChoice(choice3) },
-                                    modifier = Modifier.fillMaxWidth()
-                                )
                             }
-                        } else {
-                            Column(
-                                modifier = Modifier.fillMaxWidth(),
-                                verticalArrangement = Arrangement.spacedBy(4.dp)
-                            ) {
-                                currentNode.choices.forEachIndexed { index, choice ->
-                                    val isCompleted = choice.completionFlag != null && storyState.narrativeFlags[choice.completionFlag] == true
-                                    DialogueChoiceItem(
-                                        index = index + 1,
-                                        choice = choice,
-                                        isCompleted = isCompleted,
-                                        onSelect = { storyViewModel.selectChoice(choice) },
-                                        modifier = Modifier.fillMaxWidth()
-                                    )
-                                }
-                            }
+                        }
+
+                        if (landscapeChoicesScrollState.canScrollForward) {
+                            Text(
+                                text = "▼ SCROLL FOR MORE OPTIONS ▼",
+                                color = LogosGold.copy(alpha = 0.85f),
+                                fontSize = 8.sp,
+                                fontFamily = FontFamily.Monospace,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(top = 1.dp)
+                            )
                         }
                     }
 

@@ -1,8 +1,12 @@
 package com.voicerpg.engine.combat
 
+import com.voicerpg.engine.content.GameContent
+
 /**
  * Shallow progression (SPEC §8): levels grow HP/MP/speed/defense + a 3-4.5%/level
  * potency multiplier on base power. Never a dominant ATK stat — resonance stays king.
+ * Growth curves are data-driven: hero classes define their growth in
+ * assets/game/classes/<name>.json and companion characters in assets/game/characters/<name>.json.
  */
 data class StatGrowth(
     val maxHp: Int,
@@ -35,28 +39,26 @@ object Progression {
     const val MAX_LEVEL = 30
     const val FALLEN_SHARE = 0.5f
 
+    val DEFAULT_GROWTH = StatGrowth(18, 8, 1, 1, 0.03f)
+
     fun xpToNext(level: Int): Int = 80 + 60 * level
 
-    val GROWTH: Map<String, StatGrowth> = mapOf(
-        "default" to StatGrowth(18, 8, 1, 1, 0.03f),
-        "hero/elementalist" to StatGrowth(12, 14, 1, 1, 0.04f),
-        "hero/battlemage" to StatGrowth(16, 10, 1, 2, 0.035f),
-        "hero/chanter" to StatGrowth(14, 12, 1, 1, 0.03f),
-        "hero/shadowweaver" to StatGrowth(11, 11, 2, 1, 0.04f),
-        "cedric/templar" to StatGrowth(24, 6, 1, 3, 0.03f),
-        "lyra/warden" to StatGrowth(15, 12, 1, 1, 0.035f),
-        "zephyr/shadowblade" to StatGrowth(12, 9, 2, 1, 0.045f)
-    )
-
-    fun growthFor(classKey: String): StatGrowth = GROWTH[classKey] ?: GROWTH.getValue("default")
-
-    fun classKey(memberId: String, loreClass: String): String = when {
-        memberId == "hero" -> "hero/" + loreClass.lowercase().replace(" ", "")
-        memberId == "cedric" -> "cedric/templar"
-        memberId == "lyra" -> "lyra/warden"
-        memberId == "zephyr" -> "zephyr/shadowblade"
-        else -> "default"
+    /**
+     * Growth keys:
+     * - "hero/<classId>" resolves to the class growth curve from class data files.
+     * - "<characterId>" resolves to a companion character's growth from its character file.
+     * - anything else falls back to [DEFAULT_GROWTH].
+     */
+    fun growthFor(classKey: String): StatGrowth = when {
+        classKey.startsWith("hero/") -> {
+            val classId = classKey.removePrefix("hero/")
+            GameContent.classes.firstOrNull { it.id == classId }?.growth ?: DEFAULT_GROWTH
+        }
+        else -> GameContent.characterById(classKey)?.combat?.growth ?: DEFAULT_GROWTH
     }
+
+    fun classKey(memberId: String, heroClassId: String?): String =
+        if (memberId == "hero") "hero/" + (heroClassId ?: "") else memberId
 
     /**
      * Even split among alive story-legal members; fallen members still gain at 50% share.
@@ -64,7 +66,6 @@ object Progression {
      */
     fun awardXp(members: List<ProgressMember>, totalXp: Int): List<ProgressOutcome> {
         if (members.isEmpty() || totalXp <= 0) return emptyList()
-        val alive = members.count { it.alive }
         val weightSum = members.sumOf { if (it.alive) 1.0 else FALLEN_SHARE.toDouble() }
         val unit = if (weightSum > 0) totalXp.toDouble() / weightSum else 0.0
 

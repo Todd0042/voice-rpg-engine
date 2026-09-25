@@ -97,7 +97,7 @@ fun MicPermissionRationaleDialog(
                 Spacer(modifier = Modifier.height(12.dp))
 
                 Text(
-                    text = "VOICE OF THE LOGOS",
+                    text = "TEMPLATE VOICE CONTROL",
                     color = LogosGold,
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Black,
@@ -109,7 +109,7 @@ fun MicPermissionRationaleDialog(
                 Spacer(modifier = Modifier.height(4.dp))
 
                 Text(
-                    text = "Hands-Free Fantasy Roleplay",
+                    text = "Template Hands-Free Voice RPG",
                     color = Color.LightGray.copy(alpha = 0.85f),
                     fontSize = 11.sp,
                     fontFamily = FontFamily.Monospace,
@@ -133,8 +133,9 @@ fun MicPermissionRationaleDialog(
                     icon = Icons.Default.Security,
                     iconTint = HolyYellow,
                     title = "Private & On-Device Processing",
-                    description = "Speech recognition runs locally via Android speech services. VoiceRPG never records, stores, or uploads your voice to any remote servers."
+                    description = "Speech recognition runs locally via Android speech services. The engine never records, stores, or uploads your voice to any remote servers."
                 )
+
 
                 Spacer(modifier = Modifier.height(8.dp))
 

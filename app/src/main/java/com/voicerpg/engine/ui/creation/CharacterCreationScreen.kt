@@ -52,9 +52,9 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.voicerpg.engine.engine.ClassSpellLibrary
+import com.voicerpg.engine.content.GameContent
+import com.voicerpg.engine.content.HeroClassDef
 import com.voicerpg.engine.model.AuraColor
-import com.voicerpg.engine.model.HeroClass
 import com.voicerpg.engine.model.PlayerCustomization
 import com.voicerpg.engine.model.SpellSchool
 import com.voicerpg.engine.ui.story.StoryAssetLoader
@@ -85,25 +85,33 @@ fun CharacterCreationScreen(
     val coroutineScope = rememberCoroutineScope()
 
     val context = LocalContext.current
-    val aethelBitmap = remember {
-        StoryAssetLoader.loadBitmap(context, "portraits/aethel.jpg")
+    val manifest = GameContent.manifest
+    val heroSpeaker = GameContent.heroCharacter?.speaker
+    val defaultHeroName = manifest.defaultHeroName.ifBlank { heroSpeaker?.name ?: "Hero" }
+    val defaultHeroTitle = manifest.defaultHeroTitle.ifBlank { heroSpeaker?.title ?: "Adventurer" }
+    val defaultHeroPortrait = manifest.defaultHeroPortrait ?: heroSpeaker?.portraitAsset ?: "portraits/todd.jpg"
+
+    val heroBitmap = remember {
+        StoryAssetLoader.loadBitmap(context, defaultHeroPortrait)
     }
 
-    val titles = listOf(
-        "The Awakened Invocator",
-        "The Flame-Woven",
-        "The Silent Breaker",
-        "The Star-Caller",
-        "The Oath-Bound"
-    )
+    val titles = remember {
+        manifest.characterTitles.ifEmpty {
+            listOf(defaultHeroTitle)
+        }
+    }
 
-    val quickNames = listOf("Aethel", "Rowan", "Kaelen", "Elira", "Vaelen")
+    val quickNames = remember {
+        manifest.quickNames.ifEmpty {
+            listOf(defaultHeroName)
+        }
+    }
 
     fun confirmAndAwaken() {
         speechManager?.cancel()
         val finalCustomization = PlayerCustomization(
-            name = if (name.isBlank()) "Aethel" else name.trim(),
-            heroClass = selectedClass,
+            name = if (name.isBlank()) defaultHeroName else name.trim(),
+            heroClassId = selectedClass.id,
             title = selectedTitle,
             auraColor = selectedAura,
             voiceAffinityBonusSchool = selectedClass.preferredSchool
@@ -116,11 +124,9 @@ fun CharacterCreationScreen(
         if (lower.isBlank()) return
 
         // 1. Awaken / Embark command
-        val embarkKeywords = listOf(
-            "awaken", "embark", "begin", "start", "enter", "let us begin", "ready",
-            "venture", "let's go", "awaken in aethelgard", "begin journey", "start game",
-            "play", "lets go", "confirm", "forward", "onward"
-        )
+        val embarkKeywords = (manifest.creationVoiceKeywords.ifEmpty {
+            listOf("awaken", "embark", "begin", "start", "enter", "ready")
+        } + listOf("confirm", "forward", "onward", "play", "lets go", "let's go")).distinct()
         if (embarkKeywords.any { lower.contains(it) }) {
             confirmAndAwaken()
             return
@@ -133,28 +139,15 @@ fun CharacterCreationScreen(
             return
         }
 
-        // 2. Class selection commands
-        when {
-            lower.contains("elementalist") || lower.contains("mage") || lower.contains("sorcerer") || lower.contains("wizard") || lower.contains("pyromancer") -> {
-                selectedClass = HeroClass.ELEMENTALIST
-                selectedAffinity = SpellSchool.PYROMANCY
-                combatNarrator?.speak("Elementalist selected. Master of pyromancy and destructive elements.", force = true)
-            }
-            lower.contains("battlemage") || lower.contains("templar") || lower.contains("paladin") || lower.contains("knight") || lower.contains("crusader") || lower.contains("warrior") || lower.contains("spellblade") -> {
-                selectedClass = HeroClass.BATTLEMAGE
-                selectedAffinity = SpellSchool.PHYSICAL
-                combatNarrator?.speak("Battlemage selected. Frontline spellblade vanguard.", force = true)
-            }
-            lower.contains("chanter") || lower.contains("chronomancer") || lower.contains("bard") || lower.contains("acoustic") || lower.contains("lightning") -> {
-                selectedClass = HeroClass.CHANTER
-                selectedAffinity = SpellSchool.ELECTROMANCY
-                combatNarrator?.speak("Chanter selected. Acoustic chronomancer and master of cadence.", force = true)
-            }
-            lower.contains("shadowweaver") || lower.contains("shadowblade") || lower.contains("rogue") || lower.contains("assassin") || lower.contains("shadow") || lower.contains("thief") || lower.contains("occultist") -> {
-                selectedClass = HeroClass.SHADOWWEAVER
-                selectedAffinity = SpellSchool.SHADOW
-                combatNarrator?.speak("Shadowweaver selected. Umbral occultist of lethal precision.", force = true)
-            }
+        // 2. Class selection commands - data-driven via the loaded content classes
+        GameContent.classes.firstOrNull { hc ->
+            lower.contains(hc.title.lowercase()) ||
+                lower.contains(hc.id) ||
+                hc.voiceKeywords.any { kw -> kw.isNotBlank() && lower.contains(kw) }
+        }?.let { matched ->
+            selectedClass = matched
+            selectedAffinity = matched.preferredSchool
+            combatNarrator?.speak("${matched.title} selected. ${matched.subtitle}.", force = true)
         }
 
         // 3. Title selection
@@ -227,18 +220,19 @@ fun CharacterCreationScreen(
 
             // Header
             Text(
-                text = "⚔️ FORGE YOUR INVOCATOR ⚔️",
+                text = "⚔️ TEMPLATE CHARACTER CREATION ⚔️",
                 color = LogosGold,
                 fontSize = 18.sp,
                 fontWeight = FontWeight.Black,
                 fontFamily = FontFamily.Monospace
             )
             Text(
-                text = "Character Creation & Initial Loadout",
+                text = "Template Character Setup & Initial Loadout",
                 color = Color.LightGray,
                 fontSize = 11.sp,
                 fontFamily = FontFamily.Monospace
             )
+
 
             Spacer(modifier = Modifier.height(14.dp))
 
@@ -264,9 +258,9 @@ fun CharacterCreationScreen(
                             .clip(RoundedCornerShape(10.dp))
                             .border(2.dp, auraColorVal, RoundedCornerShape(10.dp))
                     ) {
-                        if (aethelBitmap != null) {
+                        if (heroBitmap != null) {
                             Image(
-                                bitmap = aethelBitmap,
+                                bitmap = heroBitmap,
                                 contentDescription = name,
                                 contentScale = ContentScale.Crop,
                                 modifier = Modifier.fillMaxSize()
@@ -389,7 +383,7 @@ fun CharacterCreationScreen(
             Spacer(modifier = Modifier.height(8.dp))
 
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                HeroClass.entries.forEach { hc ->
+                GameContent.classes.forEach { hc ->
                     ClassOptionCard(
                         heroClass = hc,
                         isSelected = hc == selectedClass,
@@ -498,7 +492,7 @@ fun CharacterCreationScreen(
                     .height(48.dp)
             ) {
                 Text(
-                    text = "AWAKEN IN AETHELGARD ➔",
+                    text = manifest.creationEmbarkPrompt.ifBlank { "AWAKEN ➔" },
                     fontFamily = FontFamily.Monospace,
                     fontWeight = FontWeight.Black,
                     fontSize = 14.sp
@@ -551,11 +545,11 @@ fun CharacterCreationScreen(
 
 @Composable
 private fun ClassOptionCard(
-    heroClass: HeroClass,
+    heroClass: HeroClassDef,
     isSelected: Boolean,
     onSelect: () -> Unit
 ) {
-    val spells = remember(heroClass) { ClassSpellLibrary.getSpellsForClass(heroClass) }
+    val spells = remember(heroClass) { GameContent.spellsForClass(heroClass.id) }
 
     Box(
         modifier = Modifier

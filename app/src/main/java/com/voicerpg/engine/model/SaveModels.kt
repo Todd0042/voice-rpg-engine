@@ -1,69 +1,6 @@
 package com.voicerpg.engine.model
 
-import androidx.compose.ui.graphics.Color
-import com.voicerpg.engine.model.SpellSchool
-
-enum class HeroClass(
-    val id: String,
-    val title: String,
-    val subtitle: String,
-    val description: String,
-    val startingHp: Int,
-    val startingMp: Int,
-    val startingSpeed: Int,
-    val startingBaseAttack: Int,
-    val preferredSchool: SpellSchool,
-    val starterSpellIds: List<String>
-) {
-    ELEMENTALIST(
-        id = "elementalist",
-        title = "Elementalist",
-        subtitle = "Master of Primordial Elements",
-        description = "Wields blistering fire, piercing frost, and crackling storm incantations. High magical burst damage.",
-        startingHp = 240,
-        startingMp = 160,
-        startingSpeed = 70,
-        startingBaseAttack = 22,
-        preferredSchool = SpellSchool.PYROMANCY,
-        starterSpellIds = listOf("fireball", "frost_spike", "chain_lightning")
-    ),
-    BATTLEMAGE(
-        id = "battlemage",
-        title = "Battlemage",
-        subtitle = "Frontline Spellblade Vanguard",
-        description = "Combines heavy martial fortitude with devastating close-range elemental inflections. High vitality and defense.",
-        startingHp = 320,
-        startingMp = 110,
-        startingSpeed = 60,
-        startingBaseAttack = 28,
-        preferredSchool = SpellSchool.PHYSICAL,
-        starterSpellIds = listOf("flame_strike", "arcane_barrier", "thunder_cleave")
-    ),
-    CHANTER(
-        id = "chanter",
-        title = "Chanter",
-        subtitle = "Acoustic Chronomancer",
-        description = "Manipulates battle cadence, accelerates turn gauges, and doubles vocal resonance bonuses. High agility and tactical speed.",
-        startingHp = 220,
-        startingMp = 180,
-        startingSpeed = 80,
-        startingBaseAttack = 18,
-        preferredSchool = SpellSchool.ELECTROMANCY,
-        starterSpellIds = listOf("temporal_stasis", "haste_cadence", "resonant_surge")
-    ),
-    SHADOWWEAVER(
-        id = "shadowweaver",
-        title = "Shadowweaver",
-        subtitle = "Umbral Occultist",
-        description = "Strikes from the blind spots of the Blight with precision critical strikes and dark life-draining sibilants.",
-        startingHp = 230,
-        startingMp = 140,
-        startingSpeed = 85,
-        startingBaseAttack = 26,
-        preferredSchool = SpellSchool.SHADOW,
-        starterSpellIds = listOf("shadow_spike", "void_drain", "umbral_veil")
-    )
-}
+import com.voicerpg.engine.content.GameContent
 
 enum class AuraColor(
     val id: String,
@@ -78,13 +15,19 @@ enum class AuraColor(
     AMETHYST_VOID("shadow", "Amethyst Void", "#E040FB", "Mysterious umbral frequency")
 }
 
+/**
+ * Player-created hero identity. Hero classes are data-driven: [heroClassId]
+ * resolves against assets/game/classes/<name>.json via the content registry.
+ */
 data class PlayerCustomization(
-    val name: String = "Aethel",
-    val heroClass: HeroClass = HeroClass.ELEMENTALIST,
-    val title: String = "The Awakened Invocator",
+    val name: String = "Hero",
+    val heroClassId: String = "",
+    val title: String = "The Awakened Hero",
     val auraColor: AuraColor = AuraColor.SAPPHIRE_FROST,
-    val voiceAffinityBonusSchool: SpellSchool = SpellSchool.PYROMANCY
-)
+    val voiceAffinityBonusSchool: SpellSchool = SpellSchool.PHYSICAL
+) {
+    val heroClass get() = GameContent.classById(heroClassId)
+}
 
 data class SavedCharacterStats(
     val id: String,
@@ -126,13 +69,14 @@ data class GameSaveData(
     // 1. Player Profile & Initial Loadout
     val player: PlayerCustomization = PlayerCustomization(),
 
-    // 2. Story Progress & Current Scene/Dialogue
-    val currentSceneId: String = "scene_cottage",
-    val currentNodeId: String = "cottage_intro",
+    // 2. Story Progress & Current Scene/Dialogue (empty = resolve to manifest initial values)
+    val currentSceneId: String = "",
+    val currentNodeId: String = "",
 
     // 3. Complete Decision History (every choice ever selected by player)
     val decisionsMade: List<String> = emptyList(),
     val narrativeFlags: Map<String, Boolean> = emptyMap(),
+    val visitedNodeIds: List<String> = emptyList(),
     val recentDialogueLog: List<DialogueLogEntry> = emptyList(),
 
     // 4. Current Stats for all Party Members

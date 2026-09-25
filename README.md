@@ -52,6 +52,7 @@ A high-performance, native Android game engine designed for building audio-first
 com.voicerpg.engine/
 ├── audio/            # SpeechManager, CombatNarrator, PitchDetector, MusicManager, SfxManager
 ├── combat/           # DamageResolver, EnemyBrain AI, StatusSystem, AffinityTable, Movesets
+├── content/          # GameContent, GameContentPack, dynamic schema models & asset loaders
 ├── engine/           # IntentParser, ResonanceEngine, NoveltyCache, StoryChoiceMatcher, SaveManager
 ├── model/            # CombatModels, StoryModels, SaveModels, BattleEnvironment, ResonanceResult
 ├── ui/               # Jetpack Compose UI
@@ -68,7 +69,7 @@ com.voicerpg.engine/
 
 ## Quickstart: Creating a New Game
 
-1. **Clone as a template or branch:**
+1. **Clone as a template or branch:** this repo builds the engine's **reference app** (`applicationId` `com.voicerpg.engine.reference`) for testing the framework. To make a game, clone it and follow the starter guide:
    ```bash
    git clone https://github.com/Todd0042/voice-rpg-engine.git my-voice-game
    ```
@@ -81,4 +82,6 @@ com.voicerpg.engine/
    ```bash
    adb install -r app/build/outputs/apk/debug/app-debug.apk
    ```
-4. **Follow [STARTER_GUIDE.md](STARTER_GUIDE.md)** to swap in your custom story script, characters, and encounters!
+4. **Follow [STARTER_GUIDE.md](STARTER_GUIDE.md)** to swap in your own world: game content is drop-in **JSON + assets** under `app/src/main/assets/game/` (story graph, characters, spells, enemies, encounters, voices, art, music) — no engine code changes required.
+
+> ⚠️ **Uniqueness rule (AGENTS.md §8):** every game built with this engine must be **its own unique app** — a unique `applicationId`, app name, icon, and game content. Never ship an app that keeps the reference `applicationId` or another game's identity; on Android, two APKs with the same `applicationId` overwrite each other on a device (which is why the reference app previously replaced *Commander America* when both used `com.voicerpg.engine`).

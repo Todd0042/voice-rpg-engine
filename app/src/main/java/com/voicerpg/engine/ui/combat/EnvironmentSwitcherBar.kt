@@ -15,6 +15,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -23,7 +24,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.voicerpg.engine.engine.StoryEncounters
+import com.voicerpg.engine.content.GameContent
 import com.voicerpg.engine.model.BattleEnvironment
 import com.voicerpg.engine.model.EncounterDefinition
 import com.voicerpg.engine.ui.theme.LogosGold
@@ -81,14 +82,14 @@ fun EnvironmentSwitcherBar(
             }
         }
 
-        // 2. Story Encounter Switchers (Party 1-4, Enemies 1-6)
+        // 2. Story Encounter Switchers (loaded data-driven from the active game's content)
         if (onSelectEncounter != null) {
-            listOf(
-                Triple(StoryEncounters.PROLOGUE_SOLO, "👤 Solo (1v2)", Color(0xFF81D4FA)),
-                Triple(StoryEncounters.FOREST_AMBUSH, "👥 Ambush (2v3)", Color(0xFFA5D6A7)),
-                Triple(StoryEncounters.CASTLE_HORDE, "⚔️ Horde (4v6)", Color(0xFFFFB74D)),
-                Triple(StoryEncounters.CAVE_BROODMOTHER, "👑 Boss Queen", Color(0xFFFF8A80))
-            ).forEach { (enc, label, tint) ->
+            val encounterPresets = remember { GameContent.encounters.values.toList().take(4) }
+            val presetLabels = listOf("👤 Solo", "👥 Duo", "⚔️ Squad", "👑 Boss")
+            val presetTints = listOf(Color(0xFF81D4FA), Color(0xFFA5D6A7), Color(0xFFFFB74D), Color(0xFFFF8A80))
+            encounterPresets.forEachIndexed { index, enc ->
+                val label = presetLabels.getOrElse(index) { "⚔️ Encounter ${index + 1}" }
+                val tint = presetTints[index % presetTints.size]
                 Box(
                     modifier = Modifier
                         .clip(RoundedCornerShape(6.dp))

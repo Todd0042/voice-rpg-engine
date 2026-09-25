@@ -30,18 +30,11 @@ class CombatNarrator(
 
     companion object {
         /**
-         * First-try preferred voice packs per speaker, set by the player for auditioning.
-         * These are used only when the exact Android voice model is installed on the device;
-         * otherwise the heuristic assignment below falls back gracefully.
+         * Fallback preferred voice packs per speaker, declared by the active game's
+         * character data files (assets/game/characters/<name>.json).
          */
-        val PREFERRED_VOICE_IDS: Map<String, String> = mapOf(
-            DialogueSpeaker.CEDRIC.id to "en-gb-x-gbd-local",
-            DialogueSpeaker.AETHEL.id to "en-gb-x-gba-local",
-            DialogueSpeaker.LYRA.id to "en-us-x-tpf-local",
-            DialogueSpeaker.ZEPHYR.id to "en-us-x-tpc-local",
-            DialogueSpeaker.MALAKOR.id to "en-us-x-tpd-local",
-            DialogueSpeaker.NARRATOR.id to "en-gb-x-rjs-local"
-        )
+        val PREFERRED_VOICE_IDS: Map<String, String>
+            get() = com.voicerpg.engine.content.GameContent.preferredVoiceIds
 
         /**
          * Resolves the voice a speaker should use: a persisted player override wins when its
@@ -68,15 +61,31 @@ class CombatNarrator(
     // Persisted per-speaker voice assignments restored from the save file (speakerId -> voice name)
     private var pendingVoiceAssignments: Map<String, String> = emptyMap()
 
-    // Multi-voice character profile mapping
+    // Dynamic Multi-Voice Character Profile Registry
     private var defaultVoice: Voice? = null
-    private var cedricVoice: Voice? = null
-    private var aethelVoice: Voice? = null
-    private var lyraVoice: Voice? = null
-    private var zephyrVoice: Voice? = null
-    private var malakorVoice: Voice? = null
-    private var shadowWispVoice: Voice? = null
-    private var narratorVoice: Voice? = null
+    private val dynamicSpeakerVoices = mutableMapOf<String, Voice?>()
+    private val registeredSpeakers = mutableListOf<DialogueSpeaker>()
+    private val customPreferredVoiceIds = mutableMapOf<String, String>()
+
+    fun registerSpeaker(speaker: DialogueSpeaker, preferredVoiceId: String? = null) {
+        if (registeredSpeakers.none { it.id == speaker.id }) {
+            registeredSpeakers.add(speaker)
+        }
+        if (preferredVoiceId != null) {
+            customPreferredVoiceIds[speaker.id] = preferredVoiceId
+        }
+    }
+
+    fun registerSpeakers(speakers: Collection<DialogueSpeaker>) {
+        speakers.forEach { registerSpeaker(it) }
+    }
+
+    fun getRegisteredSpeakers(): List<DialogueSpeaker> {
+        if (registeredSpeakers.isEmpty()) {
+            registeredSpeakers.addAll(com.voicerpg.engine.engine.StoryScript.ALL_SPEAKERS)
+        }
+        return registeredSpeakers.toList()
+    }
 
     private val _availableVoiceCount = MutableStateFlow(0)
     val availableVoiceCount: StateFlow<Int> = _availableVoiceCount.asStateFlow()
@@ -113,6 +122,13 @@ class CombatNarrator(
 
     private val _isSpeaking = MutableStateFlow(false)
     val isSpeaking: StateFlow<Boolean> = _isSpeaking.asStateFlow()
+
+    private val _isCombatActive = MutableStateFlow(false)
+    val isCombatActive: StateFlow<Boolean> = _isCombatActive.asStateFlow()
+
+    fun setCombatActive(active: Boolean) {
+        _isCombatActive.value = active
+    }
 
     init {
         if (context != null) {
@@ -272,67 +288,28 @@ class CombatNarrator(
                 malePool
             }
 
-            narratorVoice = applyVoicePreference(DialogueSpeaker.NARRATOR.id, britishStoryteller ?: defaultVoice, englishPhysicalVoices)
+            val allSpeakers = getRegisteredSpeakers().ifEmpty {
+                listOf(com.voicerpg.engine.content.GameContent.narrator)
+            }
 
-            // Sir Cedric is a noble knight templar: prioritize deep, resonant US baritone male (iob or iog)
-            val cedricCandidate = distinctMalePool.firstOrNull { it.name.contains("iob") }
-                ?: distinctMalePool.firstOrNull { it.name.contains("iog") }
-                ?: distinctMalePool.firstOrNull { it.name.contains("gbc") }
-                ?: distinctMalePool.firstOrNull() ?: defaultVoice
-            cedricVoice = applyVoicePreference(DialogueSpeaker.CEDRIC.id, cedricCandidate, englishPhysicalVoices)
-
-            val remainingMaleAfterCedric = distinctMalePool.filter { it != cedricCandidate }
-
-            // Zephyr: swift agile rogue
-            val zephyrCandidate = remainingMaleAfterCedric.firstOrNull { it.name.contains("tpc") }
-                ?: remainingMaleAfterCedric.firstOrNull() ?: defaultVoice
-            zephyrVoice = applyVoicePreference(DialogueSpeaker.ZEPHYR.id, zephyrCandidate, englishPhysicalVoices)
-
-            val remainingMaleAfterZephyr = remainingMaleAfterCedric.filter { it != zephyrVoice }
-
-            // Malakor: dark brooding voidwalker inquisitor
-            val malakorCandidate = remainingMaleAfterZephyr.firstOrNull { it.name.contains("iog") }
-                ?: remainingMaleAfterZephyr.firstOrNull { it.name.contains("aub") }
-                ?: remainingMaleAfterZephyr.firstOrNull() ?: defaultVoice
-            malakorVoice = applyVoicePreference(DialogueSpeaker.MALAKOR.id, malakorCandidate, englishPhysicalVoices)
-
-            val remainingMaleAfterMalakor = remainingMaleAfterZephyr.filter { it != malakorVoice }
-
-            // Shadow Wisp: raspy sibilant shade
-            val shadowWispCandidate = remainingMaleAfterMalakor.firstOrNull { it.name.contains("iol") }
-                ?: remainingMaleAfterMalakor.firstOrNull() ?: defaultVoice
-            shadowWispVoice = applyVoicePreference(DialogueSpeaker.SHADOW_WISP.id, shadowWispCandidate, englishPhysicalVoices)
-
-            // Aethel: spirited elemental invocator (female)
-            val aethelCandidate = femalePool.firstOrNull { it.name.contains("gba") }
-                ?: femalePool.firstOrNull { it.name.contains("sfg") }
-                ?: femalePool.firstOrNull() ?: defaultVoice
-            aethelVoice = applyVoicePreference(DialogueSpeaker.AETHEL.id, aethelCandidate, englishPhysicalVoices)
-
-            val remainingFemaleAfterAethel = femalePool.filter { it != aethelVoice }
-
-            // Lyra: lyrical soothing woodland grove warden (female)
-            val lyraCandidate = remainingFemaleAfterAethel.firstOrNull { it.name.contains("tpf") }
-                ?: remainingFemaleAfterAethel.firstOrNull { it.name.contains("iom") }
-                ?: remainingFemaleAfterAethel.firstOrNull() ?: defaultVoice
-            lyraVoice = applyVoicePreference(DialogueSpeaker.LYRA.id, lyraCandidate, englishPhysicalVoices)
-
-            android.util.Log.d("VoiceRPG_TTS", "Assigned Cedric: ${cedricVoice?.name}")
-            android.util.Log.d("VoiceRPG_TTS", "Assigned Aethel: ${aethelVoice?.name}")
-            android.util.Log.d("VoiceRPG_TTS", "Assigned Lyra: ${lyraVoice?.name}")
-            android.util.Log.d("VoiceRPG_TTS", "Assigned Zephyr: ${zephyrVoice?.name}")
-            android.util.Log.d("VoiceRPG_TTS", "Assigned Malakor: ${malakorVoice?.name}")
-            android.util.Log.d("VoiceRPG_TTS", "Assigned ShadowWisp: ${shadowWispVoice?.name}")
-            android.util.Log.d("VoiceRPG_TTS", "Assigned Narrator: ${narratorVoice?.name}")
+            // Dynamically distribute available physical voices across all registered speakers
+            allSpeakers.forEachIndexed { index, speaker ->
+                val preferred = customPreferredVoiceIds[speaker.id] ?: PREFERRED_VOICE_IDS[speaker.id]
+                val candidate = when {
+                    preferred != null && englishPhysicalVoices.any { it.name == preferred } ->
+                        englishPhysicalVoices.first { it.name == preferred }
+                    englishPhysicalVoices.isNotEmpty() ->
+                        englishPhysicalVoices[index % englishPhysicalVoices.size]
+                    else -> defaultVoice
+                }
+                dynamicSpeakerVoices[speaker.id] = applyVoicePreference(speaker.id, candidate, englishPhysicalVoices)
+                android.util.Log.d("VoiceRPG_TTS", "Assigned ${speaker.name} (${speaker.id}): ${dynamicSpeakerVoices[speaker.id]?.name}")
+            }
         } catch (e: Exception) {
             android.util.Log.e("VoiceRPG_TTS", "Error assigning voices", e)
-            cedricVoice = defaultVoice
-            aethelVoice = defaultVoice
-            lyraVoice = defaultVoice
-            zephyrVoice = defaultVoice
-            malakorVoice = defaultVoice
-            narratorVoice = defaultVoice
-            shadowWispVoice = defaultVoice
+            getRegisteredSpeakers().forEach { speaker ->
+                dynamicSpeakerVoices[speaker.id] = defaultVoice
+            }
         }
     }
 
@@ -462,16 +439,9 @@ class CombatNarrator(
      * persisting into the save file.
      */
     fun getVoiceAssignments(): Map<String, String> =
-        listOf(
-            DialogueSpeaker.CEDRIC,
-            DialogueSpeaker.AETHEL,
-            DialogueSpeaker.LYRA,
-            DialogueSpeaker.ZEPHYR,
-            DialogueSpeaker.MALAKOR,
-            DialogueSpeaker.SHADOW_WISP,
-            DialogueSpeaker.NARRATOR
-        ).mapNotNull { speaker -> getVoiceForSpeaker(speaker)?.name?.let { speaker.id to it } }
-            .toMap()
+        getRegisteredSpeakers().mapNotNull { speaker ->
+            getVoiceForSpeaker(speaker)?.name?.let { speaker.id to it }
+        }.toMap()
 
     fun openVoiceSettings(context: Context) {
         val installIntent = Intent(TextToSpeech.Engine.ACTION_INSTALL_TTS_DATA).apply {
@@ -497,40 +467,16 @@ class CombatNarrator(
         }
     }
 
-    fun getVoiceForSpeaker(speaker: DialogueSpeaker): Voice? = when (speaker.id) {
-        DialogueSpeaker.CEDRIC.id -> cedricVoice
-        DialogueSpeaker.AETHEL.id -> aethelVoice
-        DialogueSpeaker.LYRA.id -> lyraVoice
-        DialogueSpeaker.ZEPHYR.id -> zephyrVoice
-        DialogueSpeaker.MALAKOR.id -> malakorVoice
-        DialogueSpeaker.SHADOW_WISP.id -> shadowWispVoice
-        DialogueSpeaker.NARRATOR.id -> narratorVoice
-        else -> narratorVoice
-    }
+    fun getVoiceForSpeaker(speaker: DialogueSpeaker): Voice? =
+        dynamicSpeakerVoices[speaker.id] ?: defaultVoice
 
     fun setSpeakerVoice(speaker: DialogueSpeaker, voice: Voice) {
-        when (speaker.id) {
-            DialogueSpeaker.CEDRIC.id -> cedricVoice = voice
-            DialogueSpeaker.AETHEL.id -> aethelVoice = voice
-            DialogueSpeaker.LYRA.id -> lyraVoice = voice
-            DialogueSpeaker.ZEPHYR.id -> zephyrVoice = voice
-            DialogueSpeaker.MALAKOR.id -> malakorVoice = voice
-            DialogueSpeaker.SHADOW_WISP.id -> shadowWispVoice = voice
-            DialogueSpeaker.NARRATOR.id -> narratorVoice = voice
-            else -> narratorVoice = voice
-        }
+        dynamicSpeakerVoices[speaker.id] = voice
     }
 
     fun previewSpeakerVoice(speaker: DialogueSpeaker, onDone: (() -> Unit)? = null) {
-        val samplePhrase = when (speaker.id) {
-            DialogueSpeaker.CEDRIC.id -> "By the light of the dawn, our shields will hold the line."
-            DialogueSpeaker.LYRA.id -> "The ancient grove whispers its secrets to those who listen."
-            DialogueSpeaker.AETHEL.id -> "The aether responds to our command. Let us begin."
-            DialogueSpeaker.ZEPHYR.id -> "Keep your senses sharp and stay in the shadows."
-            DialogueSpeaker.MALAKOR.id -> "The void harbors power far older than this kingdom."
-            DialogueSpeaker.SHADOW_WISP.id -> "The shadows will consume all who dare enter."
-            else -> "The chronicle of Aethelgard unfolds with every step."
-        }
+        val samplePhrase = speaker.samplePhrase
+            ?: "I am ${speaker.name}, ${speaker.title}. My voice stands ready."
         narrateDialogue(speaker, samplePhrase, emptyList(), force = true) {
             onDone?.invoke()
         }
@@ -598,47 +544,15 @@ class CombatNarrator(
 
         // Apply character vocal inflection/pitch if enabled
         if (_isCharacterPitchEnabled.value) {
-            when (speaker.id) {
-                DialogueSpeaker.CEDRIC.id -> {
-                    tts?.setPitch(0.82f) // Deep baritone noble knight
-                    tts?.setSpeechRate(_speechRate.value * 0.95f)
-                }
-                DialogueSpeaker.AETHEL.id -> {
-                    tts?.setPitch(1.08f) // Clear, spirited invocator
-                    tts?.setSpeechRate(_speechRate.value)
-                }
-                DialogueSpeaker.LYRA.id -> {
-                    tts?.setPitch(1.20f) // Lyrical, soothing grove warden
-                    tts?.setSpeechRate(_speechRate.value * 0.98f)
-                }
-                DialogueSpeaker.ZEPHYR.id -> {
-                    tts?.setPitch(0.95f) // Jaunty, agile rogue
-                    tts?.setSpeechRate(_speechRate.value * 1.05f)
-                }
-                DialogueSpeaker.MALAKOR.id -> {
-                    tts?.setPitch(0.72f) // Dark, brooding inquisitor
-                    tts?.setSpeechRate(_speechRate.value * 0.90f)
-                }
-                DialogueSpeaker.SHADOW_WISP.id -> {
-                    tts?.setPitch(0.70f) // Raspy sibilant phantom
-                    tts?.setSpeechRate(_speechRate.value * 0.88f)
-                }
-                DialogueSpeaker.NARRATOR.id -> {
-                    tts?.setPitch(1.0f) // Measured storyteller cadence
-                    tts?.setSpeechRate(_speechRate.value)
-                }
-                else -> {
-                    tts?.setPitch(1.0f)
-                    tts?.setSpeechRate(_speechRate.value)
-                }
-            }
+            tts?.setPitch(speaker.ttsPitch)
+            tts?.setSpeechRate(_speechRate.value)
         } else {
             tts?.setPitch(1.0f)
             tts?.setSpeechRate(_speechRate.value)
         }
 
         val cleanedText = text.replace("...", ". ").trim()
-        val speakerPrefix = if (speaker == DialogueSpeaker.NARRATOR || !_isSpeakerAttributionEnabled.value) "" else "${speaker.name} says: "
+        val speakerPrefix = if (speaker.isNarrator || !_isSpeakerAttributionEnabled.value) "" else "${speaker.name} says: "
 
         val fullScript = StringBuilder()
         fullScript.append("$speakerPrefix$cleanedText")
@@ -679,7 +593,7 @@ class CombatNarrator(
             // Reset to Narrator voice for system / tactical announcements
             tts?.setPitch(1.0f)
             tts?.setSpeechRate(_speechRate.value)
-            narratorVoice?.let {
+            getVoiceForSpeaker(com.voicerpg.engine.content.GameContent.narrator)?.let {
                 try {
                     tts?.voice = it
                 } catch (_: Exception) {}
@@ -751,7 +665,7 @@ class CombatNarrator(
     // =========================================================================
 
     fun narratePlayerTurn(hero: PartyMember, enemies: List<Enemy>, onDone: () -> Unit) {
-        if (!_isEyesFreeMode.value && !_isCombatNarrationEnabled.value) {
+        if (!_isCombatActive.value || (!_isEyesFreeMode.value && !_isCombatNarrationEnabled.value)) {
             onDone()
             return
         }
@@ -767,7 +681,7 @@ class CombatNarrator(
     }
 
     suspend fun narratePlayerTurnSuspend(hero: PartyMember, enemies: List<Enemy>, timeoutMs: Long = 8000L) {
-        if (!_isEyesFreeMode.value && !_isCombatNarrationEnabled.value) return
+        if (!_isCombatActive.value || (!_isEyesFreeMode.value && !_isCombatNarrationEnabled.value)) return
         if (tts == null || !isTtsInitialized) return
         withTimeoutOrNull(timeoutMs) {
             suspendCancellableCoroutine<Unit> { cont ->
@@ -789,7 +703,7 @@ class CombatNarrator(
         effectNote: String? = null,
         onDone: (() -> Unit)? = null
     ) {
-        if (!_isEyesFreeMode.value && !_isCombatNarrationEnabled.value) {
+        if (!_isCombatActive.value || (!_isEyesFreeMode.value && !_isCombatNarrationEnabled.value)) {
             onDone?.invoke()
             return
         }
@@ -823,7 +737,7 @@ class CombatNarrator(
         effectNote: String? = null,
         timeoutMs: Long = 8000L
     ) {
-        if (!_isEyesFreeMode.value && !_isCombatNarrationEnabled.value) return
+        if (!_isCombatActive.value || (!_isEyesFreeMode.value && !_isCombatNarrationEnabled.value)) return
         if (tts == null || !isTtsInitialized) return
         withTimeoutOrNull(timeoutMs) {
             suspendCancellableCoroutine<Unit> { cont ->
@@ -843,7 +757,7 @@ class CombatNarrator(
         statusNote: String? = null,
         onDone: (() -> Unit)? = null
     ) {
-        if (!_isEyesFreeMode.value && !_isCombatNarrationEnabled.value) {
+        if (!_isCombatActive.value || (!_isEyesFreeMode.value && !_isCombatNarrationEnabled.value)) {
             onDone?.invoke()
             return
         }
@@ -866,7 +780,7 @@ class CombatNarrator(
         statusNote: String? = null,
         timeoutMs: Long = 8000L
     ) {
-        if (!_isEyesFreeMode.value && !_isCombatNarrationEnabled.value) return
+        if (!_isCombatActive.value || (!_isEyesFreeMode.value && !_isCombatNarrationEnabled.value)) return
         if (tts == null || !isTtsInitialized) return
         withTimeoutOrNull(timeoutMs) {
             suspendCancellableCoroutine<Unit> { cont ->
@@ -878,7 +792,7 @@ class CombatNarrator(
     }
 
     fun narrateReinforcements(count: Int, enemyNames: List<String>, onDone: (() -> Unit)? = null) {
-        if (!_isEyesFreeMode.value && !_isCombatNarrationEnabled.value) {
+        if (!_isCombatActive.value || (!_isEyesFreeMode.value && !_isCombatNarrationEnabled.value)) {
             onDone?.invoke()
             return
         }
@@ -891,7 +805,7 @@ class CombatNarrator(
     }
 
     suspend fun narrateReinforcementsSuspend(count: Int, enemyNames: List<String>, timeoutMs: Long = 8000L) {
-        if (!_isEyesFreeMode.value && !_isCombatNarrationEnabled.value) return
+        if (!_isCombatActive.value || (!_isEyesFreeMode.value && !_isCombatNarrationEnabled.value)) return
         if (tts == null || !isTtsInitialized) return
         withTimeoutOrNull(timeoutMs) {
             suspendCancellableCoroutine<Unit> { cont ->
@@ -903,6 +817,10 @@ class CombatNarrator(
     }
 
     fun narrateStatus(party: List<PartyMember>, enemies: List<Enemy>, onDone: (() -> Unit)? = null) {
+        if (!_isCombatActive.value) {
+            onDone?.invoke()
+            return
+        }
         val aliveHeroes = party.filter { it.isAlive }
         val partyStatus = aliveHeroes.joinToString(", ") { "${it.name} at ${it.currentHp} HP" }
         val aliveEnemies = enemies.filter { it.isAlive }
@@ -914,6 +832,10 @@ class CombatNarrator(
     }
 
     fun narrateEnemies(enemies: List<Enemy>, onDone: (() -> Unit)? = null) {
+        if (!_isCombatActive.value) {
+            onDone?.invoke()
+            return
+        }
         val alive = enemies.filter { it.isAlive }
         val targeted = alive.firstOrNull { it.isTargeted }?.name ?: alive.firstOrNull()?.name
         val list = alive.mapIndexed { idx, e -> "Enemy ${idx + 1}, ${e.name} with ${e.currentHp} HP" }.joinToString(". ")
@@ -922,14 +844,22 @@ class CombatNarrator(
     }
 
     fun narrateParty(party: List<PartyMember>, onDone: (() -> Unit)? = null) {
+        if (!_isCombatActive.value) {
+            onDone?.invoke()
+            return
+        }
         val members = party.map {
             if (it.isAlive) "${it.name} the ${it.loreClass}, ${it.currentHp} HP" else "${it.name} has fallen"
         }.joinToString(". ")
-        val text = "Fellowship status. $members."
+        val text = "Party status. $members."
         speak(text, force = true, onDone = onDone)
     }
 
     fun narrateHelp(onDone: (() -> Unit)? = null) {
+        if (!_isCombatActive.value) {
+            onDone?.invoke()
+            return
+        }
         val text = "Voice commands. Say your spell name to cast. Say 'Status' for situation report. " +
                 "Say 'Enemies' for target scan. Say 'Pocket mode' to toggle audio guidance. " +
                 "Say 'Auto listen' to toggle hands-free mic. Say 'Options' to open settings."
@@ -937,20 +867,17 @@ class CombatNarrator(
     }
 
     fun narrateConclusion(isVictory: Boolean, onDone: (() -> Unit)? = null) {
-        if (!_isEyesFreeMode.value && !_isCombatNarrationEnabled.value) {
+        if (!_isCombatActive.value || (!_isEyesFreeMode.value && !_isCombatNarrationEnabled.value)) {
             onDone?.invoke()
             return
         }
-        val text = if (isVictory) {
-            "Victory achieved! The Logos resonates through the sanctum."
-        } else {
-            "Defeat. Your voice fades into the Silent Blight."
-        }
+        val manifest = com.voicerpg.engine.content.GameContent.manifest
+        val text = if (isVictory) manifest.victoryLine else manifest.defeatLine
         speak(text, force = true, onDone = onDone)
     }
 
     suspend fun narrateConclusionSuspend(isVictory: Boolean, timeoutMs: Long = 8000L) {
-        if (!_isEyesFreeMode.value && !_isCombatNarrationEnabled.value) return
+        if (!_isCombatActive.value || (!_isEyesFreeMode.value && !_isCombatNarrationEnabled.value)) return
         if (tts == null || !isTtsInitialized) return
         withTimeoutOrNull(timeoutMs) {
             suspendCancellableCoroutine<Unit> { cont ->
