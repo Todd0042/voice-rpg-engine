@@ -86,6 +86,7 @@ class MainActivity : ComponentActivity() {
 
         speechManager = SpeechManager(this)
         combatNarrator = CombatNarrator(this)
+        combatNarrator.registerSpeakers(com.voicerpg.engine.content.GameContent.allSpeakers)
         musicManager = MusicManager(this)
         saveManager = SaveManager(this)
 
@@ -152,6 +153,7 @@ class MainActivity : ComponentActivity() {
             val isTtsSpeaking by combatNarrator.isSpeaking.collectAsState()
             val isNarrationEnabled by combatNarrator.isNarrationEnabled.collectAsState()
             val isReadChoicesEnabled by combatNarrator.isReadChoicesEnabled.collectAsState()
+            val isAutoReadHubChoices by combatNarrator.isAutoReadHubChoices.collectAsState()
             val isCharacterPitchEnabled by combatNarrator.isCharacterPitchEnabled.collectAsState()
             val isSpeakerAttributionEnabled by combatNarrator.isSpeakerAttributionEnabled.collectAsState()
             val speechRate by combatNarrator.speechRate.collectAsState()
@@ -321,8 +323,7 @@ class MainActivity : ComponentActivity() {
                                 viewModel = combatViewModel,
                                 onReturnToStory = { storyViewModel.switchToStory() },
                                 onContinueStory = {
-                                    storyViewModel.updatePartyStatsFromCombat(combatViewModel.state.value.party)
-                                    storyViewModel.onCombatVictory()
+                                    combatViewModel.onContinueStory?.invoke()
                                 }
                             )
                         }
@@ -336,6 +337,7 @@ class MainActivity : ComponentActivity() {
                         isCombatNarrationEnabled = isCombatNarrationEnabled,
                         isPocketGuardEnabled = isPocketGuardEnabled,
                         isReadChoicesEnabled = isReadChoicesEnabled,
+                        isAutoReadHubChoices = isAutoReadHubChoices,
                         isCharacterPitchEnabled = isCharacterPitchEnabled,
                         isSpeakerAttributionEnabled = isSpeakerAttributionEnabled,
                         speechRate = speechRate,
@@ -367,6 +369,7 @@ class MainActivity : ComponentActivity() {
                                     combatNarrator.setCombatNarrationEnabled(true)
                                     combatNarrator.setNarrationEnabled(true)
                                     combatNarrator.setReadChoicesEnabled(true)
+                                    combatNarrator.setAutoReadHubChoices(true)
                                     combatNarrator.setEyesFreeMode(true, lockGuard = true)
                                     speechManager.setAutoListen(true)
                                     speechManager.setChimeMuted(true)
@@ -395,6 +398,10 @@ class MainActivity : ComponentActivity() {
                         },
                         onToggleReadChoices = {
                             combatNarrator.toggleReadChoices()
+                            storyViewModel.persistCurrentState()
+                        },
+                        onToggleAutoReadHubChoices = {
+                            combatNarrator.toggleAutoReadHubChoices()
                             storyViewModel.persistCurrentState()
                         },
                         onToggleCharacterPitch = {

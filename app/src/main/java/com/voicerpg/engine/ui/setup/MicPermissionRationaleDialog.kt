@@ -37,6 +37,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import com.voicerpg.engine.content.GameContent
 import com.voicerpg.engine.ui.theme.FrostCyan
 import com.voicerpg.engine.ui.theme.HolyYellow
 import com.voicerpg.engine.ui.theme.LogosGold
@@ -97,7 +98,7 @@ fun MicPermissionRationaleDialog(
                 Spacer(modifier = Modifier.height(12.dp))
 
                 Text(
-                    text = "TEMPLATE VOICE CONTROL",
+                    text = GameContent.manifest.voicePermissionTitle.ifBlank { "HANDS-FREE VOICE CONTROL" },
                     color = LogosGold,
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Black,
@@ -109,7 +110,10 @@ fun MicPermissionRationaleDialog(
                 Spacer(modifier = Modifier.height(4.dp))
 
                 Text(
-                    text = "Template Hands-Free Voice RPG",
+                    text = GameContent.manifest.voicePermissionSubtitle.ifBlank {
+                        if (GameContent.manifest.gameTitle.isNotBlank()) "${GameContent.manifest.gameTitle} Hands-Free Voice Controls"
+                        else "Hands-Free Voice Controls"
+                    },
                     color = Color.LightGray.copy(alpha = 0.85f),
                     fontSize = 11.sp,
                     fontFamily = FontFamily.Monospace,

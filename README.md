@@ -4,7 +4,8 @@ A high-performance, native Android game engine designed for building audio-first
 
 > [!NOTE]
 > For a step-by-step tutorial on creating your own game with this engine, see [STARTER_GUIDE.md](STARTER_GUIDE.md).  
-> For complete mathematical equations, combat design, and architectural specs, see [DESIGN.md](DESIGN.md).
+> For complete mathematical equations, combat design, and architectural specs, see [DESIGN.md](DESIGN.md).  
+> For upcoming engine features and architectural roadmap items, see [TODO.md](TODO.md).
 
 ---
 

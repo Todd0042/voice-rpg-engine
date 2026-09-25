@@ -52,7 +52,11 @@ data class ManifestDto(
     val characterTitles: List<String>? = null,
     val creationEmbarkPrompt: String = "AWAKEN ➔",
     val creationVoiceKeywords: List<String>? = null,
-    val defaultHeroPortrait: String? = null
+    val defaultHeroPortrait: String? = null,
+    val tutorialCompletionText: String = "",
+    val voicePermissionTitle: String = "",
+    val voicePermissionSubtitle: String = "",
+    val voicePermissionPrompt: String = ""
 )
 
 data class GrowthDto(
@@ -406,7 +410,11 @@ data class GameManifest(
     val characterTitles: List<String> = emptyList(),
     val creationEmbarkPrompt: String = "AWAKEN ➔",
     val creationVoiceKeywords: List<String> = emptyList(),
-    val defaultHeroPortrait: String? = null
+    val defaultHeroPortrait: String? = null,
+    val tutorialCompletionText: String = "",
+    val voicePermissionTitle: String = "",
+    val voicePermissionSubtitle: String = "",
+    val voicePermissionPrompt: String = ""
 )
 
 data class EnvironmentDefinition(
@@ -868,7 +876,11 @@ class GameContentLoader(private val source: ContentSource) {
                 characterTitles = manifestDto.characterTitles ?: emptyList(),
                 creationEmbarkPrompt = manifestDto.creationEmbarkPrompt,
                 creationVoiceKeywords = manifestDto.creationVoiceKeywords ?: emptyList(),
-                defaultHeroPortrait = manifestDto.defaultHeroPortrait
+                defaultHeroPortrait = manifestDto.defaultHeroPortrait,
+                tutorialCompletionText = manifestDto.tutorialCompletionText,
+                voicePermissionTitle = manifestDto.voicePermissionTitle,
+                voicePermissionSubtitle = manifestDto.voicePermissionSubtitle,
+                voicePermissionPrompt = manifestDto.voicePermissionPrompt
             ),
             characters = characters,
             classes = classes,
@@ -1154,7 +1166,11 @@ object EmergencyFallback {
                 characterTitles = emptyList(),
                 creationEmbarkPrompt = "AWAKEN ➔",
                 creationVoiceKeywords = emptyList(),
-                defaultHeroPortrait = null
+                defaultHeroPortrait = null,
+                tutorialCompletionText = "",
+                voicePermissionTitle = "",
+                voicePermissionSubtitle = "",
+                voicePermissionPrompt = ""
             ),
             characters = emptyMap(),
             classes = emptyList(),

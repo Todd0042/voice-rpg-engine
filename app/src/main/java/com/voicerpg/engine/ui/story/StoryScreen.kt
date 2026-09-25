@@ -133,7 +133,6 @@ fun StoryScreen(
             }
         }
     }
-    val isRightWisp = rightSpeaker?.id?.contains("wisp", ignoreCase = true) == true
 
     val rightSpeakerAsset = remember(rightSpeaker?.id) {
         rightSpeaker?.effectivePortraitAsset(currentNode.id)
@@ -471,22 +470,13 @@ fun StoryScreen(
 
                         // Right Character (Companion / NPC)
                         if (rightSpeaker != null) {
-                            if (isRightWisp) {
-                                ShadowWispBust(
-                                    bitmap = rightBitmap,
-                                    isSpeaking = isRightSpeaking,
-                                    sizeDp = 76.dp,
-                                    modifier = Modifier.offset(y = (if (isRightSpeaking) floatY else 0f).dp)
-                                )
-                            } else {
-                                CharacterPortraitBust(
-                                    bitmap = rightBitmap,
-                                    speaker = rightSpeaker,
-                                    isSpeaking = isRightSpeaking,
-                                    sizeDp = 84.dp,
-                                    modifier = Modifier.offset(y = (if (isRightSpeaking) floatY else 0f).dp)
-                                )
-                            }
+                            CharacterPortraitBust(
+                                bitmap = rightBitmap,
+                                speaker = rightSpeaker,
+                                isSpeaking = isRightSpeaking,
+                                sizeDp = 84.dp,
+                                modifier = Modifier.offset(y = (if (isRightSpeaking) floatY else 0f).dp)
+                            )
                         } else {
                             // Empty spacer to keep left character nicely aligned
                             Spacer(modifier = Modifier.width(84.dp))
@@ -598,28 +588,16 @@ fun StoryScreen(
 
                 // Right Flank: Companion / NPC Bust standing on the right
                 if (rightSpeaker != null) {
-                    if (isRightWisp) {
-                        ShadowWispBust(
-                            bitmap = rightBitmap,
-                            isSpeaking = isRightSpeaking,
-                            sizeDp = 100.dp,
-                            modifier = Modifier
-                                .align(Alignment.BottomEnd)
-                                .padding(end = 14.dp, bottom = 8.dp)
-                                .offset(y = (if (isRightSpeaking) floatY else 0f).dp)
-                        )
-                    } else {
-                        CharacterPortraitBust(
-                            bitmap = rightBitmap,
-                            speaker = rightSpeaker,
-                            isSpeaking = isRightSpeaking,
-                            sizeDp = 110.dp,
-                            modifier = Modifier
-                                .align(Alignment.BottomEnd)
-                                .padding(end = 14.dp, bottom = 8.dp)
-                                .offset(y = (if (isRightSpeaking) floatY else 0f).dp)
-                        )
-                    }
+                    CharacterPortraitBust(
+                        bitmap = rightBitmap,
+                        speaker = rightSpeaker,
+                        isSpeaking = isRightSpeaking,
+                        sizeDp = 110.dp,
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .padding(end = 14.dp, bottom = 8.dp)
+                            .offset(y = (if (isRightSpeaking) floatY else 0f).dp)
+                    )
                 }
 
                 // Center Stage: Dialogue Bubble & Choices positioned neatly between characters
@@ -837,69 +815,6 @@ private fun CharacterPortraitBust(
             Text(
                 text = speaker.name,
                 color = if (isSpeaking) RetroBlack else Color.LightGray,
-                fontSize = 9.sp,
-                fontWeight = FontWeight.Bold,
-                fontFamily = FontFamily.Monospace
-            )
-        }
-    }
-}
-
-/**
- * Silhouette avatar for Shadow Wisps when encountered in dialogue.
- */
-@Composable
-private fun ShadowWispBust(
-    bitmap: ImageBitmap?,
-    isSpeaking: Boolean,
-    sizeDp: Dp = 90.dp,
-    modifier: Modifier = Modifier
-) {
-    val scale = if (isSpeaking) 1.04f else 0.96f
-    val alpha = if (isSpeaking) 1.0f else 0.70f
-
-    Column(
-        modifier = modifier
-            .scale(scale)
-            .alpha(alpha),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Box(
-            modifier = Modifier
-                .size(sizeDp)
-                .shadow(8.dp, CircleShape, spotColor = Color(0xFF7E57C2))
-                .clip(CircleShape)
-                .background(Color(0xCC1A0033))
-                .border(if (isSpeaking) 2.dp else 1.dp, Color(0xFFB39DDB), CircleShape),
-            contentAlignment = Alignment.Center
-        ) {
-            if (bitmap != null) {
-                Image(
-                    bitmap = bitmap,
-                    contentDescription = "Corrupted Wisp",
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize()
-                )
-            } else {
-                Text(
-                    text = "👁️",
-                    fontSize = if (sizeDp > 90.dp) 38.sp else 32.sp
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(3.dp))
-
-        Box(
-            modifier = Modifier
-                .clip(RoundedCornerShape(4.dp))
-                .background(Color(0xCC2A0845))
-                .border(1.dp, Color(0xFF9575CD), RoundedCornerShape(4.dp))
-                .padding(horizontal = 6.dp, vertical = 2.dp)
-        ) {
-            Text(
-                text = "Shadow Wisp",
-                color = Color(0xFFE1BEE7),
                 fontSize = 9.sp,
                 fontWeight = FontWeight.Bold,
                 fontFamily = FontFamily.Monospace

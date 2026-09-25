@@ -107,11 +107,6 @@ class CombatViewModel(
 
     var currentEncounterId: String? = null
         internal set
-    var isZephyrRecruitedMidBattle: Boolean = false
-        internal set
-    var isMalakorUltimateCast: Boolean = false
-        internal set
-    val isPhase3Triggered: Boolean get() = isMalakorUltimateCast
 
     var onContinueStory: (() -> Unit)? = null
 
@@ -748,11 +743,6 @@ class CombatViewModel(
                 delay(250)
             }
 
-            // Option A: Zephyr mid-battle recruitment in Chapter 8
-            if (currentEncounterId == "ch8_executioner_ambush" && !isZephyrRecruitedMidBattle && _state.value.party.none { it.id == "zephyr" }) {
-                recruitZephyrMidBattle()
-            }
-
             // Turn transition: check if another combatant is already ready
             lastActedFaction = CombatantFaction.ENEMY
             registerTurnCompleted()
@@ -924,27 +914,7 @@ class CombatViewModel(
     }
 
     private fun performTurnTransition() {
-        val currentParty = _state.value.party
-        val currentEnemies = _state.value.enemies
-
-        // Phase threshold: Cords of Severance in Chapter 16 against Grand Inquisitor Malakor
-        val malakor = currentEnemies.firstOrNull { it.id == "malakor" && it.isAlive }
-        if (currentEncounterId == "ch16_malakor_finale" && malakor != null && malakor.currentHp <= 450 && !isMalakorUltimateCast) {
-            triggerMalakorCordsOfSeverance()
-            if (combatNarrator.isEyesFreeMode.value) {
-                activeScope.launch {
-                    val waitStart = System.currentTimeMillis()
-                    while (combatNarrator.isSpeaking.value && (System.currentTimeMillis() - waitStart < 7000L)) {
-                        delay(50)
-                    }
-                    delay(200)
-                    proceedAfterTurnCheck(_state.value.party, _state.value.enemies)
-                }
-                return
-            }
-        }
-
-        proceedAfterTurnCheck(currentParty, currentEnemies)
+        proceedAfterTurnCheck(_state.value.party, _state.value.enemies)
     }
 
     private fun proceedAfterTurnCheck(currentParty: List<PartyMember>, currentEnemies: List<Enemy>) {
@@ -1011,105 +981,6 @@ class CombatViewModel(
             // Nobody ready yet — resume advancing turn gauges
             _state.value = _state.value.copy(phase = CombatPhase.ATB_WAITING)
         }
-    }
-
-    fun recruitZephyrMidBattle() {
-        if (isZephyrRecruitedMidBattle || _state.value.party.any { it.id == "zephyr" }) return
-        isZephyrRecruitedMidBattle = true
-        val zephyr = GameContent.companionMember("zephyr") ?: return
-        val updatedParty = _state.value.party + zephyr
-        val fct = FloatingCombatText(
-            text = "Zephyr Defects to the Fellowship!",
-            color = Color(0xFFCE93D8),
-            startX = 400f,
-            startY = 350f,
-            isCrit = true
-        )
-        sfxManager.playSpellCast()
-        triggerScreenShake(16f)
-        combatNarrator.speak(
-            "Zephyr descends from the rocky canyon rim with twin daggers flashing! 'I will not cut my tongue for your silence!' Zephyr defects to the fellowship!",
-            force = true
-        )
-        _state.value = _state.value.copy(
-            party = updatedParty,
-            floatingTexts = _state.value.floatingTexts + fct
-        )
-        activeScope.launch {
-            delay(1500)
-            _state.value = _state.value.copy(
-                floatingTexts = _state.value.floatingTexts.filter { it.id != fct.id }
-            )
-        }
-    }
-
-    fun triggerMalakorCordsOfSeverance() {
-        if (isMalakorUltimateCast) return
-        isMalakorUltimateCast = true
-
-        triggerScreenShake(28f)
-        sfxManager.playHitImpact()
-
-        val fctBanner = FloatingCombatText(
-            text = "CORDS OF SEVERANCE — Cataclysmic Severance",
-            color = Color(0xFFFF1744),
-            startX = 380f,
-            startY = 320f,
-            isCrit = true
-        )
-
-        combatNarrator.speak(
-            "Malakor unleashes Cords of Severance! A devastating cataclysm tears through the party, severing their life force!",
-            force = true
-        )
-
-        val newFloats = mutableListOf<FloatingCombatText>(fctBanner)
-        val updatedParty = _state.value.party.map { hero ->
-            if (hero.isAlive) {
-                val hpRatio = hero.currentHp.toFloat() / hero.maxHp
-                val (newHp, dmg) = if (hpRatio < 0.30f) {
-                    0 to hero.currentHp
-                } else {
-                    val remainingRatio = 0.05f + Random.nextFloat() * 0.05f // 5% to 10%
-                    val targetHp = (hero.maxHp * remainingRatio).roundToInt().coerceIn(1, (hero.maxHp * 0.10f).roundToInt().coerceAtLeast(1))
-                    val damageDealt = (hero.currentHp - targetHp).coerceAtLeast(1)
-                    targetHp to damageDealt
-                }
-                val (hx, hy) = partyFloatSlot(hero.id)
-                newFloats += FloatingCombatText(
-                    text = "-$dmg",
-                    color = Color(0xFFFF1744),
-                    startX = hx,
-                    startY = hy,
-                    isCrit = true
-                )
-                val isFallen = newHp <= 0
-                hero.copy(
-                    currentHp = newHp,
-                    currentMp = if (isFallen) 0 else hero.currentMp,
-                    atbGauge = if (isFallen) 0f else hero.atbGauge,
-                    stance = if (isFallen) CharacterStance.DEAD else CharacterStance.DAMAGED,
-                    isGuarding = false
-                )
-            } else hero
-        }
-
-        _state.value = _state.value.copy(
-            party = updatedParty,
-            floatingTexts = _state.value.floatingTexts + newFloats
-        )
-
-        activeScope.launch {
-            delay(2200)
-            _state.value = _state.value.copy(
-                floatingTexts = _state.value.floatingTexts.filterNot { ft -> newFloats.any { it.id == ft.id } }
-            )
-        }
-    }
-
-    /** Compatibility alias for legacy callers/tests. */
-    fun triggerPhase3DeathOfVoice() {
-        triggerMalakorCordsOfSeverance()
     }
 
     fun selectEnemy(enemy: Enemy) {
@@ -2549,8 +2420,6 @@ class CombatViewModel(
     fun startEncounter(encounter: EncounterDefinition) {
         lastEncounterDefinition = encounter
         currentEncounterId = encounter.id
-        isZephyrRecruitedMidBattle = false
-        isMalakorUltimateCast = false
         _combatantPositions.clear()
         sfxManager.mute(false)
         musicManager?.playCombatMusic()

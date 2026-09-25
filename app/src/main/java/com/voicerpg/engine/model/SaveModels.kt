@@ -98,6 +98,7 @@ data class GameSaveData(
     val isCombatNarrationEnabled: Boolean = true,
     val isPocketGuardEnabled: Boolean = true,
     val isReadChoicesEnabled: Boolean = true,
+    val isAutoReadHubChoices: Boolean = true,
     val speechRate: Float = 1.05f,
     val isCharacterPitchEnabled: Boolean = true,
     val isSpeakerAttributionEnabled: Boolean = true,

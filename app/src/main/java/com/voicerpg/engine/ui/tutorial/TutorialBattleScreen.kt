@@ -1001,8 +1001,12 @@ private fun CompletionBannerCard() {
                 fontWeight = FontWeight.Black,
                 fontFamily = FontFamily.Monospace
             )
+            val manifest = com.voicerpg.engine.content.GameContent.manifest
+            val completionMsg = manifest.tutorialCompletionText.ifBlank {
+                "All companions assembled. Resonance mechanics understood. You are prepared to enter the world of ${manifest.worldName}."
+            }
             Text(
-                text = "All companions assembled. Resonance mechanics understood. You are prepared to enter the world of Logos.",
+                text = completionMsg,
                 color = Color(0xFFFFF9C4),
                 fontSize = 11.sp,
                 textAlign = TextAlign.Center

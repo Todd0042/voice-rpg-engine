@@ -51,6 +51,7 @@ fun OptionsDialog(
     isCombatNarrationEnabled: Boolean = true,
     isPocketGuardEnabled: Boolean = true,
     isReadChoicesEnabled: Boolean,
+    isAutoReadHubChoices: Boolean = true,
     isCharacterPitchEnabled: Boolean,
     isSpeakerAttributionEnabled: Boolean,
     onToggleSpeakerAttribution: () -> Unit,
@@ -64,6 +65,7 @@ fun OptionsDialog(
     onToggleCombatNarration: () -> Unit = {},
     onTogglePocketGuard: () -> Unit = {},
     onToggleReadChoices: () -> Unit,
+    onToggleAutoReadHubChoices: () -> Unit = {},
     onToggleCharacterPitch: () -> Unit,
     onSpeechRateChange: (Float) -> Unit,
     onToggleAutoListen: () -> Unit,
@@ -745,6 +747,19 @@ fun OptionsDialog(
                         )
                     }
                 }
+
+                // =============================================================
+                // Toggle: Auto-Read Hub Choices in Screenless Pocket Mode
+                // =============================================================
+                Spacer(modifier = Modifier.height(10.dp))
+                OptionToggleRow(
+                    title = "🎧 Pocket Mode Auto-Read Choices",
+                    subtitle = "When Screenless Pocket Mode is active, automatically reads all available story choices upon visiting story hubs.",
+                    voiceHint = "Pocket Mode default: ON",
+                    checked = isAutoReadHubChoices,
+                    activeColor = Color(0xFF64B5F6),
+                    onCheckedChange = onToggleAutoReadHubChoices
+                )
 
                 // =============================================================
                 // Universal Cheat Code: up up down down left right left right b a start

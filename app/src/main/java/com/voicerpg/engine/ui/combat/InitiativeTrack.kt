@@ -22,6 +22,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.voicerpg.engine.content.GameContent
 import com.voicerpg.engine.model.CombatPhase
 import com.voicerpg.engine.ui.theme.LogosGold
 import com.voicerpg.engine.ui.theme.RetroBorder
@@ -89,17 +90,12 @@ fun InitiativeTrack(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 if (party.isEmpty()) {
-                    listOf(
-                        Triple("hero", "A", Color(0xFF0288D1)),
-                        Triple("cedric", "C", Color(0xFFFFA000)),
-                        Triple("lyra", "L", Color(0xFF43A047)),
-                        Triple("zephyr", "Z", Color(0xFF8E24AA))
-                    ).forEach { (id, label, color) ->
+                    GameContent.allSpeakers.filter { !it.isNarrator }.take(4).forEach { speaker ->
                         TimelineIcon(
-                            label = label,
+                            label = speaker.name.take(1).uppercase(),
                             isCurrent = false,
                             isAlive = true,
-                            color = color
+                            color = speaker.themeColor
                         )
                     }
                 } else {

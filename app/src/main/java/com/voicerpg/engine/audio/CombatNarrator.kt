@@ -77,12 +77,15 @@ class CombatNarrator(
     }
 
     fun registerSpeakers(speakers: Collection<DialogueSpeaker>) {
-        speakers.forEach { registerSpeaker(it) }
+        speakers.forEach { speaker ->
+            val pref = com.voicerpg.engine.content.GameContent.preferredVoiceIds[speaker.id]
+            registerSpeaker(speaker, pref)
+        }
     }
 
     fun getRegisteredSpeakers(): List<DialogueSpeaker> {
         if (registeredSpeakers.isEmpty()) {
-            registeredSpeakers.addAll(com.voicerpg.engine.engine.StoryScript.ALL_SPEAKERS)
+            registerSpeakers(com.voicerpg.engine.content.GameContent.allSpeakers)
         }
         return registeredSpeakers.toList()
     }
@@ -110,6 +113,9 @@ class CombatNarrator(
 
     private val _isReadChoicesEnabled = MutableStateFlow(true)
     val isReadChoicesEnabled: StateFlow<Boolean> = _isReadChoicesEnabled.asStateFlow()
+
+    private val _isAutoReadHubChoices = MutableStateFlow(true)
+    val isAutoReadHubChoices: StateFlow<Boolean> = _isAutoReadHubChoices.asStateFlow()
 
     private val _speechRate = MutableStateFlow(1.05f)
     val speechRate: StateFlow<Float> = _speechRate.asStateFlow()
@@ -394,6 +400,15 @@ class CombatNarrator(
         return _isReadChoicesEnabled.value
     }
 
+    fun setAutoReadHubChoices(enabled: Boolean) {
+        _isAutoReadHubChoices.value = enabled
+    }
+
+    fun toggleAutoReadHubChoices(): Boolean {
+        _isAutoReadHubChoices.value = !_isAutoReadHubChoices.value
+        return _isAutoReadHubChoices.value
+    }
+
     fun setSpeechRate(rate: Float) {
         _speechRate.value = rate
         tts?.setSpeechRate(rate)
@@ -557,8 +572,11 @@ class CombatNarrator(
         val fullScript = StringBuilder()
         fullScript.append("$speakerPrefix$cleanedText")
 
-        // Read choices aloud if setting enabled
-        if (_isReadChoicesEnabled.value && choices.isNotEmpty()) {
+        // Read choices aloud if setting enabled, or if in Screenless Pocket Mode with auto-read enabled
+        val shouldReadChoices = choices.isNotEmpty() && (
+            _isReadChoicesEnabled.value || (_isEyesFreeMode.value && _isAutoReadHubChoices.value)
+        )
+        if (shouldReadChoices) {
             fullScript.append(". Your options are: ")
             choices.forEachIndexed { index, choice ->
                 fullScript.append("Option ${index + 1}: ${choice.text}. ")

@@ -126,11 +126,12 @@ fun TitleScreen(
     var showStoryModePromptDialog by remember { mutableStateOf(false) }
     var slotDialogIsNewGameMode by remember { mutableStateOf(false) }
 
-    val backgroundBitmap = remember(manifest.titleBackgroundAsset) {
-        StoryAssetLoader.loadBitmap(
-            context,
-            manifest.titleBackgroundAsset ?: "backgrounds/bg_summit.jpg"
-        )
+    val configuration = androidx.compose.ui.platform.LocalConfiguration.current
+    val isPortrait = configuration.orientation == android.content.res.Configuration.ORIENTATION_PORTRAIT
+
+    val backgroundBitmap = remember(manifest.titleBackgroundAsset, isPortrait) {
+        val assetPath = manifest.titleBackgroundAsset ?: "backgrounds/bg_summit.jpg"
+        StoryAssetLoader.loadBackground(context, assetPath, isPortrait)
     }
 
     val infiniteTransition = rememberInfiniteTransition(label = "title_glow")

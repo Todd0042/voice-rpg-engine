@@ -345,6 +345,7 @@ class StoryViewModel(
             combatNarrator.setCombatNarrationEnabled(existingSave.isCombatNarrationEnabled)
             combatNarrator.setNarrationEnabled(existingSave.isNarrationEnabled)
             combatNarrator.setReadChoicesEnabled(existingSave.isReadChoicesEnabled)
+            combatNarrator.setAutoReadHubChoices(existingSave.isAutoReadHubChoices)
             combatNarrator.setSpeechRate(existingSave.speechRate)
             combatNarrator.setCharacterPitchEnabled(existingSave.isCharacterPitchEnabled)
             combatNarrator.setSpeakerAttributionEnabled(existingSave.isSpeakerAttributionEnabled)
@@ -434,6 +435,7 @@ class StoryViewModel(
         combatNarrator.setCombatNarrationEnabled(existingSave.isCombatNarrationEnabled)
         combatNarrator.setNarrationEnabled(existingSave.isNarrationEnabled)
         combatNarrator.setReadChoicesEnabled(existingSave.isReadChoicesEnabled)
+        combatNarrator.setAutoReadHubChoices(existingSave.isAutoReadHubChoices)
         combatNarrator.setSpeechRate(existingSave.speechRate)
         combatNarrator.setCharacterPitchEnabled(existingSave.isCharacterPitchEnabled)
         combatNarrator.setSpeakerAttributionEnabled(existingSave.isSpeakerAttributionEnabled)
@@ -938,6 +940,7 @@ class StoryViewModel(
             isChimeMuted = speechManager.isChimeMuted.value,
             isNarrationEnabled = combatNarrator.isNarrationEnabled.value,
             isReadChoicesEnabled = combatNarrator.isReadChoicesEnabled.value,
+            isAutoReadHubChoices = combatNarrator.isAutoReadHubChoices.value,
             speechRate = combatNarrator.speechRate.value,
             isCharacterPitchEnabled = combatNarrator.isCharacterPitchEnabled.value,
             isSpeakerAttributionEnabled = combatNarrator.isSpeakerAttributionEnabled.value,
@@ -1475,7 +1478,7 @@ class StoryViewModel(
         val isPaused = _state.value.isStoryAutoPlayPaused
 
         // In Pure Story Mode, do not read choices aloud with "What is your command?" — let narrator speak the story
-        val choicesToRead = if (isStoryMode) emptyList() else effective
+        val choicesToRead = if (isStoryMode || effective.isEmpty()) emptyList() else eligibleChoices(node)
 
         combatNarrator.narrateDialogue(
             speaker = node.speaker,
