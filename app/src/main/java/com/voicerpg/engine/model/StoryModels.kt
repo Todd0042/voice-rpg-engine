@@ -53,7 +53,8 @@ data class DialogueChoice(
     val text: String,
     val voiceKeywords: List<String>,
     val nextNodeId: String,
-    val completionFlag: String? = null
+    val completionFlag: String? = null,
+    val requiredFlags: List<String> = emptyList()
 )
 
 /**

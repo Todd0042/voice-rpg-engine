@@ -122,11 +122,13 @@ fun StoryScreen(
     val isHeroSpeaking = !isNarratorSpeaking && (
         currentNode.speaker == heroSpeaker ||
         currentNode.speaker.id == "hero" ||
-        currentNode.speaker.id.startsWith("hero_") ||
+        currentNode.speaker.id == "todd_shop" ||
+        currentNode.speaker.id == "todd" ||
         (heroSpeaker != null && (
             currentNode.speaker.name.equals(heroSpeaker.name, ignoreCase = true) ||
             (currentNode.speaker.portraitAsset != null && currentNode.speaker.portraitAsset == heroSpeaker.portraitAsset)
-        ))
+        )) ||
+        currentNode.speaker.name.equals("Todd", ignoreCase = true)
     )
 
     val leftSpeaker = when {
@@ -541,10 +543,12 @@ fun StoryScreen(
                             ) {
                                 currentNode.choices.forEachIndexed { index, choice ->
                                     val isCompleted = choice.completionFlag != null && storyState.narrativeFlags[choice.completionFlag] == true
+                                    val isLocked = storyViewModel.isChoiceLocked(choice)
                                     DialogueChoiceItem(
                                         index = index + 1,
                                         choice = choice,
                                         isCompleted = isCompleted,
+                                        isLocked = isLocked,
                                         onSelect = { storyViewModel.selectChoice(choice) }
                                     )
                                 }
@@ -673,10 +677,12 @@ fun StoryScreen(
                                             rowChoices.forEachIndexed { colIndex, choice ->
                                                 val originalIndex = rowIndex * 2 + colIndex
                                                 val isCompleted = choice.completionFlag != null && storyState.narrativeFlags[choice.completionFlag] == true
+                                                val isLocked = storyViewModel.isChoiceLocked(choice)
                                                 DialogueChoiceItem(
                                                     index = originalIndex + 1,
                                                     choice = choice,
                                                     isCompleted = isCompleted,
+                                                    isLocked = isLocked,
                                                     onSelect = { storyViewModel.selectChoice(choice) },
                                                     modifier = Modifier.weight(1f)
                                                 )
@@ -686,10 +692,12 @@ fun StoryScreen(
                                         val choice = rowChoices.first()
                                         val originalIndex = rowIndex * 2
                                         val isCompleted = choice.completionFlag != null && storyState.narrativeFlags[choice.completionFlag] == true
+                                        val isLocked = storyViewModel.isChoiceLocked(choice)
                                         DialogueChoiceItem(
                                             index = originalIndex + 1,
                                             choice = choice,
                                             isCompleted = isCompleted,
+                                            isLocked = isLocked,
                                             onSelect = { storyViewModel.selectChoice(choice) },
                                             modifier = Modifier.fillMaxWidth()
                                         )
@@ -1036,13 +1044,30 @@ private fun DialogueChoiceItem(
     index: Int,
     choice: DialogueChoice,
     isCompleted: Boolean = false,
+    isLocked: Boolean = false,
     onSelect: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val backgroundColor = if (isCompleted) Color(0xCC1A1C23) else RetroPanel.copy(alpha = 0.95f)
-    val borderColor = if (isCompleted) Color(0xFF37474F) else RetroBorderGold
-    val textColor = if (isCompleted) Color(0xFF78909C) else Color.White
-    val indexColor = if (isCompleted) Color(0xFF546E7A) else LogosGold
+    val backgroundColor = when {
+        isCompleted -> Color(0xCC1A1C23)
+        isLocked -> Color(0x6614161C)
+        else -> RetroPanel.copy(alpha = 0.95f)
+    }
+    val borderColor = when {
+        isCompleted -> Color(0xFF37474F)
+        isLocked -> Color(0xFF263238)
+        else -> RetroBorderGold
+    }
+    val textColor = when {
+        isCompleted -> Color(0xFF78909C)
+        isLocked -> Color(0xFF607D8B)
+        else -> Color.White
+    }
+    val indexColor = when {
+        isCompleted -> Color(0xFF546E7A)
+        isLocked -> Color(0xFF455A64)
+        else -> LogosGold
+    }
 
     Box(
         modifier = modifier
@@ -1070,7 +1095,7 @@ private fun DialogueChoiceItem(
                 )
                 Spacer(modifier = Modifier.width(6.dp))
                 Text(
-                    text = choice.text,
+                    text = if (isLocked) "🔒 " + choice.text else choice.text,
                     color = textColor,
                     fontSize = 11.sp,
                     fontFamily = FontFamily.Monospace,
@@ -1091,6 +1116,22 @@ private fun DialogueChoiceItem(
                     Text(
                         text = "✓ DONE",
                         color = Color(0xFF81C784),
+                        fontSize = 8.sp,
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            } else if (isLocked) {
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(Color(0x33B0BEC5))
+                        .border(1.dp, Color(0xFF546E7A), RoundedCornerShape(4.dp))
+                        .padding(horizontal = 5.dp, vertical = 2.dp)
+                ) {
+                    Text(
+                        text = "🔒 LOCKED",
+                        color = Color(0xFF90A4AE),
                         fontSize = 8.sp,
                         fontFamily = FontFamily.Monospace,
                         fontWeight = FontWeight.Bold

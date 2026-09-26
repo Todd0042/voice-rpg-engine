@@ -58,7 +58,8 @@ data class ManifestDto(
     val voicePermissionTitle: String = "",
     val voicePermissionSubtitle: String = "",
     val voicePermissionPrompt: String = "",
-    val resonance: ResonanceProfileDto? = null
+    val resonance: ResonanceProfileDto? = null,
+    val ttsReplacements: Map<String, String>? = null
 )
 
 data class ResonanceProfileDto(
@@ -348,7 +349,8 @@ data class ChoiceDto(
     val text: String = "",
     val voiceKeywords: List<String>? = null,
     val nextNodeId: String = "",
-    val completionFlag: String? = null
+    val completionFlag: String? = null,
+    val requiredFlags: List<String>? = null
 )
 
 data class HubCompletionDto(
@@ -443,7 +445,8 @@ data class GameManifest(
     val voicePermissionTitle: String = "",
     val voicePermissionSubtitle: String = "",
     val voicePermissionPrompt: String = "",
-    val resonanceProfile: ResonanceProfile = ResonanceProfile.CLASSIC
+    val resonanceProfile: ResonanceProfile = ResonanceProfile.CLASSIC,
+    val ttsReplacements: Map<String, String> = emptyMap()
 )
 
 data class ResonanceProfile(
@@ -944,7 +947,8 @@ class GameContentLoader(private val source: ContentSource) {
                 voicePermissionTitle = manifestDto.voicePermissionTitle,
                 voicePermissionSubtitle = manifestDto.voicePermissionSubtitle,
                 voicePermissionPrompt = manifestDto.voicePermissionPrompt,
-                resonanceProfile = manifestDto.resonance?.toProfile() ?: ResonanceProfile.CLASSIC
+                resonanceProfile = manifestDto.resonance?.toProfile() ?: ResonanceProfile.CLASSIC,
+                ttsReplacements = manifestDto.ttsReplacements ?: emptyMap()
             ),
             characters = characters,
             classes = classes,
@@ -1174,7 +1178,8 @@ class GameContentLoader(private val source: ContentSource) {
                 text = it.text,
                 voiceKeywords = it.voiceKeywords ?: emptyList(),
                 nextNodeId = it.nextNodeId,
-                completionFlag = it.completionFlag
+                completionFlag = it.completionFlag,
+                requiredFlags = it.requiredFlags ?: emptyList()
             )
         },
         nextNodeId = nextNodeId,

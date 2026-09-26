@@ -103,9 +103,60 @@ class StoryViewModel(
         pendingAutoAdvanceJob = null
     }
 
+    fun isChoiceLocked(choice: DialogueChoice): Boolean {
+        val node = _state.value.currentNode
+        return isChoiceLocked(choice, node, _state.value.narrativeFlags)
+    }
+
+    fun isChoiceCompleted(
+        choice: DialogueChoice,
+        flags: Map<String, Boolean> = _state.value.narrativeFlags,
+        defeated: List<String> = _state.value.defeatedEncounters
+    ): Boolean {
+        if (choice.completionFlag != null && flags[choice.completionFlag] == true) {
+            return true
+        }
+        val target = StoryScript.ALL_NODES[choice.nextNodeId]
+        if (target?.triggerBattleEncounterId != null && defeated.contains(target.triggerBattleEncounterId)) {
+            return true
+        }
+        return false
+    }
+
+    fun isChoiceLocked(choice: DialogueChoice, node: DialogueNode, flags: Map<String, Boolean>): Boolean {
+        // 1. Explicit choice required flags
+        if (choice.requiredFlags.isNotEmpty() && !choice.requiredFlags.all { flags[it] == true }) {
+            return true
+        }
+        // 2. Hub gating: In a hub node (declaring hubCompletion), all dialogue options
+        // (choices with completionFlag that do not trigger battle) must be completed
+        // before advancing choices (e.g. battles, scene transitions) are unlocked.
+        val completion = node.hubCompletion
+        val targetNode = StoryScript.ALL_NODES[choice.nextNodeId]
+        val isBattleOrAdvance = choice.completionFlag == null ||
+            targetNode?.triggerBattleEncounterId != null ||
+            targetNode?.changeSceneId != null
+
+        if (completion != null && isBattleOrAdvance) {
+            val dialogueChoices = node.choices.filter { other ->
+                val otherTarget = StoryScript.ALL_NODES[other.nextNodeId]
+                other.completionFlag != null && otherTarget?.triggerBattleEncounterId == null
+            }
+            if (dialogueChoices.isNotEmpty()) {
+                val allDialogueDone = dialogueChoices.all { flags[it.completionFlag] == true }
+                if (!allDialogueDone) {
+                    return true
+                }
+            }
+        }
+        return false
+    }
+
     private fun eligibleChoices(node: DialogueNode): List<DialogueChoice> =
         node.choices.filter { choice ->
-            choice.completionFlag == null || _state.value.narrativeFlags[choice.completionFlag] != true
+            val notCompleted = !isChoiceCompleted(choice, _state.value.narrativeFlags, _state.value.defeatedEncounters)
+            val notLocked = !isChoiceLocked(choice, node, _state.value.narrativeFlags)
+            notCompleted && notLocked
         }
 
     private fun effectiveDialogueChoices(node: DialogueNode): List<DialogueChoice> {
@@ -702,8 +753,12 @@ class StoryViewModel(
         }
         cancelPendingAutoAdvance()
         cancelPendingStoryMode()
-        if (choice.completionFlag != null && _state.value.narrativeFlags[choice.completionFlag] == true) {
+        if (isChoiceCompleted(choice, _state.value.narrativeFlags, _state.value.defeatedEncounters)) {
             combatNarrator.speak("That objective has already been completed. Please select a remaining task.", force = true)
+            return
+        }
+        if (isChoiceLocked(choice, _state.value.currentNode, _state.value.narrativeFlags)) {
+            combatNarrator.speak("That option is locked. Please explore the remaining dialogue options first.", force = true)
             return
         }
 
@@ -835,6 +890,16 @@ class StoryViewModel(
             val completion = effective.hubCompletion
             if (completion == null || completion.requiredFlags.isEmpty()) break
             if (completion.requiredFlags.all { flags[it] == true }) {
+                // If the hub still has an eligible choice that is not yet completed (e.g. an unlocked battle),
+                // do not redirect immediately; let the choice be presented and chosen.
+                val hasPendingChoice = effective.choices.any { choice ->
+                    val notCompleted = !isChoiceCompleted(choice, flags, _state.value.defeatedEncounters)
+                    val notLocked = !isChoiceLocked(choice, effective, flags)
+                    notCompleted && notLocked && choice.nextNodeId != completion.redirectToNodeId
+                }
+                if (hasPendingChoice) {
+                    break
+                }
                 val redirect = StoryScript.ALL_NODES[completion.redirectToNodeId]
                 if (redirect == null || redirect.id == effective.id) break
                 effective = redirect
@@ -1399,7 +1464,11 @@ class StoryViewModel(
                 completedFlags = _state.value.narrativeFlags
             )
             if (matchedChoice != null) {
-                if (matchedChoice.completionFlag != null && _state.value.narrativeFlags[matchedChoice.completionFlag] == true) {
+                if (isChoiceLocked(matchedChoice, node, _state.value.narrativeFlags)) {
+                    combatNarrator.speak("That option is locked. Please explore the remaining dialogue options first.", force = true)
+                    return
+                }
+                if (isChoiceCompleted(matchedChoice, _state.value.narrativeFlags, _state.value.defeatedEncounters)) {
                     combatNarrator.speak("That objective has already been completed. Please select a remaining task.", force = true)
                     return
                 }

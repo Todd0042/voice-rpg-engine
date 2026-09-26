@@ -79,6 +79,22 @@ class CombatNarrator(
             preferredByDefault[speakerId]?.let { if (it in installedNames) return it }
             return heuristicName
         }
+
+        private val SAINT_ABBREVIATION_REGEX = Regex("""\bSt\.?\s+([A-Z][a-zA-Z]*)""")
+    }
+
+    internal fun normalizeTtsText(input: String): String {
+        var text = input
+        // 1. Data-driven project/story pronunciation overrides from manifest (content neutrality)
+        com.voicerpg.engine.content.GameContent.manifest.ttsReplacements.forEach { (target, replacement) ->
+            text = text.replace(target, replacement, ignoreCase = true)
+        }
+        // 2. Generic English title/place abbreviation expansion: "St. <Name>" or "St <Name>" -> "Saint <Name>"
+        // Prevents on-device TTS from pronouncing names like "St. Augustine" as "Street. Augustine"
+        text = SAINT_ABBREVIATION_REGEX.replace(text) { matchResult ->
+            "Saint ${matchResult.groupValues[1]}"
+        }
+        return text.replace(Regex("""[ \t]+"""), " ").trim()
     }
 
     private var tts: TextToSpeech? = null
@@ -711,15 +727,16 @@ class CombatNarrator(
         prevCb?.invoke()
         _isSpeaking.value = true
 
+        val speechText = normalizeTtsText(text)
         val params = Bundle().apply {
             putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, 1.0f)
         }
-        var result = tts?.speak(text, TextToSpeech.QUEUE_FLUSH, params, utteranceId)
+        var result = tts?.speak(speechText, TextToSpeech.QUEUE_FLUSH, params, utteranceId)
         if (result != TextToSpeech.SUCCESS) {
             // Safety fallback: if custom voice failed, reset to defaultVoice and retry immediately
             try {
                 defaultVoice?.let { tts?.voice = it }
-                result = tts?.speak(text, TextToSpeech.QUEUE_FLUSH, params, utteranceId)
+                result = tts?.speak(speechText, TextToSpeech.QUEUE_FLUSH, params, utteranceId)
             } catch (_: Exception) {}
         }
 
