@@ -262,10 +262,10 @@ class CombatNarrator(
             android.util.Log.d("VoiceRPG_TTS", "Installed: ${installedVoices.size}, Physical English: ${englishPhysicalVoices.size}")
 
             // Google TTS & third-party voice classification tokens:
-            // Female codes: sfg (Voice 1), iom (Voice 3), tpd (Voice 5), tpf (Voice 7), gba, gbb, gbd, gbg, aua, auc, or "female"
-            // Male codes: iob (Voice 2), iog (Voice 4), tpc (Voice 6), iol (Voice 8), rjs, gbc, aub, aud, or "male"
-            val femaleTokens = listOf("female", "#f", "-f-", "_female", "sfg", "iom", "tpd", "tpf", "gba", "gbb", "gbg", "aua", "auc")
-            val maleTokens = listOf("male", "#m", "-m-", "_male", "iob", "iog", "tpc", "iol", "rjs", "gbc", "gbd", "aub", "aud")
+            // Female codes: sfg (Voice 1), iom (Voice 3), tpd (Voice 5), tpf (Voice 7), gba, gbb, gbg, aua, auc, inc, or "female"
+            // Male codes: iob (Voice 2), iog (Voice 4), tpc (Voice 6), iol (Voice 8), rjs, gbc, gbd, aub, aud, ina, or "male"
+            val femaleTokens = listOf("female", "#f", "-f-", "_f_", "_female", "-f0", "smtf", "sfg", "iom", "tpd", "tpf", "gba", "gbb", "gbg", "aua", "auc", "inc")
+            val maleTokens = listOf("male", "#m", "-m-", "_m_", "_male", "-m0", "smtm", "iob", "iog", "tpc", "iol", "rjs", "gbc", "gbd", "aub", "aud", "ina")
 
             val femaleVoices = englishPhysicalVoices.filter { v ->
                 val lower = v.name.lowercase(Locale.ROOT)
@@ -298,18 +298,31 @@ class CombatNarrator(
                 listOf(com.voicerpg.engine.content.GameContent.narrator)
             }
 
-            // Dynamically distribute available physical voices across all registered speakers
-            allSpeakers.forEachIndexed { index, speaker ->
+            var femaleIdx = 0
+            var maleIdx = 0
+            var neutralIdx = 0
+
+            // Dynamically distribute available physical voices respecting character gender
+            allSpeakers.forEach { speaker ->
                 val preferred = customPreferredVoiceIds[speaker.id] ?: PREFERRED_VOICE_IDS[speaker.id]
+                val charGender = speaker.gender ?: com.voicerpg.engine.content.GameContent.characterById(speaker.id)?.gender
+                val isFemale = charGender?.equals("female", ignoreCase = true) == true
+                val isMale = charGender?.equals("male", ignoreCase = true) == true
+
                 val candidate = when {
                     preferred != null && englishPhysicalVoices.any { it.name == preferred } ->
                         englishPhysicalVoices.first { it.name == preferred }
-                    englishPhysicalVoices.isNotEmpty() ->
-                        englishPhysicalVoices[index % englishPhysicalVoices.size]
-                    else -> defaultVoice
+                    speaker.isNarrator || speaker.id == "narrator" ->
+                        britishStoryteller ?: defaultVoice
+                    isFemale ->
+                        femalePool[femaleIdx++ % femalePool.size]
+                    isMale ->
+                        distinctMalePool[maleIdx++ % distinctMalePool.size]
+                    else ->
+                        englishPhysicalVoices[neutralIdx++ % englishPhysicalVoices.size]
                 }
                 dynamicSpeakerVoices[speaker.id] = applyVoicePreference(speaker.id, candidate, englishPhysicalVoices)
-                android.util.Log.d("VoiceRPG_TTS", "Assigned ${speaker.name} (${speaker.id}): ${dynamicSpeakerVoices[speaker.id]?.name}")
+                android.util.Log.d("VoiceRPG_TTS", "Assigned ${speaker.name} (${speaker.id}, gender=$charGender): ${dynamicSpeakerVoices[speaker.id]?.name}")
             }
         } catch (e: Exception) {
             android.util.Log.e("VoiceRPG_TTS", "Error assigning voices", e)
@@ -514,10 +527,30 @@ class CombatNarrator(
     fun cycleSpeakerVoice(speaker: DialogueSpeaker, onDone: (() -> Unit)? = null): Voice? {
         val physicalVoices = getInstalledPhysicalVoices()
         if (physicalVoices.isEmpty()) return null
+
+        val charGender = speaker.gender ?: com.voicerpg.engine.content.GameContent.characterById(speaker.id)?.gender
+        val isFemale = charGender?.equals("female", ignoreCase = true) == true
+        val isMale = charGender?.equals("male", ignoreCase = true) == true
+
+        val femaleTokens = listOf("female", "#f", "-f-", "_f_", "_female", "-f0", "smtf", "sfg", "iom", "tpd", "tpf", "gba", "gbb", "gbg", "aua", "auc", "inc")
+        val maleTokens = listOf("male", "#m", "-m-", "_m_", "_male", "-m0", "smtm", "iob", "iog", "tpc", "iol", "rjs", "gbc", "gbd", "aub", "aud", "ina")
+
+        val eligibleVoices = when {
+            isFemale -> physicalVoices.filter { v ->
+                val lower = v.name.lowercase(Locale.ROOT)
+                femaleTokens.any { lower.contains(it) } && !lower.contains("male")
+            }.ifEmpty { physicalVoices }
+            isMale -> physicalVoices.filter { v ->
+                val lower = v.name.lowercase(Locale.ROOT)
+                maleTokens.any { lower.contains(it) } && !lower.contains("female")
+            }.ifEmpty { physicalVoices }
+            else -> physicalVoices
+        }
+
         val current = getVoiceForSpeaker(speaker)
-        val currentIndex = physicalVoices.indexOfFirst { it.name == current?.name }
-        val nextIndex = if (currentIndex >= 0) (currentIndex + 1) % physicalVoices.size else 0
-        val nextVoice = physicalVoices[nextIndex]
+        val currentIndex = eligibleVoices.indexOfFirst { it.name == current?.name }
+        val nextIndex = if (currentIndex >= 0) (currentIndex + 1) % eligibleVoices.size else 0
+        val nextVoice = eligibleVoices[nextIndex]
         setSpeakerVoice(speaker, nextVoice)
         previewSpeakerVoice(speaker, onDone)
         return nextVoice

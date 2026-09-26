@@ -947,7 +947,8 @@ class GameContentLoader(private val source: ContentSource) {
             portraitAsset = portraitAsset,
             themeColor = parseHexColor(themeColor, Color.White),
             ttsPitch = ttsPitch,
-            samplePhrase = samplePhrase
+            samplePhrase = samplePhrase,
+            gender = gender
         )
         val combat = combat?.let { c ->
             val embeddedSpells = (c.spells ?: this.spells ?: emptyList()).map { it.toSpell() }

@@ -22,7 +22,8 @@ data class DialogueSpeaker(
     val portraitAsset: String?,
     val themeColor: Color,
     val ttsPitch: Float = 1.0f,
-    val samplePhrase: String? = null
+    val samplePhrase: String? = null,
+    val gender: String? = null
 ) {
     companion object {
         /**
