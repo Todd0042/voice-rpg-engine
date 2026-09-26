@@ -316,6 +316,7 @@ class StoryDialogueTest {
         storyViewModel.stopFastForward()
         assertFalse(storyViewModel.state.value.isFastForwarding)
 
+        storyViewModel.startNewGame(com.voicerpg.engine.model.PlayerCustomization(name = "Kaelen"))
         storyViewModel.handleStoryVoiceInput("skip")
         assertTrue(storyViewModel.state.value.isFastForwarding)
 

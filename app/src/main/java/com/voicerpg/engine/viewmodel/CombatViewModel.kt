@@ -209,6 +209,7 @@ class CombatViewModel(
 
     private var atbJob: Job? = null
     private var conclusionTransitionJob: Job? = null
+    private var conclusionWatchdogJob: Job? = null
     private var lastActedHeroId: String? = null
     var lastActedFaction: CombatantFaction = CombatantFaction.NONE
         internal set
@@ -773,6 +774,7 @@ class CombatViewModel(
     /** Shared victory conclusion: award XP, narrate, arm the continue/listen loop. */
     private fun concludeVictory() {
         conclusionTransitionJob?.cancel()
+        conclusionWatchdogJob?.cancel()
         _state.value = _state.value.copy(phase = CombatPhase.BATTLE_WON)
         val levelUpLines = awardVictoryXp()
 
@@ -783,15 +785,20 @@ class CombatViewModel(
             }
         }
 
+        val fullVictoryText = if (!levelUpLines.isNullOrBlank()) {
+            "$levelUpLines ${com.voicerpg.engine.content.GameContent.manifest.victoryLine}"
+        } else {
+            com.voicerpg.engine.content.GameContent.manifest.victoryLine
+        }
         if (_state.value.isPureStoryMode) {
-            conclusionTransitionJob = activeScope.launch {
-                // Safety watchdog: wait for narration to finish speaking (up to 30s) if onDone isn't triggered
-                val start = System.currentTimeMillis()
-                while (combatNarrator.isSpeaking.value && (System.currentTimeMillis() - start) < 30000L) {
-                    delay(250L)
+            val wordCount = fullVictoryText.split(Regex("\\s+")).count { it.isNotBlank() }
+            val estimatedDurationMs = maxOf(4000L, ((wordCount / 2.0f) * 1000L).toLong() + 3000L)
+            val watchdogTimeoutMs = estimatedDurationMs + 6000L
+            conclusionWatchdogJob = activeScope.launch {
+                delay(watchdogTimeoutMs)
+                if (_state.value.phase == CombatPhase.BATTLE_WON && _state.value.isPureStoryMode) {
+                    proceedToStory()
                 }
-                delay(1200L)
-                proceedToStory()
             }
         }
 
@@ -800,10 +807,12 @@ class CombatViewModel(
             extraPrefix = levelUpLines,
             force = _state.value.isPureStoryMode
         ) {
+            conclusionWatchdogJob?.cancel()
+            conclusionWatchdogJob = null
             if (_state.value.isPureStoryMode) {
                 conclusionTransitionJob?.cancel()
                 conclusionTransitionJob = activeScope.launch {
-                    delay(1200L)
+                    delay(1500L)
                     proceedToStory()
                 }
             } else if (speechManager.isAutoListen.value) {
@@ -817,6 +826,7 @@ class CombatViewModel(
 
     private fun concludeDefeat() {
         conclusionTransitionJob?.cancel()
+        conclusionWatchdogJob?.cancel()
         _state.value = _state.value.copy(phase = CombatPhase.BATTLE_LOST)
 
         fun proceedToStory() {
@@ -826,15 +836,16 @@ class CombatViewModel(
             }
         }
 
+        val fullDefeatText = com.voicerpg.engine.content.GameContent.manifest.defeatLine
         if (_state.value.isPureStoryMode) {
-            conclusionTransitionJob = activeScope.launch {
-                // Safety watchdog: wait for narration to finish speaking (up to 30s) if onDone isn't triggered
-                val start = System.currentTimeMillis()
-                while (combatNarrator.isSpeaking.value && (System.currentTimeMillis() - start) < 30000L) {
-                    delay(250L)
+            val wordCount = fullDefeatText.split(Regex("\\s+")).count { it.isNotBlank() }
+            val estimatedDurationMs = maxOf(4000L, ((wordCount / 2.0f) * 1000L).toLong() + 3000L)
+            val watchdogTimeoutMs = estimatedDurationMs + 6000L
+            conclusionWatchdogJob = activeScope.launch {
+                delay(watchdogTimeoutMs)
+                if (_state.value.phase == CombatPhase.BATTLE_LOST && _state.value.isPureStoryMode) {
+                    proceedToStory()
                 }
-                delay(1200L)
-                proceedToStory()
             }
         }
 
@@ -842,10 +853,12 @@ class CombatViewModel(
             isVictory = false,
             force = _state.value.isPureStoryMode
         ) {
+            conclusionWatchdogJob?.cancel()
+            conclusionWatchdogJob = null
             if (_state.value.isPureStoryMode) {
                 conclusionTransitionJob?.cancel()
                 conclusionTransitionJob = activeScope.launch {
-                    delay(1200L)
+                    delay(1500L)
                     proceedToStory()
                 }
             } else if (speechManager.isAutoListen.value) {
@@ -1544,6 +1557,7 @@ class CombatViewModel(
             when (conclusionAction) {
                 com.voicerpg.engine.engine.StoryChoiceMatcher.ConclusionAction.CONTINUE_STORY -> {
                     speechManager.cancel()
+                    combatNarrator.stop()
                     onContinueStory?.invoke()
                 }
                 com.voicerpg.engine.engine.StoryChoiceMatcher.ConclusionAction.RESTART_BATTLE -> {
@@ -2371,6 +2385,8 @@ class CombatViewModel(
     fun pauseAtb() {
         conclusionTransitionJob?.cancel()
         conclusionTransitionJob = null
+        conclusionWatchdogJob?.cancel()
+        conclusionWatchdogJob = null
         atbJob?.cancel()
         atbJob = null
         combatNarrator.setCombatActive(false)
@@ -2508,6 +2524,8 @@ class CombatViewModel(
     ) {
         conclusionTransitionJob?.cancel()
         conclusionTransitionJob = null
+        conclusionWatchdogJob?.cancel()
+        conclusionWatchdogJob = null
         atbJob?.cancel()
         speechManager.cancel()
         particleEmitter.clear()
@@ -2540,6 +2558,10 @@ class CombatViewModel(
         }
         val currentEnv = _state.value.currentEnvironment
         val currentEnvId = _state.value.currentEnvironmentId
+        conclusionTransitionJob?.cancel()
+        conclusionTransitionJob = null
+        conclusionWatchdogJob?.cancel()
+        conclusionWatchdogJob = null
         turnsTakenInRound = 0
         lastActedHeroId = null
         lastActedFaction = CombatantFaction.NONE
@@ -2570,6 +2592,8 @@ class CombatViewModel(
     fun cleanup() {
         conclusionTransitionJob?.cancel()
         conclusionTransitionJob = null
+        conclusionWatchdogJob?.cancel()
+        conclusionWatchdogJob = null
         atbJob?.cancel()
         speechManager.destroy()
         combatNarrator.destroy()
