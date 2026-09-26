@@ -156,6 +156,13 @@ fun TutorialBattleScreen(
                         modifier = Modifier.fillMaxSize()
                     )
 
+                    // 25% black contrast overlay between background and sprites
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(Color.Black.copy(alpha = 0.25f))
+                    )
+
                     // Battle Grid Flanks
                     Row(
                         modifier = Modifier
