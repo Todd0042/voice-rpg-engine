@@ -118,6 +118,7 @@ data class CharacterDto(
     val ttsPitch: Float = 1.0f,
     val samplePhrase: String? = null,
     val preferredVoiceId: String? = null,
+    val allowedVoiceRegions: List<String>? = null,
     val voiceAliases: List<String>? = null,
     val loreClass: String = "Adventurer",
     val combat: CharacterCombatDto? = null,
@@ -496,6 +497,7 @@ data class GameCharacter(
     val joinWhenFlag: String?,
     val spellGrants: List<SpellGrant>,
     val gender: String? = null,
+    val allowedVoiceRegions: List<String> = emptyList(),
     val sprite: SpriteDefinition? = null
 ) {
     fun toPartyMember(atbOverride: Float? = null): PartyMember? {
@@ -948,7 +950,8 @@ class GameContentLoader(private val source: ContentSource) {
             themeColor = parseHexColor(themeColor, Color.White),
             ttsPitch = ttsPitch,
             samplePhrase = samplePhrase,
-            gender = gender
+            gender = gender,
+            allowedVoiceRegions = allowedVoiceRegions ?: emptyList()
         )
         val combat = combat?.let { c ->
             val embeddedSpells = (c.spells ?: this.spells ?: emptyList()).map { it.toSpell() }
@@ -984,6 +987,7 @@ class GameContentLoader(private val source: ContentSource) {
                 SpellGrant(it.flag, it.spellIds ?: emptyList())
             },
             gender = gender,
+            allowedVoiceRegions = allowedVoiceRegions ?: emptyList(),
             sprite = resolvedSprite
         )
     }

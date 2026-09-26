@@ -17,6 +17,13 @@
     "champion",
     "spellblade"
   ],
+  "gender": "male",
+  "allowedVoiceRegions": [
+    "US",
+    "CA",
+    "GB",
+    "AU"
+  ],
   "loreClass": "Spellblade",
   "combat": {
     "maxHp": 240,

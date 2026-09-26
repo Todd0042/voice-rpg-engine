@@ -9,5 +9,9 @@
   "ttsPitch": 1.0,
   "samplePhrase": "The chronicle unfolds with every step.",
   "preferredVoiceId": "en-gb-x-rjs-local",
-  "voiceAliases": []
+  "voiceAliases": [],
+  "gender": "agender",
+  "allowedVoiceRegions": [
+    "GB"
+  ]
 }

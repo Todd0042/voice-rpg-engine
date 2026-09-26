@@ -331,9 +331,11 @@ fun AudioSetupScreen(
                     }
 
                     activeSpeakers.forEach { speaker ->
+                        val currentVoice = remember(voiceUpdateKey, installedVoiceCount) { combatNarrator.getVoiceForSpeaker(speaker) }
                         CompanionVoiceBadge(
                             speaker = speaker,
-                            assignedVoiceName = remember(voiceUpdateKey, installedVoiceCount) { combatNarrator.getVoiceForSpeaker(speaker)?.name },
+                            assignedVoiceName = currentVoice?.name,
+                            voiceRegion = currentVoice?.let { CombatNarrator.getVoiceRegionCode(it) },
                             onPreview = { combatNarrator.previewSpeakerVoice(speaker) },
                             onCycle = {
                                 combatNarrator.cycleSpeakerVoice(speaker)
@@ -741,6 +743,7 @@ fun AudioSetupScreen(
 private fun CompanionVoiceBadge(
     speaker: DialogueSpeaker,
     assignedVoiceName: String?,
+    voiceRegion: String? = null,
     onPreview: () -> Unit,
     onCycle: (() -> Unit)? = null
 ) {
@@ -772,8 +775,13 @@ private fun CompanionVoiceBadge(
                     maxLines = 1
                 )
             }
+            val regionTag = when (voiceRegion) {
+                "GB" -> "[UK] "
+                null, "" -> ""
+                else -> "[$voiceRegion] "
+            }
             Text(
-                text = if (assignedVoiceName != null) "Voice Model: $assignedVoiceName" else "Default System Voice",
+                text = if (assignedVoiceName != null) "Voice Model: $regionTag$assignedVoiceName" else "Default System Voice",
                 color = Color(0xFF90CAF9),
                 fontSize = 9.sp,
                 fontFamily = FontFamily.Monospace,

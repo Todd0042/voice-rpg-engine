@@ -30,6 +30,34 @@ class CombatNarrator(
 
     companion object {
         /**
+         * Standard baseline allowed English voice regions, excluding Nigeria and India
+         * from general cast distribution by default unless explicitly configured on a character.
+         */
+        val DEFAULT_ALLOWED_VOICE_REGIONS = listOf("US", "CA", "GB", "AU", "IE", "ZA")
+
+        /**
+         * Extracts the 2-letter uppercase ISO country/region code from a voice
+         * (e.g. "US", "GB", "AU", "IN", "CA", "IE", "ZA", "NG").
+         */
+        fun getVoiceRegionCode(voice: Voice?): String {
+            if (voice == null) return ""
+            val country = voice.locale.country.uppercase(Locale.ROOT)
+            if (country.isNotBlank()) return country
+            val nameLower = voice.name.lowercase(Locale.ROOT)
+            return when {
+                nameLower.startsWith("en-us") || nameLower.contains("-us-") -> "US"
+                nameLower.startsWith("en-gb") || nameLower.contains("-gb-") -> "GB"
+                nameLower.startsWith("en-au") || nameLower.contains("-au-") -> "AU"
+                nameLower.startsWith("en-in") || nameLower.contains("-in-") -> "IN"
+                nameLower.startsWith("en-ng") || nameLower.contains("-ng-") -> "NG"
+                nameLower.startsWith("en-ca") || nameLower.contains("-ca-") -> "CA"
+                nameLower.startsWith("en-za") || nameLower.contains("-za-") -> "ZA"
+                nameLower.startsWith("en-ie") || nameLower.contains("-ie-") -> "IE"
+                else -> ""
+            }
+        }
+
+        /**
          * Fallback preferred voice packs per speaker, declared by the active game's
          * character data files (assets/game/characters/<name>.json).
          */
@@ -302,27 +330,45 @@ class CombatNarrator(
             var maleIdx = 0
             var neutralIdx = 0
 
-            // Dynamically distribute available physical voices respecting character gender
+            fun List<Voice>.filterByRegion(regions: List<String>): List<Voice> {
+                val matched = filter { getVoiceRegionCode(it) in regions }
+                return matched.ifEmpty { this }
+            }
+
+            // Dynamically distribute available physical voices respecting character gender and region
             allSpeakers.forEach { speaker ->
                 val preferred = customPreferredVoiceIds[speaker.id] ?: PREFERRED_VOICE_IDS[speaker.id]
-                val charGender = speaker.gender ?: com.voicerpg.engine.content.GameContent.characterById(speaker.id)?.gender
+                val char = com.voicerpg.engine.content.GameContent.characterById(speaker.id)
+                val charGender = speaker.gender ?: char?.gender
                 val isFemale = charGender?.equals("female", ignoreCase = true) == true
                 val isMale = charGender?.equals("male", ignoreCase = true) == true
+
+                val rawRegions = speaker.allowedVoiceRegions.ifEmpty {
+                    char?.allowedVoiceRegions?.ifEmpty { DEFAULT_ALLOWED_VOICE_REGIONS } ?: DEFAULT_ALLOWED_VOICE_REGIONS
+                }.map { it.uppercase(Locale.ROOT) }
 
                 val candidate = when {
                     preferred != null && englishPhysicalVoices.any { it.name == preferred } ->
                         englishPhysicalVoices.first { it.name == preferred }
-                    speaker.isNarrator || speaker.id == "narrator" ->
-                        britishStoryteller ?: defaultVoice
-                    isFemale ->
-                        femalePool[femaleIdx++ % femalePool.size]
-                    isMale ->
-                        distinctMalePool[maleIdx++ % distinctMalePool.size]
-                    else ->
-                        englishPhysicalVoices[neutralIdx++ % englishPhysicalVoices.size]
+                    speaker.isNarrator || speaker.id == "narrator" -> {
+                        val narratorPool = englishPhysicalVoices.filterByRegion(rawRegions)
+                        britishStoryteller ?: narratorPool.firstOrNull() ?: defaultVoice
+                    }
+                    isFemale -> {
+                        val regional = femalePool.filterByRegion(rawRegions)
+                        regional[femaleIdx++ % regional.size]
+                    }
+                    isMale -> {
+                        val regional = distinctMalePool.filterByRegion(rawRegions)
+                        regional[maleIdx++ % regional.size]
+                    }
+                    else -> {
+                        val regional = englishPhysicalVoices.filterByRegion(rawRegions)
+                        regional[neutralIdx++ % regional.size]
+                    }
                 }
                 dynamicSpeakerVoices[speaker.id] = applyVoicePreference(speaker.id, candidate, englishPhysicalVoices)
-                android.util.Log.d("VoiceRPG_TTS", "Assigned ${speaker.name} (${speaker.id}, gender=$charGender): ${dynamicSpeakerVoices[speaker.id]?.name}")
+                android.util.Log.d("VoiceRPG_TTS", "Assigned ${speaker.name} (${speaker.id}, gender=$charGender, regions=$rawRegions): ${dynamicSpeakerVoices[speaker.id]?.name}")
             }
         } catch (e: Exception) {
             android.util.Log.e("VoiceRPG_TTS", "Error assigning voices", e)
@@ -528,14 +574,19 @@ class CombatNarrator(
         val physicalVoices = getInstalledPhysicalVoices()
         if (physicalVoices.isEmpty()) return null
 
-        val charGender = speaker.gender ?: com.voicerpg.engine.content.GameContent.characterById(speaker.id)?.gender
+        val char = com.voicerpg.engine.content.GameContent.characterById(speaker.id)
+        val charGender = speaker.gender ?: char?.gender
         val isFemale = charGender?.equals("female", ignoreCase = true) == true
         val isMale = charGender?.equals("male", ignoreCase = true) == true
+
+        val rawRegions = speaker.allowedVoiceRegions.ifEmpty {
+            char?.allowedVoiceRegions?.ifEmpty { DEFAULT_ALLOWED_VOICE_REGIONS } ?: DEFAULT_ALLOWED_VOICE_REGIONS
+        }.map { it.uppercase(Locale.ROOT) }
 
         val femaleTokens = listOf("female", "#f", "-f-", "_f_", "_female", "-f0", "smtf", "sfg", "iom", "tpd", "tpf", "gba", "gbb", "gbg", "aua", "auc", "inc")
         val maleTokens = listOf("male", "#m", "-m-", "_m_", "_male", "-m0", "smtm", "iob", "iog", "tpc", "iol", "rjs", "gbc", "gbd", "aub", "aud", "ina")
 
-        val eligibleVoices = when {
+        val genderVoices = when {
             isFemale -> physicalVoices.filter { v ->
                 val lower = v.name.lowercase(Locale.ROOT)
                 femaleTokens.any { lower.contains(it) } && !lower.contains("male")
@@ -546,6 +597,8 @@ class CombatNarrator(
             }.ifEmpty { physicalVoices }
             else -> physicalVoices
         }
+
+        val eligibleVoices = genderVoices.filter { getVoiceRegionCode(it) in rawRegions }.ifEmpty { genderVoices }
 
         val current = getVoiceForSpeaker(speaker)
         val currentIndex = eligibleVoices.indexOfFirst { it.name == current?.name }
