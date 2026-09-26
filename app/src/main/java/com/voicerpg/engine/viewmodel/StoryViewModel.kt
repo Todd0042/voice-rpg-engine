@@ -254,10 +254,13 @@ class StoryViewModel(
         if (!_state.value.isPureStoryMode || _state.value.isStoryAutoPlayPaused) return
         if (_state.value.gameScreen != GameScreen.STORY_EXPLORATION) return
 
+        val wordCount = node.text.split(Regex("\\s+")).count { it.isNotBlank() }
+        val maxSpeechTimeoutMs = maxOf(90000L, ((wordCount / 1.2f) * 1000L).toLong() + 45000L)
+
         pendingStoryModeJob = activeScope.launch {
             // Wait for active narration to complete before advancing, with a safety timeout
             val startWait = System.currentTimeMillis()
-            while (combatNarrator.isSpeaking.value && (System.currentTimeMillis() - startWait) < 30000L) {
+            while (combatNarrator.isSpeaking.value && (System.currentTimeMillis() - startWait) < maxSpeechTimeoutMs) {
                 delay(200L)
             }
             delay(delayMs)
