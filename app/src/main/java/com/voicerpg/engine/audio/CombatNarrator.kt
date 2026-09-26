@@ -173,6 +173,8 @@ class CombatNarrator(
     private val _isSpeaking = MutableStateFlow(false)
     val isSpeaking: StateFlow<Boolean> = _isSpeaking.asStateFlow()
 
+    private val utteranceCounter = java.util.concurrent.atomic.AtomicLong(0)
+
     private val _isCombatActive = MutableStateFlow(false)
     val isCombatActive: StateFlow<Boolean> = _isCombatActive.asStateFlow()
 
@@ -206,7 +208,9 @@ class CombatNarrator(
                     engine.setPitch(1.0f)
                     engine.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
                         override fun onStart(utteranceId: String?) {
-                            _isSpeaking.value = true
+                            if (utteranceId != null && utteranceId == activeUtteranceId) {
+                                _isSpeaking.value = true
+                            }
                         }
 
                         override fun onDone(utteranceId: String?) {
@@ -216,6 +220,14 @@ class CombatNarrator(
                                 val cb = pendingSpeechOnDone
                                 pendingSpeechOnDone = null
                                 cb?.invoke()
+                            }
+                        }
+
+                        override fun onStop(utteranceId: String?, interrupted: Boolean) {
+                            if (utteranceId != null && utteranceId == activeUtteranceId) {
+                                _isSpeaking.value = false
+                                activeUtteranceId = null
+                                pendingSpeechOnDone = null
                             }
                         }
 
@@ -720,11 +732,9 @@ class CombatNarrator(
             }
         }
 
-        val utteranceId = "combat_tts_${System.currentTimeMillis()}"
+        val utteranceId = "combat_tts_${utteranceCounter.incrementAndGet()}"
         activeUtteranceId = utteranceId
-        val prevCb = pendingSpeechOnDone
         pendingSpeechOnDone = onDone
-        prevCb?.invoke()
         _isSpeaking.value = true
 
         val speechText = normalizeTtsText(text)
@@ -767,14 +777,12 @@ class CombatNarrator(
     }
 
     fun stop() {
-        val cb = pendingSpeechOnDone
         pendingSpeechOnDone = null
         activeUtteranceId = null
         try {
             tts?.stop()
         } catch (_: Exception) {}
         _isSpeaking.value = false
-        cb?.invoke()
     }
 
     internal fun setSpeakingForTesting(speaking: Boolean) {
@@ -987,13 +995,19 @@ class CombatNarrator(
         speak(text, force = true, onDone = onDone)
     }
 
-    fun narrateConclusion(isVictory: Boolean, onDone: (() -> Unit)? = null) {
-        if (!_isCombatActive.value || (!_isEyesFreeMode.value && !_isCombatNarrationEnabled.value)) {
+    fun narrateConclusion(
+        isVictory: Boolean,
+        extraPrefix: String? = null,
+        force: Boolean = false,
+        onDone: (() -> Unit)? = null
+    ) {
+        if (!force && (!_isCombatActive.value || (!_isEyesFreeMode.value && !_isCombatNarrationEnabled.value))) {
             onDone?.invoke()
             return
         }
         val manifest = com.voicerpg.engine.content.GameContent.manifest
-        val text = if (isVictory) manifest.victoryLine else manifest.defeatLine
+        val baseLine = if (isVictory) manifest.victoryLine else manifest.defeatLine
+        val text = if (!extraPrefix.isNullOrBlank()) "$extraPrefix $baseLine" else baseLine
         speak(text, force = true, onDone = onDone)
     }
 
@@ -1010,7 +1024,6 @@ class CombatNarrator(
     }
 
     fun destroy() {
-        val cb = pendingSpeechOnDone
         pendingSpeechOnDone = null
         activeUtteranceId = null
         try {
@@ -1018,7 +1031,6 @@ class CombatNarrator(
             tts?.shutdown()
         } catch (_: Exception) {}
         _isSpeaking.value = false
-        cb?.invoke()
         tts = null
     }
 }

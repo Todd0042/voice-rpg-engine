@@ -190,10 +190,13 @@ class StoryViewModel(
     }
 
     private var pendingStoryModeJob: Job? = null
+    private var watchdogStoryModeJob: Job? = null
 
     fun cancelPendingStoryMode() {
         pendingStoryModeJob?.cancel()
         pendingStoryModeJob = null
+        watchdogStoryModeJob?.cancel()
+        watchdogStoryModeJob = null
     }
 
     fun isBossEncounter(encounterId: String): Boolean {
@@ -305,15 +308,7 @@ class StoryViewModel(
         if (!_state.value.isPureStoryMode || _state.value.isStoryAutoPlayPaused) return
         if (_state.value.gameScreen != GameScreen.STORY_EXPLORATION) return
 
-        val wordCount = node.text.split(Regex("\\s+")).count { it.isNotBlank() }
-        val maxSpeechTimeoutMs = maxOf(90000L, ((wordCount / 1.2f) * 1000L).toLong() + 45000L)
-
         pendingStoryModeJob = activeScope.launch {
-            // Wait for active narration to complete before advancing, with a safety timeout
-            val startWait = System.currentTimeMillis()
-            while (combatNarrator.isSpeaking.value && (System.currentTimeMillis() - startWait) < maxSpeechTimeoutMs) {
-                delay(200L)
-            }
             delay(delayMs)
             if (!_state.value.isPureStoryMode || _state.value.isStoryAutoPlayPaused) return@launch
             if (_state.value.currentNode.id != node.id || _state.value.gameScreen != GameScreen.STORY_EXPLORATION) return@launch
@@ -923,21 +918,12 @@ class StoryViewModel(
 
     fun triggerEncounter(encounterId: String) {
         cancelPendingAutoAdvance()
+        cancelPendingStoryMode()
         // Data-driven encounter dispatch: the engine only knows encounter IDs as declared
         // in the game's encounter data files, never hardcoded story battles.
         val encounter = GameContent.encounterById(encounterId) ?: return
         speechManager.cancel()
         combatNarrator.stop()
-
-        if (_state.value.isPureStoryMode && !isBossEncounter(encounterId)) {
-            combatNarrator.speak("The party swiftly dispatches the lesser foes barring their path.", force = true) {
-                activeScope.launch {
-                    delay(1200)
-                    onCombatVictory()
-                }
-            }
-            return
-        }
 
         _state.value = _state.value.copy(
             gameScreen = GameScreen.COMBAT_ARENA,
@@ -1568,7 +1554,7 @@ class StoryViewModel(
             val canAuto = canAdvanceDialogue()
 
             if (_state.value.isPureStoryMode && !_state.value.isStoryAutoPlayPaused) {
-                scheduleStoryModeNextStep(node, delayMs = 1000L)
+                scheduleStoryModeNextStep(node, delayMs = 1200L)
             } else if (isPocketMode && canAuto) {
                 schedulePocketModeAutoAdvance(node)
             } else if (speechManager.isAutoListen.value) {
@@ -1588,9 +1574,19 @@ class StoryViewModel(
             }
         }
 
-        // Safety watchdog: ensure Pure Story Mode auto-advance is scheduled even if TTS onDone is delayed
+        // Safety watchdog: ensure Pure Story Mode auto-advance is scheduled even if TTS onDone is never invoked
         if (isStoryMode && !isPaused) {
-            scheduleStoryModeNextStep(node, delayMs = 1000L)
+            val wordCount = narrationText.split(Regex("\\s+")).count { it.isNotBlank() }
+            val estimatedDurationMs = maxOf(4000L, ((wordCount / 2.0f) * 1000L).toLong() + 3000L)
+            val watchdogTimeoutMs = estimatedDurationMs + 6000L
+            watchdogStoryModeJob = activeScope.launch {
+                delay(watchdogTimeoutMs)
+                if (_state.value.isPureStoryMode && !_state.value.isStoryAutoPlayPaused &&
+                    _state.value.currentNode.id == node.id && _state.value.gameScreen == GameScreen.STORY_EXPLORATION
+                ) {
+                    scheduleStoryModeNextStep(node, delayMs = 200L)
+                }
+            }
         }
     }
 

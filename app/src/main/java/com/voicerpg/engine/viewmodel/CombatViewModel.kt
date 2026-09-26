@@ -774,7 +774,7 @@ class CombatViewModel(
     private fun concludeVictory() {
         conclusionTransitionJob?.cancel()
         _state.value = _state.value.copy(phase = CombatPhase.BATTLE_WON)
-        awardVictoryXp()
+        val levelUpLines = awardVictoryXp()
 
         fun proceedToStory() {
             if (_state.value.phase == CombatPhase.BATTLE_WON && _state.value.isPureStoryMode) {
@@ -795,7 +795,11 @@ class CombatViewModel(
             }
         }
 
-        combatNarrator.narrateConclusion(isVictory = true) {
+        combatNarrator.narrateConclusion(
+            isVictory = true,
+            extraPrefix = levelUpLines,
+            force = _state.value.isPureStoryMode
+        ) {
             if (_state.value.isPureStoryMode) {
                 conclusionTransitionJob?.cancel()
                 conclusionTransitionJob = activeScope.launch {
@@ -834,7 +838,10 @@ class CombatViewModel(
             }
         }
 
-        combatNarrator.narrateConclusion(isVictory = false) {
+        combatNarrator.narrateConclusion(
+            isVictory = false,
+            force = _state.value.isPureStoryMode
+        ) {
             if (_state.value.isPureStoryMode) {
                 conclusionTransitionJob?.cancel()
                 conclusionTransitionJob = activeScope.launch {
@@ -850,9 +857,9 @@ class CombatViewModel(
         }
     }
 
-    private fun awardVictoryXp() {
+    private fun awardVictoryXp(): String? {
         val party = _state.value.party
-        if (party.isEmpty()) return
+        if (party.isEmpty()) return null
         val totalXp = _state.value.enemies.filterNot { it.isAlive }.sumOf { it.xpReward } +
                 if (_state.value.enemies.any { it.isBoss }) 300 else 0
         val roster = party.map {
@@ -866,7 +873,7 @@ class CombatViewModel(
         }
         val outcomes = Progression.awardXp(roster, totalXp)
         lastVictoryOutcomes = outcomes
-        if (outcomes.isEmpty()) return
+        if (outcomes.isEmpty()) return null
         _state.value = _state.value.copy(
             party = _state.value.party.map { hero ->
                 val o = outcomes.firstOrNull { it.memberId == hero.id } ?: return@map hero
@@ -896,8 +903,9 @@ class CombatViewModel(
                     _state.value = _state.value.copy(floatingTexts = _state.value.floatingTexts.filterNot { f -> f.id == fct.id })
                 }
             }
-            combatNarrator.speak("Victory! ${lines}", force = false)
+            return lines
         }
+        return null
     }
 
     private fun checkAndTransitionNextTurn() {
