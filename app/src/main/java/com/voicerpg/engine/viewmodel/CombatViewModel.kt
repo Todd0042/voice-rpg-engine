@@ -1181,38 +1181,36 @@ class CombatViewModel(
 
     fun triggerAutoHeroAction(hero: PartyMember): Spell? {
         if (_state.value.phase != CombatPhase.PLAYER_INPUT) return null
-        val affordableSpells = hero.spells.filter { it.mpCost <= hero.currentMp }
         val aliveEnemies = _state.value.enemies.filter { it.isAlive }
-        val chosenSpell = if (affordableSpells.isNotEmpty()) {
-            val lowestAlly = _state.value.party.filter { it.isAlive }.minByOrNull { it.currentHp.toFloat() / it.maxHp }
-            val healSpell = affordableSpells.firstOrNull { it.isHeal }
-            if (lowestAlly != null && (lowestAlly.currentHp.toFloat() / lowestAlly.maxHp) < 0.5f && healSpell != null) {
-                val woundedCount = _state.value.party.count { it.isAlive && (it.currentHp.toFloat() / it.maxHp) < 0.7f }
-                if (woundedCount >= 2) {
-                    affordableSpells.firstOrNull { it.isHeal && it.hitsAll } ?: healSpell
-                } else {
-                    healSpell
-                }
-            } else {
-                val offensiveSpells = affordableSpells.filter { !it.isHeal && it.manaRestorePct == 0f }
-                val aoeSpells = offensiveSpells.filter { it.hitsAll }
 
-                if (aliveEnemies.size >= 2 && aoeSpells.isNotEmpty()) {
-                    // Prefer casting AOE spells anytime there are 2 or more enemies alive on field
-                    aoeSpells.maxByOrNull { it.basePower } ?: aoeSpells.first()
-                } else if (offensiveSpells.isNotEmpty()) {
-                    offensiveSpells.maxByOrNull { it.basePower } ?: offensiveSpells.first()
+        // In pure story mode auto play fights, heroes NEVER heal.
+        val nonHealSpells = hero.spells.filter { !it.isHeal }
+        val affordableSpells = nonHealSpells.filter { it.mpCost <= hero.currentMp }
+
+        val chosenSpell = if (aliveEnemies.size > 1) {
+            // 1. Always prefer AoE damage spells when there is more than 1 enemy
+            val affordableAoe = affordableSpells.filter { it.hitsAll && it.manaRestorePct == 0f && !it.isGuard }
+            if (affordableAoe.isNotEmpty()) {
+                affordableAoe.maxByOrNull { it.basePower } ?: affordableAoe.first()
+            } else {
+                val zeroCostAoe = nonHealSpells.filter { it.mpCost == 0 && it.hitsAll && it.manaRestorePct == 0f && !it.isGuard }
+                if (zeroCostAoe.isNotEmpty()) {
+                    zeroCostAoe.maxByOrNull { it.basePower } ?: zeroCostAoe.first()
                 } else {
-                    affordableSpells.maxByOrNull { it.basePower } ?: affordableSpells.first()
+                    val offensive = affordableSpells.filter { it.manaRestorePct == 0f && !it.isGuard }
+                    offensive.maxByOrNull { it.basePower }
+                        ?: affordableSpells.firstOrNull { it.manaRestorePct > 0f }
+                        ?: nonHealSpells.firstOrNull { it.mpCost == 0 }
+                        ?: nonHealSpells.firstOrNull()
                 }
             }
         } else {
-            val zeroCostAoe = hero.spells.filter { it.mpCost == 0 && it.hitsAll && !it.isHeal }
-            if (aliveEnemies.size >= 2 && zeroCostAoe.isNotEmpty()) {
-                zeroCostAoe.maxByOrNull { it.basePower } ?: zeroCostAoe.first()
-            } else {
-                hero.spells.firstOrNull { it.mpCost == 0 } ?: hero.spells.firstOrNull()
-            }
+            // Single enemy on field: use strongest offensive spell
+            val offensive = affordableSpells.filter { it.manaRestorePct == 0f && !it.isGuard }
+            offensive.maxByOrNull { it.basePower }
+                ?: affordableSpells.firstOrNull { it.manaRestorePct > 0f }
+                ?: nonHealSpells.firstOrNull { it.mpCost == 0 }
+                ?: nonHealSpells.firstOrNull()
         }
 
         if (chosenSpell != null) {
@@ -1220,15 +1218,6 @@ class CombatViewModel(
                 ?: _state.value.enemies.firstOrNull { it.isAlive }
             val chant = if (chosenSpell.manaRestorePct > 0f) {
                 "attune"
-            } else if (chosenSpell.isHeal) {
-                val lowestAlly = _state.value.party.filter { it.isAlive }.minByOrNull { it.currentHp.toFloat() / it.maxHp }
-                if (chosenSpell.hitsAll) {
-                    "${chosenSpell.name} party"
-                } else if (lowestAlly != null) {
-                    "${chosenSpell.name} ${lowestAlly.name}"
-                } else {
-                    chosenSpell.name
-                }
             } else if (chosenSpell.hitsAll) {
                 "${chosenSpell.name} all"
             } else if (aliveEnemy != null) {
