@@ -119,13 +119,33 @@ fun StoryScreen(
         narratorAsset?.let { StoryAssetLoader.loadBitmap(context, it) }
     }
 
-    val leftSpeaker = if (isNarratorSpeaking) DialogueSpeaker.NARRATOR else (heroSpeaker ?: DialogueSpeaker.NARRATOR)
-    val leftBitmap = if (isNarratorSpeaking) narratorBitmap else (heroBitmap ?: narratorBitmap)
-    val isLeftSpeaking = if (isNarratorSpeaking) true else (currentNode.speaker == heroSpeaker || currentNode.side == SpeakerSide.LEFT)
+    val isHeroSpeaking = !isNarratorSpeaking && (
+        currentNode.speaker == heroSpeaker ||
+        currentNode.speaker.id == "hero" ||
+        currentNode.speaker.id.startsWith("hero_") ||
+        (heroSpeaker != null && (
+            currentNode.speaker.name.equals(heroSpeaker.name, ignoreCase = true) ||
+            (currentNode.speaker.portraitAsset != null && currentNode.speaker.portraitAsset == heroSpeaker.portraitAsset)
+        ))
+    )
 
-    val rightSpeaker: DialogueSpeaker? = remember(currentNode.id, currentNode.speaker.id) {
+    val leftSpeaker = when {
+        isNarratorSpeaking -> DialogueSpeaker.NARRATOR
+        isHeroSpeaking -> currentNode.speaker
+        currentNode.side == SpeakerSide.LEFT -> currentNode.speaker
+        else -> (heroSpeaker ?: DialogueSpeaker.NARRATOR)
+    }
+    val leftSpeakerAsset = remember(leftSpeaker.id, currentNode.id) {
+        leftSpeaker.effectivePortraitAsset(currentNode.id)
+    }
+    val leftBitmap = remember(leftSpeakerAsset) {
+        leftSpeakerAsset?.let { StoryAssetLoader.loadBitmap(context, it) }
+    } ?: if (isNarratorSpeaking) narratorBitmap else (heroBitmap ?: narratorBitmap)
+    val isLeftSpeaking = isNarratorSpeaking || isHeroSpeaking || currentNode.side == SpeakerSide.LEFT
+
+    val rightSpeaker: DialogueSpeaker? = remember(currentNode.id, currentNode.speaker.id, isHeroSpeaking, isNarratorSpeaking) {
         when {
-            isNarratorSpeaking || currentNode.speaker == heroSpeaker -> {
+            isNarratorSpeaking || isHeroSpeaking || currentNode.side == SpeakerSide.LEFT -> {
                 null
             }
             else -> {
