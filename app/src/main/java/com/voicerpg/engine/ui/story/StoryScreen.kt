@@ -270,19 +270,43 @@ fun StoryScreen(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
-                                text = if (storyState.isStoryAutoPlayPaused) "⏸ STORY MODE (PAUSED)" else "▶ STORY MODE (AUTO-PLAY)",
+                                text = if (storyState.isStoryAutoPlayPaused) "⏸ PAUSED" else "▶ STORY MODE",
                                 color = Color(0xFFF3E5F5),
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Black,
-                                fontFamily = FontFamily.Monospace
+                                fontFamily = FontFamily.Monospace,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f, fill = false)
                             )
-                            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(6.dp))
+                                        .background(Color(0xFF00695C))
+                                        .clickable {
+                                            combatViewModel.combatNarrator.setEyesFreeMode(true, lockGuard = true)
+                                            if (!combatViewModel.combatNarrator.isSpeaking.value) {
+                                                combatViewModel.combatNarrator.speak("Screen locked. Pocket mode active.", force = true)
+                                            }
+                                        }
+                                        .padding(horizontal = 8.dp, vertical = 5.dp)
+                                ) {
+                                    Text(
+                                        text = "🔒 POCKET",
+                                        color = Color.White,
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        fontFamily = FontFamily.Monospace
+                                    )
+                                }
                                 Box(
                                     modifier = Modifier
                                         .clip(RoundedCornerShape(6.dp))
                                         .background(if (storyState.isStoryAutoPlayPaused) Color(0xFF2E7D32) else Color(0xFFE65100))
                                         .clickable { storyViewModel.toggleStoryAutoPlayPause() }
-                                        .padding(horizontal = 10.dp, vertical = 5.dp)
+                                        .padding(horizontal = 8.dp, vertical = 5.dp)
                                 ) {
                                     Text(
                                         text = if (storyState.isStoryAutoPlayPaused) "RESUME" else "PAUSE",
@@ -297,7 +321,7 @@ fun StoryScreen(
                                         .clip(RoundedCornerShape(6.dp))
                                         .background(Color(0xFFC62828))
                                         .clickable { storyViewModel.returnToTitle() }
-                                        .padding(horizontal = 10.dp, vertical = 5.dp)
+                                        .padding(horizontal = 8.dp, vertical = 5.dp)
                                 ) {
                                     Text(
                                         text = "EXIT",

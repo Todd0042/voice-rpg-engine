@@ -527,11 +527,15 @@ class MainActivity : ComponentActivity() {
                         PocketModeUnlockedBanner(
                             onLock = {
                                 combatNarrator.lockPocketGuard()
-                                combatNarrator.speak("Screen locked. Pocket mode active.", force = true)
+                                if (!storyViewModel.state.value.isPureStoryMode || !combatNarrator.isSpeaking.value) {
+                                    combatNarrator.speak("Screen locked. Pocket mode active.", force = true)
+                                }
                             },
                             onExitPocketMode = {
                                 combatNarrator.setEyesFreeMode(false)
-                                combatNarrator.speak("Pocket mode disabled.", force = true)
+                                if (!storyViewModel.state.value.isPureStoryMode || !combatNarrator.isSpeaking.value) {
+                                    combatNarrator.speak("Pocket mode disabled.", force = true)
+                                }
                                 storyViewModel.persistCurrentState()
                             },
                             modifier = Modifier.align(Alignment.TopCenter)
@@ -548,11 +552,15 @@ class MainActivity : ComponentActivity() {
                             isTtsSpeaking = isTtsSpeaking,
                             onUnlock = {
                                 combatNarrator.unlockPocketGuard()
-                                combatNarrator.speak("Screen unlocked.", force = true)
+                                if (!storyViewModel.state.value.isPureStoryMode || !combatNarrator.isSpeaking.value) {
+                                    combatNarrator.speak("Screen unlocked.", force = true)
+                                }
                             },
                             onExitPocketMode = {
                                 combatNarrator.setEyesFreeMode(false)
-                                combatNarrator.speak("Pocket mode disabled.", force = true)
+                                if (!storyViewModel.state.value.isPureStoryMode || !combatNarrator.isSpeaking.value) {
+                                    combatNarrator.speak("Pocket mode disabled.", force = true)
+                                }
                                 storyViewModel.persistCurrentState()
                             }
                         )
