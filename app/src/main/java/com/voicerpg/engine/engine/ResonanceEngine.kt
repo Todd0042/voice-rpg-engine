@@ -6,8 +6,13 @@ import com.voicerpg.engine.model.ResonanceTier
 import com.voicerpg.engine.model.SpellSchool
 
 class ResonanceEngine(
-    val noveltyCache: NoveltyCache = NoveltyCache()
+    val noveltyCache: NoveltyCache = NoveltyCache(),
+    val customProfile: com.voicerpg.engine.content.ResonanceProfile? = null
 ) {
+
+    fun getActiveProfile(): com.voicerpg.engine.content.ResonanceProfile =
+        customProfile ?: runCatching { com.voicerpg.engine.content.GameContent.manifest.resonanceProfile }.getOrNull()
+        ?: com.voicerpg.engine.content.ResonanceProfile.CLASSIC
 
     /**
      * Evaluates a recognized chant string and acoustic performance for a given spell school.
@@ -24,6 +29,7 @@ class ResonanceEngine(
         acousticProfile: AcousticProfile = AcousticProfile(),
         ignoreNoveltyDecay: Boolean = false
     ): ResonanceResult {
+        val activeProfile = getActiveProfile()
         val trimmed = utterance.trim()
         if (trimmed.isBlank()) {
             return buildResult(
@@ -42,34 +48,57 @@ class ResonanceEngine(
         val wordCount = words.size
         val syllableCount = words.sumOf { countSyllables(it) }
 
-        val lexicalPoints = when {
-            wordCount <= 2 -> 0f
-            wordCount <= 4 -> 10f
-            wordCount <= 7 -> 20f
-            wordCount <= 11 -> 32f
-            else -> 45f // Sustained multi-clause invocation
+        val lexicalPoints = if (activeProfile.conciseCommandBonus) {
+            when {
+                wordCount <= 2 -> 5f
+                wordCount <= 5 -> 15f
+                wordCount <= 8 -> 28f
+                else -> 45f
+            }
+        } else {
+            when {
+                wordCount <= 2 -> 0f
+                wordCount <= 4 -> 10f
+                wordCount <= 7 -> 20f
+                wordCount <= 11 -> 32f
+                else -> 45f // Sustained multi-clause invocation
+            }
         }
 
         // 2. Thematic Root Matching (Up to +45% bonus)
         val matchedRoots = SpellThesaurus.findMatches(trimmed, school)
         val matchedCount = matchedRoots.size
 
-        val thematicPoints = when (matchedCount) {
-            0 -> 0f
-            1 -> 10f // Base spell name
-            2 -> 22f // Good elemental evocative language
-            3 -> 35f // Deep arcane roots
-            else -> 45f // Mythic elemental invocation
+        val thematicPoints = if (activeProfile.singleRootMaxBonus) {
+            when {
+                matchedCount == 0 -> 0f
+                matchedCount == 1 -> if (wordCount <= 2) 5f else if (wordCount <= 8) 20f else 35f
+                else -> 45f
+            }
+        } else {
+            when (matchedCount) {
+                0 -> 0f
+                1 -> 10f // Base spell name
+                2 -> 22f // Good elemental evocative language
+                3 -> 35f // Deep arcane roots
+                else -> 45f // Mythic elemental invocation
+            }
         }
 
-        // Poetic phrasing bonus (archaic/invocation structure)
-        val poeticBonus = if (hasPoeticIndicators(trimmed)) 12f else 0f
+        // Poetic / Conviction phrasing bonus
+        val poeticBonus = if (activeProfile.bypassPoeticRequirement) {
+            if (hasPoeticIndicators(trimmed) || (wordCount >= 3 && hasUrgencyIndicators(trimmed))) {
+                if (activeProfile.urgencyBonus > 0f) activeProfile.urgencyBonus else 12f
+            } else 0f
+        } else {
+            if (hasPoeticIndicators(trimmed)) 12f else 0f
+        }
 
         // 3. Acoustic Vocal Volume & Projection (Up to +40% bonus)
-        val volumePoints = acousticProfile.volumeScore * 100f // 0f to 40f
+        val volumePoints = (acousticProfile.volumeScore * 100f * activeProfile.acousticSensitivity).coerceIn(0f, 40f)
 
         // 4. Vocal Inflection, Tone, Pitch & Crescendo (Up to +40% bonus)
-        val inflectionPoints = acousticProfile.inflectionScore * 100f // 0f to 40f
+        val inflectionPoints = (acousticProfile.inflectionScore * 100f * activeProfile.acousticSensitivity).coerceIn(0f, 40f)
 
         // 5. Anti-Repetition Novelty Cache & Surge (Up to +30% bonus)
         val noveltyResult = if (ignoreNoveltyDecay) {
@@ -77,13 +106,23 @@ class ResonanceEngine(
         } else {
             noveltyCache.evaluateAndRecord(trimmed)
         }
-        val noveltyPoints = when {
-            !noveltyResult.isNovel -> 0f
-            wordCount <= 2 -> 0f
-            wordCount <= 5 -> 10f
-            wordCount in 6..8 && matchedCount >= 2 -> 20f
-            wordCount >= 9 && matchedCount >= 2 -> 30f
-            else -> 10f
+        val noveltyPoints = if (activeProfile.conciseCommandBonus) {
+            when {
+                !noveltyResult.isNovel -> 0f
+                wordCount <= 2 -> 0f
+                wordCount <= 5 -> 8f
+                wordCount <= 8 -> 18f
+                else -> 30f
+            }
+        } else {
+            when {
+                !noveltyResult.isNovel -> 0f
+                wordCount <= 2 -> 0f
+                wordCount <= 5 -> 10f
+                wordCount in 6..8 && matchedCount >= 2 -> 20f
+                wordCount >= 9 && matchedCount >= 2 -> 30f
+                else -> 10f
+            }
         }
 
         // Calculate Raw Total Points (0 to 200+)
@@ -144,6 +183,16 @@ class ResonanceEngine(
             "hearken", "from the void", "unleash", "shall burn", "solar core"
         )
         return poeticTerms.any { lower.contains(it) }
+    }
+
+    private fun hasUrgencyIndicators(text: String): Boolean {
+        val lower = text.lowercase()
+        val terms = listOf(
+            "now", "quick", "fast", "stay", "clear",
+            "focus", "survive", "don't", "keep", "come on", "together", "dig deep",
+            "ready", "let's go", "hurry"
+        )
+        return terms.any { lower.contains(it) }
     }
 
     private fun countSyllables(word: String): Int {

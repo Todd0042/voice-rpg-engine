@@ -3,6 +3,7 @@ package com.voicerpg.engine.content
 import android.content.Context
 import android.content.res.AssetManager
 import androidx.compose.ui.graphics.Color
+import java.util.Locale
 import com.google.gson.Gson
 import com.google.gson.annotations.SerializedName
 import com.voicerpg.engine.combat.EnemyMove
@@ -56,8 +57,34 @@ data class ManifestDto(
     val tutorialCompletionText: String = "",
     val voicePermissionTitle: String = "",
     val voicePermissionSubtitle: String = "",
-    val voicePermissionPrompt: String = ""
+    val voicePermissionPrompt: String = "",
+    val resonance: ResonanceProfileDto? = null
 )
+
+data class ResonanceProfileDto(
+    val mode: String = "CLASSIC",
+    val topDamageAccessible: Boolean = true,
+    val conciseCommandBonus: Boolean = false,
+    val singleRootMaxBonus: Boolean = false,
+    val bypassPoeticRequirement: Boolean = false,
+    val urgencyBonus: Float = 0f,
+    val acousticSensitivity: Float = 1.0f,
+    val tierChants: Map<String, String>? = null
+) {
+    fun toProfile(): ResonanceProfile {
+        val isSurv = mode.equals("SURVIVAL", ignoreCase = true)
+        return ResonanceProfile(
+            mode = if (isSurv) "SURVIVAL" else mode.uppercase(Locale.ROOT),
+            topDamageAccessible = topDamageAccessible,
+            conciseCommandBonus = conciseCommandBonus || isSurv,
+            singleRootMaxBonus = singleRootMaxBonus || isSurv,
+            bypassPoeticRequirement = bypassPoeticRequirement || isSurv,
+            urgencyBonus = if (urgencyBonus > 0f) urgencyBonus else if (isSurv) 12f else 0f,
+            acousticSensitivity = if (acousticSensitivity != 1.0f) acousticSensitivity else if (isSurv) 1.25f else 1.0f,
+            tierChants = tierChants ?: emptyMap()
+        )
+    }
+}
 
 data class GrowthDto(
     val maxHp: Int = 18,
@@ -415,8 +442,42 @@ data class GameManifest(
     val tutorialCompletionText: String = "",
     val voicePermissionTitle: String = "",
     val voicePermissionSubtitle: String = "",
-    val voicePermissionPrompt: String = ""
+    val voicePermissionPrompt: String = "",
+    val resonanceProfile: ResonanceProfile = ResonanceProfile.CLASSIC
 )
+
+data class ResonanceProfile(
+    val mode: String = "CLASSIC",
+    val topDamageAccessible: Boolean = true,
+    val conciseCommandBonus: Boolean = false,
+    val singleRootMaxBonus: Boolean = false,
+    val bypassPoeticRequirement: Boolean = false,
+    val urgencyBonus: Float = 0f,
+    val acousticSensitivity: Float = 1.0f,
+    val tierChants: Map<String, String> = emptyMap()
+) {
+    val isSurvival: Boolean get() = mode == "SURVIVAL"
+
+    companion object {
+        val CLASSIC = ResonanceProfile(mode = "CLASSIC")
+        val SURVIVAL = ResonanceProfile(
+            mode = "SURVIVAL",
+            topDamageAccessible = true,
+            conciseCommandBonus = true,
+            singleRootMaxBonus = true,
+            bypassPoeticRequirement = true,
+            urgencyBonus = 12f,
+            acousticSensitivity = 1.25f,
+            tierChants = mapOf(
+                "BASIC" to "{name}",
+                "ADEPT" to "Get it done: {name}!",
+                "MASTER" to "Hold on! Push through: {name}!",
+                "MYTHIC" to "We have to survive this shift: {name} now!",
+                "TRANSCENDENTAL" to "Dig deep, push through the grind, and survive: {name}!"
+            )
+        )
+    }
+}
 
 data class EnvironmentDefinition(
     val id: String,
@@ -882,7 +943,8 @@ class GameContentLoader(private val source: ContentSource) {
                 tutorialCompletionText = manifestDto.tutorialCompletionText,
                 voicePermissionTitle = manifestDto.voicePermissionTitle,
                 voicePermissionSubtitle = manifestDto.voicePermissionSubtitle,
-                voicePermissionPrompt = manifestDto.voicePermissionPrompt
+                voicePermissionPrompt = manifestDto.voicePermissionPrompt,
+                resonanceProfile = manifestDto.resonance?.toProfile() ?: ResonanceProfile.CLASSIC
             ),
             characters = characters,
             classes = classes,

@@ -25,8 +25,23 @@ data class ChantPreset(
  */
 object SpellChantPresets {
 
+    fun acousticFor(tier: ResonanceTier): AcousticProfile = when (tier) {
+        ResonanceTier.BASIC -> AcousticProfile.BASIC
+        ResonanceTier.ADEPT -> AcousticProfile.ADEPT
+        ResonanceTier.MASTER -> AcousticProfile.MASTER
+        ResonanceTier.MYTHIC -> AcousticProfile.MYTHIC
+        ResonanceTier.TRANSCENDENTAL -> AcousticProfile.TRANSCENDENTAL
+    }
+
     fun getPreset(spell: Spell, tier: ResonanceTier): ChantPreset {
-        val (chant, acoustic) = presetFor(spell, tier)
+        val manifest = runCatching { com.voicerpg.engine.content.GameContent.manifest }.getOrNull()
+        val customTemplate = manifest?.resonanceProfile?.tierChants?.get(tier.name)
+        val chant = if (!customTemplate.isNullOrBlank()) {
+            customTemplate.replace("{name}", spell.name)
+        } else {
+            defaultChantFor(spell, tier)
+        }
+        val acoustic = acousticFor(tier)
 
         val label = when (tier) {
             ResonanceTier.BASIC -> "10% Basic"
@@ -44,17 +59,12 @@ object SpellChantPresets {
         )
     }
 
-    private fun presetFor(spell: Spell, tier: ResonanceTier): Pair<String, AcousticProfile> {
-        // Generic, deterministic chants: word length + poetic phrasing + the fixed
-        // acoustic profile for each tier are chosen so the resonance engine lands inside
-        // the target bracket for ANY spell whose name matches a single thematic root.
-        return when (tier) {
-            ResonanceTier.BASIC -> spell.name to AcousticProfile.BASIC
-            ResonanceTier.ADEPT -> spell.name to AcousticProfile.ADEPT
-            ResonanceTier.MASTER -> "Unleash ${spell.name} now" to AcousticProfile.MASTER
-            ResonanceTier.MYTHIC -> "By the power of ancient song, now cast ${spell.name}" to AcousticProfile.MYTHIC
-            ResonanceTier.TRANSCENDENTAL ->
-                "O primordial celestial forces descend from the heavens, unleash ${spell.name} to obliterate all in eternal victory once and for all!" to AcousticProfile.TRANSCENDENTAL
-        }
+    fun defaultChantFor(spell: Spell, tier: ResonanceTier): String = when (tier) {
+        ResonanceTier.BASIC -> spell.name
+        ResonanceTier.ADEPT -> spell.name
+        ResonanceTier.MASTER -> "Unleash ${spell.name} now"
+        ResonanceTier.MYTHIC -> "By the power of ancient song, now cast ${spell.name}"
+        ResonanceTier.TRANSCENDENTAL ->
+            "O primordial celestial forces descend from the heavens, unleash ${spell.name} to obliterate all in eternal victory once and for all!"
     }
 }
