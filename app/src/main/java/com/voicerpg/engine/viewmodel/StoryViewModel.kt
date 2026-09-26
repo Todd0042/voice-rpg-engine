@@ -767,7 +767,14 @@ class StoryViewModel(
         val nextNode = StoryScript.ALL_NODES[choice.nextNodeId]
         if (nextNode != null) {
             val updatedDecisions = _state.value.decisionsMade + choice.id
-            _state.value = _state.value.copy(decisionsMade = updatedDecisions)
+            if (choice.completionFlag != null && _state.value.narrativeFlags[choice.completionFlag] != true) {
+                _state.value = _state.value.copy(
+                    narrativeFlags = _state.value.narrativeFlags + (choice.completionFlag to true),
+                    decisionsMade = updatedDecisions
+                )
+            } else {
+                _state.value = _state.value.copy(decisionsMade = updatedDecisions)
+            }
             applyNodeTransition(nextNode)
         }
     }
