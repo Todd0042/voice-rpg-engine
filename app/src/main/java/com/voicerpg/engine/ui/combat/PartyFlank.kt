@@ -61,6 +61,7 @@ fun PartyFlank(
                 isActiveTurn = member.id == activePartyMemberId,
                 stance = member.stance,
                 isFlippedHorizontally = false,
+                isGhost = member.isGhost,
                 onClick = { onSelectHero(member) },
                 modifier = Modifier.onGloballyPositioned { cardCoords = it }
             )

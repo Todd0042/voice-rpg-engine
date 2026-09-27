@@ -64,12 +64,15 @@ data class PartyMember(
     val xp: Int = 0,
     val defense: Int = 0,
     val statuses: List<StatusInstance> = emptyList(),
-    val isGuarding: Boolean = false
+    val isGuarding: Boolean = false,
+    val isGhost: Boolean = false,
+    val canAttack: Boolean = true,
+    val isUntargetable: Boolean = false
 ) {
-    val isAlive: Boolean get() = currentHp > 0 && stance != CharacterStance.DEAD
+    val isAlive: Boolean get() = (isGhost || currentHp > 0) && stance != CharacterStance.DEAD
     val isTurnReady: Boolean get() = isAlive && atbGauge >= 1.0f
-    val hpRatio: Float get() = if (isAlive) (currentHp.toFloat() / maxHp).coerceIn(0f, 1f) else 0f
-    val mpRatio: Float get() = if (isAlive) (currentMp.toFloat() / maxMp).coerceIn(0f, 1f) else 0f
+    val hpRatio: Float get() = if (isGhost) 1.0f else if (isAlive) (currentHp.toFloat() / maxHp).coerceIn(0f, 1f) else 0f
+    val mpRatio: Float get() = if (isGhost) 1.0f else if (isAlive) (currentMp.toFloat() / maxMp).coerceIn(0f, 1f) else 0f
     val atbRatio: Float get() = if (isAlive) atbGauge.coerceIn(0f, 1f) else 0f
 }
 

@@ -37,7 +37,8 @@ object SpellThesaurus {
         "purity", "pure", "heal", "healing", "grace", "light", "halo", "cadence",
         "restorative", "prayer", "cure", "sanctuary", "smite", "soothing",
         // Generic care/labor lexicon (genre-neutral additions for workplace-flavored games)
-        "steady", "calm", "soothe", "listen"
+        "steady", "calm", "soothe", "listen",
+        "backrub", "inspiring", "lunch", "groceries", "breath", "remember"
     )
 
     private val NATURE_ROOTS = setOf(

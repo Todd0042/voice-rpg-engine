@@ -431,11 +431,12 @@ class CombatViewModel(
             )
             speechManager.cancel()
 
-            val aliveHeroes = _state.value.party.filter { it.isAlive }
-            if (aliveHeroes.isEmpty()) {
+            val mortalHeroes = _state.value.party.filter { it.isAlive && !it.isGhost }
+            if (mortalHeroes.isEmpty()) {
                 concludeDefeat()
                 return@launch
             }
+            val aliveHeroes = _state.value.party.filter { it.isAlive && !it.isGhost && !it.isUntargetable }.ifEmpty { mortalHeroes }
 
             // 2. Begin-of-enemy-turn status effects: DoT ticks and stun/bind skips.
             val livingSelf = _state.value.enemies.firstOrNull { it.id == enemy.id } ?: return@launch
@@ -653,7 +654,7 @@ class CombatViewModel(
             } else null
 
             val updatedParty = _state.value.party.map { hero ->
-                if (targetList.any { it.id == hero.id } && hero.isAlive) {
+                if (targetList.any { it.id == hero.id } && hero.isAlive && !hero.isGhost && !hero.isUntargetable) {
                     val blessMitigation = 1f / StatusSystem.defenseMult(hero.statuses).coerceAtLeast(1f)
                     val damage = DamageResolver.resolveEnemyStrike(
                         enemyAttack = enemy.baseAttack,
@@ -732,8 +733,8 @@ class CombatViewModel(
                 statusNote = moveStatusId?.let { StatusSystem.shortName(it) }
             )
 
-            // Check defeat
-            if (_state.value.party.none { it.isAlive }) {
+            // Check defeat (excluding ethereal/ghost companions)
+            if (_state.value.party.filter { !it.isGhost }.none { it.isAlive }) {
                 concludeDefeat()
                 return@launch
             }
@@ -1183,11 +1184,20 @@ class CombatViewModel(
         if (_state.value.phase != CombatPhase.PLAYER_INPUT) return null
         val aliveEnemies = _state.value.enemies.filter { it.isAlive }
 
-        // In pure story mode auto play fights, heroes NEVER heal.
+        val isSupportOnly = hero.isGhost || !hero.canAttack || hero.spells.none { !it.isHeal && it.basePower > 0 }
         val nonHealSpells = hero.spells.filter { !it.isHeal }
         val affordableSpells = nonHealSpells.filter { it.mpCost <= hero.currentMp }
 
-        val chosenSpell = if (aliveEnemies.size > 1) {
+        val chosenSpell = if (isSupportOnly) {
+            val affordable = hero.spells.filter { it.mpCost <= hero.currentMp }
+            val pool = if (affordable.isNotEmpty()) affordable else hero.spells
+            val lowestAlly = _state.value.party.filter { it.isAlive && !it.isGhost }.minByOrNull { it.hpRatio }
+            if (lowestAlly != null && lowestAlly.hpRatio < 0.75f) {
+                pool.firstOrNull { it.isHeal } ?: pool.firstOrNull()
+            } else {
+                pool.firstOrNull { it.isGuard || it.manaRestorePct > 0f } ?: pool.firstOrNull()
+            }
+        } else if (aliveEnemies.size > 1) {
             // 1. Always prefer AoE damage spells when there is more than 1 enemy
             val affordableAoe = affordableSpells.filter { it.hitsAll && it.manaRestorePct == 0f && !it.isGuard }
             if (affordableAoe.isNotEmpty()) {
@@ -1218,6 +1228,9 @@ class CombatViewModel(
                 ?: _state.value.enemies.firstOrNull { it.isAlive }
             val chant = if (chosenSpell.manaRestorePct > 0f) {
                 "attune"
+            } else if (chosenSpell.isHeal || chosenSpell.isGuard) {
+                val lowestAlly = _state.value.party.filter { it.isAlive && !it.isGhost }.minByOrNull { it.hpRatio }
+                if (lowestAlly != null) "${chosenSpell.name} ${lowestAlly.name}" else chosenSpell.name
             } else if (chosenSpell.hitsAll) {
                 "${chosenSpell.name} all"
             } else if (aliveEnemy != null) {

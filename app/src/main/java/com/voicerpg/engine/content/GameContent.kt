@@ -104,6 +104,9 @@ data class CharacterCombatDto(
     val defense: Int = 0,
     val avatarTint: String = "#4FC3F7",
     val startAtb: Float = 0f,
+    val isGhost: Boolean = false,
+    val canAttack: Boolean = true,
+    val isUntargetable: Boolean = false,
     val spellIds: List<String>? = null,
     val spells: List<SpellDto>? = null,
     val growth: GrowthDto? = null
@@ -530,7 +533,10 @@ data class CharacterCombat(
     val avatarTint: Color,
     val startAtb: Float,
     val spells: List<Spell>,
-    val growth: StatGrowth
+    val growth: StatGrowth,
+    val isGhost: Boolean = false,
+    val canAttack: Boolean = true,
+    val isUntargetable: Boolean = false
 )
 
 data class SpriteDefinition(
@@ -578,7 +584,10 @@ data class GameCharacter(
             avatarTint = c.avatarTint,
             speed = c.speed,
             defense = c.defense,
-            atbGauge = atbOverride ?: c.startAtb
+            atbGauge = atbOverride ?: c.startAtb,
+            isGhost = c.isGhost,
+            canAttack = c.canAttack,
+            isUntargetable = c.isUntargetable
         )
     }
 
@@ -1031,7 +1040,10 @@ class GameContentLoader(private val source: ContentSource) {
                 avatarTint = parseHexColor(c.avatarTint, Color(0xFF4FC3F7)),
                 startAtb = c.startAtb,
                 spells = allSpells,
-                growth = (c.growth ?: GrowthDto()).toStatGrowth()
+                growth = (c.growth ?: GrowthDto()).toStatGrowth(),
+                isGhost = c.isGhost,
+                canAttack = c.canAttack,
+                isUntargetable = c.isUntargetable
             )
         }
         val resolvedSprite = sprite?.toSpriteDefinition()

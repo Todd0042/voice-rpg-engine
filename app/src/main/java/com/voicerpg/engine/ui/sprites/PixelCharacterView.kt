@@ -62,6 +62,7 @@ fun PixelCharacterView(
     isTargeted: Boolean = false,
     stance: CharacterStance = CharacterStance.READY,
     isFlippedHorizontally: Boolean = false,
+    isGhost: Boolean = false,
     pixelSize: Dp = 2.2.dp,
     onClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier
@@ -101,6 +102,9 @@ fun PixelCharacterView(
     Column(
         modifier = modifier
             .offset(x = stepForwardOffset)
+            .graphicsLayer {
+                if (isGhost) alpha = 0.82f
+            }
             .clickable(enabled = !isDead && onClick != null) { onClick?.invoke() }
             .padding(horizontal = 4.dp),
         horizontalAlignment = Alignment.CenterHorizontally
