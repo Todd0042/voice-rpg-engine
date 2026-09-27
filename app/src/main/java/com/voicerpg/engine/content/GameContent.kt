@@ -24,6 +24,7 @@ import com.voicerpg.engine.model.MidBattleJoin
 import com.voicerpg.engine.model.HubCompletion
 import com.voicerpg.engine.model.PartyMember
 import com.voicerpg.engine.model.SavedCharacterStats
+import com.voicerpg.engine.model.SelfieFilterConfig
 import com.voicerpg.engine.model.SpeakerSide
 import com.voicerpg.engine.model.Spell
 import com.voicerpg.engine.model.SpellSchool
@@ -59,7 +60,8 @@ data class ManifestDto(
     val voicePermissionSubtitle: String = "",
     val voicePermissionPrompt: String = "",
     val resonance: ResonanceProfileDto? = null,
-    val ttsReplacements: Map<String, String>? = null
+    val ttsReplacements: Map<String, String>? = null,
+    val selfieConfig: SelfieFilterConfig? = null
 )
 
 data class ResonanceProfileDto(
@@ -449,7 +451,8 @@ data class GameManifest(
     val voicePermissionSubtitle: String = "",
     val voicePermissionPrompt: String = "",
     val resonanceProfile: ResonanceProfile = ResonanceProfile.CLASSIC,
-    val ttsReplacements: Map<String, String> = emptyMap()
+    val ttsReplacements: Map<String, String> = emptyMap(),
+    val selfieConfig: SelfieFilterConfig = SelfieFilterConfig()
 )
 
 data class ResonanceProfile(
@@ -933,6 +936,11 @@ class GameContentLoader(private val source: ContentSource) {
         val narrator = characters.values.firstOrNull { it.role == CharacterRole.NARRATOR }?.speaker
             ?: DialogueSpeaker.NARRATOR
 
+        val selfieConfig = read("creation/selfie_filters.json", SelfieFilterConfig::class.java)
+            ?: read("selfie_filters.json", SelfieFilterConfig::class.java)
+            ?: manifestDto.selfieConfig
+            ?: SelfieFilterConfig()
+
         val pack = GameContentPack(
             manifest = GameManifest(
                 gameTitle = manifestDto.gameTitle,
@@ -957,7 +965,8 @@ class GameContentLoader(private val source: ContentSource) {
                 voicePermissionSubtitle = manifestDto.voicePermissionSubtitle,
                 voicePermissionPrompt = manifestDto.voicePermissionPrompt,
                 resonanceProfile = manifestDto.resonance?.toProfile() ?: ResonanceProfile.CLASSIC,
-                ttsReplacements = manifestDto.ttsReplacements ?: emptyMap()
+                ttsReplacements = manifestDto.ttsReplacements ?: emptyMap(),
+                selfieConfig = selfieConfig
             ),
             characters = characters,
             classes = classes,
@@ -1254,7 +1263,8 @@ object EmergencyFallback {
                 tutorialCompletionText = "",
                 voicePermissionTitle = "",
                 voicePermissionSubtitle = "",
-                voicePermissionPrompt = ""
+                voicePermissionPrompt = "",
+                selfieConfig = SelfieFilterConfig()
             ),
             characters = emptyMap(),
             classes = emptyList(),
@@ -1362,6 +1372,7 @@ object GameContent {
     val statusCatalog: Map<String, StatusDef> get() = pack.statusCatalog
     val affinityMatrix: AffinityMatrix? get() = pack.affinityMatrix
     val thesaurusRoots: Map<SpellSchool, List<String>> get() = pack.thesaurusRoots
+    val selfieConfig: SelfieFilterConfig get() = manifest.selfieConfig
 
     fun speakerById(id: String?): DialogueSpeaker? = pack.speakerById(id)
     fun characterById(id: String?): GameCharacter? = pack.characterById(id)

@@ -59,7 +59,7 @@ class StoryDialogueTest {
         var state = storyViewModel.state.value
         assertEquals("template_hero_greeting", state.currentNode.id)
         assertEquals("hero", state.currentNode.speaker.id)
-        assertEquals("Template Hero", state.currentNode.speaker.name)
+        assertEquals("Kaelen", state.currentNode.speaker.name)
         assertEquals(SpeakerSide.LEFT, state.currentNode.side)
 
         storyViewModel.advanceDialogue()

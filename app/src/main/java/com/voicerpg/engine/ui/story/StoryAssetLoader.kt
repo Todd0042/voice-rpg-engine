@@ -90,8 +90,17 @@ object StoryAssetLoader {
     }
 
     private fun tryLoadBitmap(context: Context, assetPath: String): ImageBitmap? = try {
-        context.assets.open(assetPath).use { stream ->
-            BitmapFactory.decodeStream(stream)?.asImageBitmap()
+        val customPortraitFile = java.io.File(context.filesDir, com.voicerpg.engine.ui.creation.SelfiePortraitProcessor.CUSTOM_PORTRAIT_FILENAME)
+        val defaultHeroPortrait = com.voicerpg.engine.content.GameContent.manifest.defaultHeroPortrait
+        val isHeroPortrait = (defaultHeroPortrait != null && assetPath.equals(defaultHeroPortrait, ignoreCase = true)) ||
+                assetPath.contains("custom", ignoreCase = true) ||
+                assetPath.contains("hero", ignoreCase = true)
+        if (customPortraitFile.exists() && isHeroPortrait) {
+            BitmapFactory.decodeFile(customPortraitFile.absolutePath)?.asImageBitmap()
+        } else {
+            context.assets.open(assetPath).use { stream ->
+                BitmapFactory.decodeStream(stream)?.asImageBitmap()
+            }
         }
     } catch (_: Exception) {
         null

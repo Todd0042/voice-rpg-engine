@@ -152,6 +152,71 @@ class StoryViewModel(
         return false
     }
 
+    fun formatStoryText(rawText: String, playerName: String, playerTitle: String = ""): String {
+        if (rawText.isBlank()) return rawText
+        val defaultName = GameContent.manifest.defaultHeroName.ifBlank { "Hero" }
+        val effectiveName = playerName.ifBlank { defaultName }
+        val effectiveTitle = playerTitle.ifBlank { GameContent.manifest.defaultHeroTitle.ifBlank { "Adventurer" } }
+
+        var result = rawText
+            .replace("{hero}", effectiveName)
+            .replace("{heroName}", effectiveName)
+            .replace("{player}", effectiveName)
+            .replace("{playerName}", effectiveName)
+            .replace("{heroTitle}", effectiveTitle)
+            .replace("{title}", effectiveTitle)
+
+        // Possessive placeholders
+        result = result
+            .replace("{hero}'s", "$effectiveName's")
+            .replace("{heroName}'s", "$effectiveName's")
+            .replace("{player}'s", "$effectiveName's")
+
+        // If player has a custom name different from defaultName, replace any leftover defaultName references
+        if (!effectiveName.equals(defaultName, ignoreCase = true)) {
+            result = result.replace(Regex("\\b${Regex.escape(defaultName)}'s\\b", RegexOption.IGNORE_CASE), "$effectiveName's")
+            result = result.replace(Regex("\\b${Regex.escape(defaultName)}'\\b", RegexOption.IGNORE_CASE), "$effectiveName'")
+            result = result.replace(Regex("\\b${Regex.escape(defaultName)}\\b", RegexOption.IGNORE_CASE), effectiveName)
+        }
+
+        return result
+    }
+
+    fun formatNodeForPlayer(node: DialogueNode, player: PlayerCustomization): DialogueNode {
+        val defaultHeroName = GameContent.manifest.defaultHeroName.ifBlank { "Hero" }
+        val effectiveName = player.name.ifBlank { defaultHeroName }
+        val effectiveTitle = player.title.ifBlank { GameContent.manifest.defaultHeroTitle.ifBlank { "Adventurer" } }
+
+        val isHero = node.speaker.id in setOf("hero", "player") ||
+                node.speaker == GameContent.heroCharacter?.speaker ||
+                node.speaker.name.equals(defaultHeroName, ignoreCase = true)
+
+        val formattedSpeaker = if (isHero) {
+            node.speaker.copy(
+                name = effectiveName,
+                title = if (player.title.isNotBlank()) player.title else (if (node.speaker.title.isBlank()) effectiveTitle else node.speaker.title)
+            )
+        } else {
+            node.speaker
+        }
+
+        val formattedText = formatStoryText(node.text, effectiveName, effectiveTitle)
+        val formattedRevisit = node.revisitText?.let { formatStoryText(it, effectiveName, effectiveTitle) }
+        val formattedChoices = node.choices.map { choice ->
+            choice.copy(
+                text = formatStoryText(choice.text, effectiveName, effectiveTitle),
+                voiceKeywords = choice.voiceKeywords.map { formatStoryText(it, effectiveName, effectiveTitle) }
+            )
+        }
+
+        return node.copy(
+            speaker = formattedSpeaker,
+            text = formattedText,
+            revisitText = formattedRevisit,
+            choices = formattedChoices
+        )
+    }
+
     private fun eligibleChoices(node: DialogueNode): List<DialogueChoice> =
         node.choices.filter { choice ->
             val notCompleted = !isChoiceCompleted(choice, _state.value.narrativeFlags, _state.value.defeatedEncounters)
@@ -375,7 +440,7 @@ class StoryViewModel(
 
             _state.value = StoryState(
                 currentScene = restoredScene,
-                currentNode = restoredNode,
+                currentNode = formatNodeForPlayer(restoredNode, existingSave.player),
                 gameScreen = GameScreen.TITLE,
                 player = existingSave.player,
                 decisionsMade = existingSave.decisionsMade,
@@ -461,7 +526,7 @@ class StoryViewModel(
         val isStoryMode = targetSlot == SaveManager.STORY_MODE_SLOT || _state.value.isPureStoryMode
         _state.value = _state.value.copy(
             currentScene = restoredScene,
-            currentNode = restoredNode,
+            currentNode = formatNodeForPlayer(restoredNode, existingSave.player),
             gameScreen = GameScreen.STORY_EXPLORATION,
             previousScreen = null,
             player = existingSave.player,
@@ -616,7 +681,7 @@ class StoryViewModel(
         val targetSlot = if (slot == SaveManager.STORY_MODE_SLOT) SaveManager.STORY_MODE_SLOT else (slot ?: _state.value.currentSlot).coerceIn(1, SaveManager.MAX_SLOTS)
         saveManager.currentSlot = targetSlot
         val initialSave = saveManager.createInitialSave(customization, targetSlot)
-        val initialNode = StoryScript.INITIAL_NODE
+        val initialNode = formatNodeForPlayer(StoryScript.INITIAL_NODE, customization)
         val initialScene = StoryScript.INITIAL_SCENE
         val initialEntry = DialogueLogEntry(
             speakerId = initialNode.speaker.id,
@@ -848,11 +913,12 @@ class StoryViewModel(
         } else {
             effectiveNode.text
         }
-        val displayNode = if (activeText != effectiveNode.text) {
+        val baseNode = if (activeText != effectiveNode.text) {
             effectiveNode.copy(text = activeText)
         } else {
             effectiveNode
         }
+        val displayNode = formatNodeForPlayer(baseNode, _state.value.player)
 
         val updatedVisited = _state.value.visitedNodeIds + newNode.id + effectiveNode.id
 
