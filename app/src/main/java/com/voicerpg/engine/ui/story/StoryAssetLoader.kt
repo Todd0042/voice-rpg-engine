@@ -4,6 +4,9 @@ import android.content.Context
 import android.graphics.BitmapFactory
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
+import com.voicerpg.engine.content.GameContent
+import com.voicerpg.engine.engine.SaveManager
+import com.voicerpg.engine.ui.creation.SelfiePortraitProcessor
 
 /**
  * Loads and caches story scene backgrounds and character portraits from assets.
@@ -59,19 +62,53 @@ object StoryAssetLoader {
     // Generic bitmap loading (character portraits, title backgrounds, etc.)
     // ------------------------------------------------------------------
 
+    var activeSlot: Int = SaveManager.DEFAULT_SLOT
+
     /**
-     * Loads any arbitrary asset path (portraits, title screens).
-     * Not orientation-aware — use [loadBackground] for scene backgrounds.
-     */
-    fun loadBitmap(context: Context, assetPath: String): ImageBitmap? {
-        if (bitmapCache.containsKey(assetPath)) return bitmapCache[assetPath]
-        val bitmap = tryLoadBitmap(context, assetPath)
-        bitmapCache[assetPath] = bitmap
+      * Loads any arbitrary asset path (portraits, title screens).
+      * Not orientation-aware — use [loadBackground] for scene backgrounds.
+      */
+    fun loadBitmap(context: Context, assetPath: String, slot: Int? = null): ImageBitmap? {
+        val targetSlot = slot ?: activeSlot
+        val defaultHeroPortrait = GameContent.manifest.defaultHeroPortrait
+        val isHeroPortrait = (defaultHeroPortrait != null && assetPath.equals(defaultHeroPortrait, ignoreCase = true)) ||
+                assetPath.contains("custom", ignoreCase = true) ||
+                assetPath.contains("hero", ignoreCase = true)
+
+        val cacheKey = if (isHeroPortrait) "${assetPath}_slot_${targetSlot}" else assetPath
+        if (bitmapCache.containsKey(cacheKey)) return bitmapCache[cacheKey]
+        val bitmap = tryLoadBitmap(context, assetPath, targetSlot, isHeroPortrait)
+        bitmapCache[cacheKey] = bitmap
         return bitmap
+    }
+
+    /**
+      * Loads raw asset bitmap directly from assets without intercepting for custom hero portraits.
+      * Useful for character creation when showing the default fallback portrait.
+      */
+    fun loadRawAssetBitmap(context: Context, assetPath: String): ImageBitmap? = try {
+        val cacheKey = "raw_$assetPath"
+        if (bitmapCache.containsKey(cacheKey)) {
+            bitmapCache[cacheKey]
+        } else {
+            val bitmap = context.assets.open(assetPath).use { stream ->
+                BitmapFactory.decodeStream(stream)?.asImageBitmap()
+            }
+            bitmapCache[cacheKey] = bitmap
+            bitmap
+        }
+    } catch (_: Exception) {
+        null
     }
 
     fun clear() {
         bitmapCache.clear()
+    }
+
+    fun clearSlot(slot: Int) {
+        val suffix = "_slot_$slot"
+        val keysToRemove = bitmapCache.keys.filter { it.endsWith(suffix) }
+        keysToRemove.forEach { bitmapCache.remove(it) }
     }
 
     // ------------------------------------------------------------------
@@ -89,13 +126,17 @@ object StoryAssetLoader {
         else assetPath.substring(0, dotIdx) + "_p" + assetPath.substring(dotIdx)
     }
 
-    private fun tryLoadBitmap(context: Context, assetPath: String): ImageBitmap? = try {
-        val customPortraitFile = java.io.File(context.filesDir, com.voicerpg.engine.ui.creation.SelfiePortraitProcessor.CUSTOM_PORTRAIT_FILENAME)
-        val defaultHeroPortrait = com.voicerpg.engine.content.GameContent.manifest.defaultHeroPortrait
-        val isHeroPortrait = (defaultHeroPortrait != null && assetPath.equals(defaultHeroPortrait, ignoreCase = true)) ||
-                assetPath.contains("custom", ignoreCase = true) ||
-                assetPath.contains("hero", ignoreCase = true)
-        if (customPortraitFile.exists() && isHeroPortrait) {
+    private fun tryLoadBitmap(
+        context: Context,
+        assetPath: String,
+        slot: Int = activeSlot,
+        isHeroPortrait: Boolean = false
+    ): ImageBitmap? = try {
+        val customPortraitFile = if (isHeroPortrait) {
+            SelfiePortraitProcessor.getCustomPortraitFile(context, slot)
+        } else null
+
+        if (customPortraitFile != null && customPortraitFile.exists()) {
             BitmapFactory.decodeFile(customPortraitFile.absolutePath)?.asImageBitmap()
         } else {
             context.assets.open(assetPath).use { stream ->

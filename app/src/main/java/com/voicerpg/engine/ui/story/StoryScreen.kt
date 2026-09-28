@@ -66,6 +66,7 @@ import com.voicerpg.engine.model.DialogueChoice
 import com.voicerpg.engine.model.DialogueNode
 import com.voicerpg.engine.model.DialogueSpeaker
 import com.voicerpg.engine.model.SpeakerSide
+import com.voicerpg.engine.engine.SaveManager
 import com.voicerpg.engine.ui.combat.OptionsDialog
 import com.voicerpg.engine.ui.theme.LogosGold
 import com.voicerpg.engine.ui.theme.LogosGlow
@@ -104,51 +105,68 @@ fun StoryScreen(
             isPortrait = !isLandscape
         )
     }
-    val heroSpeaker = GameContent.heroCharacter?.speaker
-    val heroBitmap = remember(heroSpeaker?.portraitAsset) {
-        heroSpeaker?.portraitAsset?.let { StoryAssetLoader.loadBitmap(context, it) }
+    val manifest = GameContent.manifest
+    val defaultHeroName = manifest.defaultHeroName.ifBlank { "Hero" }
+    val defaultHeroTitle = manifest.defaultHeroTitle.ifBlank { "Adventurer" }
+    val effectiveHeroName = storyState.player.name.ifBlank { defaultHeroName }
+    val effectiveHeroTitle = storyState.player.title.ifBlank { defaultHeroTitle }
+
+    val heroSpeaker = remember(effectiveHeroName, effectiveHeroTitle) {
+        val base = GameContent.heroCharacter?.speaker ?: DialogueSpeaker(
+            id = "hero",
+            name = defaultHeroName,
+            title = defaultHeroTitle,
+            portraitAsset = manifest.defaultHeroPortrait ?: "portraits/template_hero.jpg",
+            themeColor = Color(0xFF64B5F6)
+        )
+        base.copy(name = effectiveHeroName, title = effectiveHeroTitle)
+    }
+    val heroBitmap = remember(heroSpeaker.portraitAsset, storyState.currentSlot) {
+        heroSpeaker.portraitAsset?.let { StoryAssetLoader.loadBitmap(context, it, storyState.currentSlot) }
     }
 
     val currentNode = storyState.currentNode
-    val isNarratorSpeaking = (currentNode.speaker == DialogueSpeaker.NARRATOR)
+    val isNarratorSpeaking = currentNode.speaker.isNarrator ||
+        currentNode.speaker.id == "narrator" ||
+        currentNode.side == SpeakerSide.CENTER_NARRATOR
 
     val narratorAsset = remember(currentNode.id) {
-        DialogueSpeaker.NARRATOR.effectivePortraitAsset()
+        GameContent.narrator.effectivePortraitAsset() ?: DialogueSpeaker.NARRATOR.effectivePortraitAsset()
     }
     val narratorBitmap = remember(narratorAsset) {
         narratorAsset?.let { StoryAssetLoader.loadBitmap(context, it) }
     }
 
     val isHeroSpeaking = !isNarratorSpeaking && (
-        currentNode.speaker == heroSpeaker ||
         currentNode.speaker.id == "hero" ||
-        currentNode.speaker.id == "todd_shop" ||
-        currentNode.speaker.id == "todd" ||
-        (heroSpeaker != null && (
-            currentNode.speaker.name.equals(heroSpeaker.name, ignoreCase = true) ||
-            (currentNode.speaker.portraitAsset != null && currentNode.speaker.portraitAsset == heroSpeaker.portraitAsset)
-        )) ||
-        currentNode.speaker.name.equals("Todd", ignoreCase = true)
+        currentNode.speaker.id == "player" ||
+        currentNode.speaker == heroSpeaker ||
+        currentNode.speaker.name.equals(heroSpeaker.name, ignoreCase = true) ||
+        (currentNode.speaker.portraitAsset != null && currentNode.speaker.portraitAsset == heroSpeaker.portraitAsset) ||
+        currentNode.speaker.name.equals(defaultHeroName, ignoreCase = true) ||
+        currentNode.speaker.name.equals(storyState.player.name, ignoreCase = true)
     )
 
     val leftSpeaker = when {
-        isNarratorSpeaking -> DialogueSpeaker.NARRATOR
         isHeroSpeaking -> currentNode.speaker
         currentNode.side == SpeakerSide.LEFT -> currentNode.speaker
-        else -> (heroSpeaker ?: DialogueSpeaker.NARRATOR)
+        else -> heroSpeaker
     }
     val leftSpeakerAsset = remember(leftSpeaker.id, currentNode.id) {
         leftSpeaker.effectivePortraitAsset(currentNode.id)
     }
-    val leftBitmap = remember(leftSpeakerAsset) {
-        leftSpeakerAsset?.let { StoryAssetLoader.loadBitmap(context, it) }
-    } ?: if (isNarratorSpeaking) narratorBitmap else (heroBitmap ?: narratorBitmap)
-    val isLeftSpeaking = isNarratorSpeaking || isHeroSpeaking || currentNode.side == SpeakerSide.LEFT
+    val leftBitmap = remember(leftSpeakerAsset, heroBitmap, narratorBitmap, storyState.currentSlot) {
+        leftSpeakerAsset?.let { StoryAssetLoader.loadBitmap(context, it, storyState.currentSlot) }
+    } ?: (heroBitmap ?: narratorBitmap)
+    val isLeftSpeaking = isHeroSpeaking || (currentNode.side == SpeakerSide.LEFT && !isNarratorSpeaking)
 
     val rightSpeaker: DialogueSpeaker? = remember(currentNode.id, currentNode.speaker.id, isHeroSpeaking, isNarratorSpeaking) {
         when {
-            isNarratorSpeaking || isHeroSpeaking || currentNode.side == SpeakerSide.LEFT -> {
+            isHeroSpeaking || (currentNode.side == SpeakerSide.LEFT && !isNarratorSpeaking) -> {
                 null
+            }
+            isNarratorSpeaking -> {
+                GameContent.narrator
             }
             else -> {
                 currentNode.speaker
@@ -156,14 +174,14 @@ fun StoryScreen(
         }
     }
 
-    val rightSpeakerAsset = remember(rightSpeaker?.id) {
+    val rightSpeakerAsset = remember(rightSpeaker?.id, currentNode.id) {
         rightSpeaker?.effectivePortraitAsset(currentNode.id)
     }
-    val rightBitmap = remember(rightSpeakerAsset) {
-        rightSpeakerAsset?.let { StoryAssetLoader.loadBitmap(context, it) }
+    val rightBitmap = remember(rightSpeakerAsset, narratorBitmap, storyState.currentSlot) {
+        rightSpeakerAsset?.let { StoryAssetLoader.loadBitmap(context, it, storyState.currentSlot) } ?: if (isNarratorSpeaking) narratorBitmap else null
     }
 
-    val isRightSpeaking = rightSpeaker != null && (currentNode.speaker == rightSpeaker || currentNode.side == SpeakerSide.RIGHT)
+    val isRightSpeaking = isNarratorSpeaking || (rightSpeaker != null && (currentNode.speaker == rightSpeaker || currentNode.side == SpeakerSide.RIGHT))
 
     // Gentle breathing & bobbing animation for speaking busts
     val infiniteTransition = rememberInfiniteTransition(label = "BustBobbing")
@@ -536,11 +554,20 @@ fun StoryScreen(
                         node = currentNode,
                         onTapToAdvance = {
                             if (currentNode.choices.isEmpty()) {
-                                storyViewModel.advanceDialogue()
+                                if (currentNode.id == "epilogue_credits" || currentNode.setFlagOnEnter == "game_completed") {
+                                    if (storyState.isPureStoryMode) {
+                                        storyViewModel.startPureStoryMode(fresh = true)
+                                    } else {
+                                        storyViewModel.startNewGameFlow(storyState.currentSlot)
+                                    }
+                                } else {
+                                    storyViewModel.advanceDialogue()
+                                }
                             }
                         },
                         isEyesFreeMode = isEyesFreeMode,
                         speakerBitmapOverride = if (isNarratorSpeaking) narratorBitmap else null,
+                        slot = storyState.currentSlot,
                         modifier = Modifier
                             .fillMaxWidth()
                             .wrapContentHeight(Alignment.Top)
@@ -663,11 +690,20 @@ fun StoryScreen(
                         node = currentNode,
                         onTapToAdvance = {
                             if (currentNode.choices.isEmpty()) {
-                                storyViewModel.advanceDialogue()
+                                if (currentNode.id == "epilogue_credits" || currentNode.setFlagOnEnter == "game_completed") {
+                                    if (storyState.isPureStoryMode) {
+                                        storyViewModel.startPureStoryMode(fresh = true)
+                                    } else {
+                                        storyViewModel.startNewGameFlow(storyState.currentSlot)
+                                    }
+                                } else {
+                                    storyViewModel.advanceDialogue()
+                                }
                             }
                         },
                         isEyesFreeMode = isEyesFreeMode,
                         speakerBitmapOverride = if (isNarratorSpeaking) narratorBitmap else null,
+                        slot = storyState.currentSlot,
                         modifier = Modifier
                             .fillMaxWidth()
                             .wrapContentHeight(Alignment.Top)
@@ -884,13 +920,14 @@ private fun RetroSpeechBubble(
     onTapToAdvance: () -> Unit,
     isEyesFreeMode: Boolean = false,
     speakerBitmapOverride: ImageBitmap? = null,
+    slot: Int = SaveManager.DEFAULT_SLOT,
     modifier: Modifier = Modifier
 ) {
     val speakerColor = node.speaker.themeColor
     val context = LocalContext.current
     val speakerAsset = remember(node.id) { node.speaker.effectivePortraitAsset() }
-    val speakerBitmap = remember(speakerAsset, speakerBitmapOverride) {
-        speakerBitmapOverride ?: speakerAsset?.let { StoryAssetLoader.loadBitmap(context, it) }
+    val speakerBitmap = remember(speakerAsset, speakerBitmapOverride, slot) {
+        speakerBitmapOverride ?: speakerAsset?.let { StoryAssetLoader.loadBitmap(context, it, slot) }
     }
 
     // Subtle breathing pulse for advance arrow

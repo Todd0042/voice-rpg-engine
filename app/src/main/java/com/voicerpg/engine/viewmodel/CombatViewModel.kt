@@ -96,6 +96,10 @@ class CombatViewModel(
     private val _state = MutableStateFlow(createInitialState())
     val state: StateFlow<CombatState> = _state.asStateFlow()
 
+    internal fun setCombatStateForTesting(testState: CombatState) {
+        _state.value = testState
+    }
+
     // Debug-only developer tools visibility. Kept OUT of CombatState so that
     // encounter/restart state reconstructions can never reset it.
     private val _isDeveloperToolsEnabled = MutableStateFlow(false)
@@ -1184,18 +1188,32 @@ class CombatViewModel(
         if (_state.value.phase != CombatPhase.PLAYER_INPUT) return null
         val aliveEnemies = _state.value.enemies.filter { it.isAlive }
 
-        val isSupportOnly = hero.isGhost || !hero.canAttack || hero.spells.none { !it.isHeal && it.basePower > 0 }
-        val nonHealSpells = hero.spells.filter { !it.isHeal }
+        val isSupportOnly = hero.isGhost || !hero.canAttack || hero.spells.none { !it.isHeal && !it.cleansesDebuffs && it.basePower > 0 }
+        val nonHealSpells = hero.spells.filter { !it.isHeal && !it.cleansesDebuffs }
         val affordableSpells = nonHealSpells.filter { it.mpCost <= hero.currentMp }
 
         val chosenSpell = if (isSupportOnly) {
             val affordable = hero.spells.filter { it.mpCost <= hero.currentMp }
             val pool = if (affordable.isNotEmpty()) affordable else hero.spells
             val lowestAlly = _state.value.party.filter { it.isAlive && !it.isGhost }.minByOrNull { it.hpRatio }
-            if (lowestAlly != null && lowestAlly.hpRatio < 0.75f) {
-                pool.firstOrNull { it.isHeal } ?: pool.firstOrNull()
-            } else {
-                pool.firstOrNull { it.isGuard || it.manaRestorePct > 0f } ?: pool.firstOrNull()
+            val debuffedAlly = _state.value.party.filter { it.isAlive && !it.isGhost }.firstOrNull { it.statuses.any { s -> s.isDebuffOnTarget } }
+
+            when {
+                // 1. If any living ally has debuffs and hero has a cleanse spell, prioritize cleansing
+                debuffedAlly != null && pool.any { it.cleansesDebuffs || it.isCleanse } -> {
+                    pool.firstOrNull { it.cleansesDebuffs || it.isCleanse }
+                }
+                // 2. If any living ally is injured and hero has a heal spell, prioritize healing
+                lowestAlly != null && lowestAlly.hpRatio < 0.85f && pool.any { it.isHeal } -> {
+                    pool.firstOrNull { it.isHeal }
+                }
+                // 3. Otherwise prefer guard, mana restore, heal, cleanse, or any available ability
+                else -> {
+                    pool.firstOrNull { it.isGuard || it.manaRestorePct > 0f }
+                        ?: pool.firstOrNull { it.isHeal }
+                        ?: pool.firstOrNull { it.cleansesDebuffs || it.isCleanse }
+                        ?: pool.firstOrNull()
+                }
             }
         } else if (aliveEnemies.size > 1) {
             // 1. Always prefer AoE damage spells when there is more than 1 enemy
@@ -1226,17 +1244,23 @@ class CombatViewModel(
         if (chosenSpell != null) {
             val aliveEnemy = _state.value.enemies.firstOrNull { it.isAlive && it.isTargeted }
                 ?: _state.value.enemies.firstOrNull { it.isAlive }
-            val chant = if (chosenSpell.manaRestorePct > 0f) {
-                "attune"
-            } else if (chosenSpell.isHeal || chosenSpell.isGuard) {
-                val lowestAlly = _state.value.party.filter { it.isAlive && !it.isGhost }.minByOrNull { it.hpRatio }
-                if (lowestAlly != null) "${chosenSpell.name} ${lowestAlly.name}" else chosenSpell.name
-            } else if (chosenSpell.hitsAll) {
-                "${chosenSpell.name} all"
-            } else if (aliveEnemy != null) {
-                "${chosenSpell.name} ${aliveEnemy.name}"
-            } else {
-                chosenSpell.name
+            val chant = when {
+                chosenSpell.cleansesDebuffs || chosenSpell.isCleanse -> {
+                    val debuffedAlly = _state.value.party.filter { it.isAlive && !it.isGhost }.firstOrNull { it.statuses.any { s -> s.isDebuffOnTarget } }
+                    if (chosenSpell.hitsAll) "${chosenSpell.name} all"
+                    else if (debuffedAlly != null) "${chosenSpell.name} ${debuffedAlly.name}"
+                    else "${chosenSpell.name} all"
+                }
+                chosenSpell.isHeal || chosenSpell.isGuard -> {
+                    val lowestAlly = _state.value.party.filter { it.isAlive && !it.isGhost }.minByOrNull { it.hpRatio }
+                    if (chosenSpell.hitsAll) "${chosenSpell.name} all"
+                    else if (lowestAlly != null) "${chosenSpell.name} ${lowestAlly.name}"
+                    else chosenSpell.name
+                }
+                chosenSpell.manaRestorePct > 0f -> "attune"
+                chosenSpell.hitsAll -> "${chosenSpell.name} all"
+                aliveEnemy != null -> "${chosenSpell.name} ${aliveEnemy.name}"
+                else -> chosenSpell.name
             }
             submitTypedChant(chant)
         }
@@ -1682,8 +1706,15 @@ class CombatViewModel(
 
         val hasHealSupportKeyword = lower.contains("heal") || lower.contains("mend") || lower.contains("restore") ||
                 lower.contains("cure") || lower.contains("protect") || lower.contains("shield") ||
-                lower.contains("lay on hands") || lower.contains("soothing rain")
-        val isHealSupportForOther = invokedOtherHero != null && hasHealSupportKeyword && activeHero.spells.any { it.isHeal || it.isGuard }
+                lower.contains("lay on hands") || lower.contains("soothing rain") ||
+                lower.contains("cleanse") || lower.contains("dispel") || lower.contains("purify")
+        val isSupportSpell = activeHero.spells.any { it.isHeal || it.isGuard || it.cleansesDebuffs || it.isCleanse }
+        val isHealSupportForOther = invokedOtherHero != null && isSupportSpell && (
+            hasHealSupportKeyword || activeHero.spells.any { spell ->
+                (spell.isHeal || spell.isGuard || spell.cleansesDebuffs || spell.isCleanse) &&
+                (lower.contains(spell.name.lowercase()) || spell.aliases.any { a -> a.length >= 3 && lower.contains(a.lowercase()) })
+            }
+        )
 
         // Breath/recovery utterances are self-disciplines: they always belong to whoever's turn it is.
         val BREATH_KEYWORDS = setOf(
@@ -1695,8 +1726,8 @@ class CombatViewModel(
         fun spellMatchesUtterance(spell: Spell): Boolean {
             if (spell.manaRestorePct != 0f) return false
             return lower.contains(spell.name.lowercase()) ||
-                spell.aliases.any { alias -> alias.length >= 4 && lower.contains(alias.lowercase()) } ||
-                spell.name.lowercase().split(" ").any { word -> word.length >= 5 && lower.contains(word) }
+                spell.aliases.any { alias -> alias.length >= 3 && lower.contains(alias.lowercase()) } ||
+                spell.name.lowercase().split(" ").any { word -> word.length >= 4 && lower.contains(word) }
         }
 
         // Check if the utterance matches a spell of the active hero
@@ -1730,7 +1761,7 @@ class CombatViewModel(
         }
 
         val outOfTurnHero = when {
-            invokedOtherHero != null && !isHealSupportForOther -> invokedOtherHero
+            invokedOtherHero != null && !isHealSupportForOther && !activeHeroSpellMatch -> invokedOtherHero
             otherHeroWithSpell != null -> otherHeroWithSpell
             otherHeroBySchool != null -> otherHeroBySchool
             else -> null
@@ -1859,7 +1890,7 @@ class CombatViewModel(
 
             // Spatially place particles & projectile: launch from caster slot to target slots
             val isAttune = parsed.spell.manaRestorePct > 0f
-            val isHeal = parsed.spell.isHeal
+            val isHeal = parsed.spell.isHeal || parsed.spell.cleansesDebuffs || parsed.spell.isCleanse
             val (casterX, casterY) = partyFloatSlot(activeHero.id)
             val spellGraphics = parsed.spell.graphics
 
@@ -2124,21 +2155,28 @@ class CombatViewModel(
         val currentParty = _state.value.party
         val targetsToHeal = resolveHealTargets(caster, spell, target, targetHeroId)
 
-        // Heals are affinity-immune: voice quality alone scales them (plus shallow level potency).
-        // Party-wide heals share the potency: a big spell spread over everyone is tuned down.
-        val healAmount = DamageResolver.resolveHeal(
-            spellBasePower = spell.basePower.toFloat(),
-            attackerLevel = caster.level,
-            resonanceMultiplier = resonance.damageMultiplier,
-            partyWide = targetsToHeal.size > 1
-        )
+        val healAmount = if (spell.basePower > 0) {
+            DamageResolver.resolveHeal(
+                spellBasePower = spell.basePower.toFloat(),
+                attackerLevel = caster.level,
+                resonanceMultiplier = resonance.damageMultiplier,
+                partyWide = targetsToHeal.size > 1
+            )
+        } else 0
 
+        var anyDebuffsCleansed = false
         val updatedParty = currentParty.map { hero ->
             if (targetsToHeal.any { it.id == hero.id }) {
                 val newHp = (hero.currentHp + healAmount).coerceAtMost(hero.maxHp)
+                var currentStatuses = hero.statuses
+                if (spell.cleansesDebuffs || spell.isCleanse) {
+                    val hadDebuffs = currentStatuses.any { it.isDebuffOnTarget }
+                    if (hadDebuffs) anyDebuffsCleansed = true
+                    currentStatuses = currentStatuses.filterNot { it.isDebuffOnTarget }
+                }
                 val blessed = if (healStatus == StatusId.BLESS || healStatus == StatusId.GUARD)
-                    StatusSystem.merge(hero.statuses, StatusSystem.apply(healStatus!!, "ADEPT", EnemyFamily.FLESH, 0f))
-                else hero.statuses
+                    StatusSystem.merge(currentStatuses, StatusSystem.apply(healStatus!!, "ADEPT", EnemyFamily.FLESH, 0f))
+                else currentStatuses
                 hero.copy(
                     currentHp = newHp,
                     statuses = blessed,
@@ -2148,16 +2186,32 @@ class CombatViewModel(
             } else hero
         }
 
-        val newFloatingTexts = targetsToHeal.map {
-            val (hx, hy) = partyFloatSlot(it.id)
-            FloatingCombatText(
-                text = "+$healAmount HP",
-                color = Color(0xFF00E676),
-                startX = hx,
-                startY = hy,
-                isHeal = true,
-                isCrit = resonance.tier == ResonanceTier.TRANSCENDENTAL || resonance.tier == ResonanceTier.MYTHIC
-            )
+        val newFloatingTexts = targetsToHeal.flatMap { targetHero ->
+            val (hx, hy) = partyFloatSlot(targetHero.id)
+            val list = mutableListOf<FloatingCombatText>()
+            if (healAmount > 0) {
+                list.add(
+                    FloatingCombatText(
+                        text = "+$healAmount HP",
+                        color = Color(0xFF00E676),
+                        startX = hx,
+                        startY = hy,
+                        isHeal = true,
+                        isCrit = resonance.tier == ResonanceTier.TRANSCENDENTAL || resonance.tier == ResonanceTier.MYTHIC
+                    )
+                )
+            }
+            if ((spell.cleansesDebuffs || spell.isCleanse) && targetHero.statuses.any { it.isDebuffOnTarget }) {
+                list.add(
+                    FloatingCombatText(
+                        text = "CLEANSED ✨",
+                        color = Color(0xFF80D8FF),
+                        startX = hx,
+                        startY = hy - (if (healAmount > 0) 30f else 0f)
+                    )
+                )
+            }
+            list
         }
 
         _state.value = _state.value.copy(
@@ -2166,15 +2220,21 @@ class CombatViewModel(
         )
 
         val targetDesc = if (spell.hitsAll) "the fellowship" else targetsToHeal.joinToString(", ") { it.name }
-        combatNarrator.narrateSpellCastSuspend(
-            heroName = caster.name,
-            spellName = spell.name,
-            targetName = targetDesc,
-            amount = healAmount,
-            isHeal = true,
-            tierTitle = resonance.tier.title,
-            defeatedNames = emptyList()
-        )
+        if (healAmount > 0) {
+            combatNarrator.narrateSpellCastSuspend(
+                heroName = caster.name,
+                spellName = spell.name,
+                targetName = targetDesc,
+                amount = healAmount,
+                isHeal = true,
+                tierTitle = resonance.tier.title,
+                defeatedNames = emptyList()
+            )
+        } else if (anyDebuffsCleansed) {
+            combatNarrator.speak("${caster.name}'s ${spell.name} dispels all negative conditions from $targetDesc!", force = true)
+        } else {
+            combatNarrator.speak("${caster.name} channels ${spell.name} upon $targetDesc.", force = false)
+        }
 
         activeScope.launch {
             delay(1200)
@@ -2326,10 +2386,11 @@ class CombatViewModel(
             for (i in 0 until 8) {
                 val dx = (Random.nextFloat() * magnitude * 2f - magnitude)
                 val dy = (Random.nextFloat() * magnitude * 2f - magnitude)
-                _state.value = _state.value.copy(screenShakeOffsetX = dx, screenShakeOffsetY = dy)
+                // Atomic recompute-from-current so concurrent summons/attacks can never be lost to a stale snapshot write.
+                _state.update { it.copy(screenShakeOffsetX = dx, screenShakeOffsetY = dy) }
                 delay(30)
             }
-            _state.value = _state.value.copy(screenShakeOffsetX = 0f, screenShakeOffsetY = 0f)
+            _state.update { it.copy(screenShakeOffsetX = 0f, screenShakeOffsetY = 0f) }
         }
     }
 

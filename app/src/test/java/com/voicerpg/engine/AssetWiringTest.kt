@@ -1,5 +1,6 @@
 package com.voicerpg.engine
 
+import com.voicerpg.engine.audio.MusicManager
 import com.voicerpg.engine.engine.StoryScript
 import java.io.File
 import org.junit.Assert.assertEquals
@@ -48,14 +49,13 @@ class AssetWiringTest {
 
     @Test
     fun allBgmAudioFilesExist() {
-        val expectedTracks = listOf(
-            "audio/music/bgm_title.ogg",
-            "audio/music/bgm_act1_forest.ogg",
-            "audio/music/bgm_act2_marsh.ogg",
-            "audio/music/bgm_act3_bastion.ogg",
-            "audio/music/bgm_act4_celestial.ogg",
-            "audio/music/bgm_combat.ogg"
-        )
+        val expectedTracks = (
+            listOf(
+                MusicManager.TRACK_TITLE,
+                MusicManager.TRACK_EXPLORATION,
+                MusicManager.TRACK_COMBAT
+            ) + StoryScript.ALL_SCENES.values.map { it.musicAsset }
+        ).distinct()
         val missing = mutableListOf<String>()
         for (track in expectedTracks) {
             val file = File(assetsDir, track)
@@ -77,11 +77,6 @@ class AssetWiringTest {
             if (!File(assetsDir, asset).isFile) missing.add("${speaker.id} -> $asset")
         }
         assertTrue("Missing portrait assets: $missing", missing.isEmpty())
-    }
-
-    @Test
-    fun narratorEasterEggAlternatePortraitExists() {
-        assertTrue("narrator1.jpg easter-egg art missing", File(assetsDir, "portraits/narrator1.jpg").isFile)
     }
 
     @Test

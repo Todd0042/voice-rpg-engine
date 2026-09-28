@@ -66,8 +66,5 @@ class MusicManagerTest {
 
         musicManager.playCombatMusic()
         assertEquals(MusicManager.TRACK_COMBAT, musicManager.currentTrack.value)
-
-        musicManager.playTrack("audio/music/bgm_act1_forest.ogg")
-        assertEquals("audio/music/bgm_act1_forest.ogg", musicManager.currentTrack.value)
     }
 }

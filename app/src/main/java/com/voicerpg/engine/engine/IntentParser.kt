@@ -125,7 +125,7 @@ object IntentParser {
         }
 
         val hasHealKeyword = lower.contains("heal") || lower.contains("mend") || lower.contains("restore") ||
-                lower.contains("cure")
+                lower.contains("cure") || lower.contains("cleanse") || lower.contains("dispel") || lower.contains("purify")
 
         var targetEnemyId: String? = null
         var targetHeroId: String? = null
@@ -232,8 +232,9 @@ object IntentParser {
             }
         } ?: availableSpells.firstOrNull { it.manaRestorePct == 0f } ?: availableSpells.firstOrNull() ?: defaultFallbackSpell()
 
-        // If it's a heal spell and targeting was unset/first alive enemy/all enemies, default to party lowest
-        if (matchedSpell.isHeal && (target == TargetSelection.FIRST_ALIVE_ENEMY || target == TargetSelection.ALL_ENEMIES || target == TargetSelection.SPECIFIC_ENEMY)) {
+        // If it's a heal or friendly cleanse spell and targeting was unset/first alive enemy/all enemies, default to party
+        val isAllySpell = matchedSpell.isHeal || matchedSpell.cleansesDebuffs || matchedSpell.isCleanse
+        if (isAllySpell && (target == TargetSelection.FIRST_ALIVE_ENEMY || target == TargetSelection.ALL_ENEMIES || target == TargetSelection.SPECIFIC_ENEMY)) {
             target = TargetSelection.PARTY_LOWEST
             targetEnemyId = null
         }

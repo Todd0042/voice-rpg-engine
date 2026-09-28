@@ -109,6 +109,7 @@ data class CharacterCombatDto(
     val isGhost: Boolean = false,
     val canAttack: Boolean = true,
     val isUntargetable: Boolean = false,
+    val spriteAlpha: Float? = null,
     val spellIds: List<String>? = null,
     val spells: List<SpellDto>? = null,
     val growth: GrowthDto? = null
@@ -206,7 +207,8 @@ data class SpellDto(
     val isGuard: Boolean = false,
     val manaRestorePct: Float = 0f,
     val aliases: List<String>? = null,
-    val graphics: SpellGraphicsDto? = null
+    val graphics: SpellGraphicsDto? = null,
+    val cleansesDebuffs: Boolean = false
 )
 
 data class SpellFileDto(val spells: List<SpellDto>? = null)
@@ -539,7 +541,8 @@ data class CharacterCombat(
     val growth: StatGrowth,
     val isGhost: Boolean = false,
     val canAttack: Boolean = true,
-    val isUntargetable: Boolean = false
+    val isUntargetable: Boolean = false,
+    val spriteAlpha: Float? = null
 )
 
 data class SpriteDefinition(
@@ -590,7 +593,8 @@ data class GameCharacter(
             atbGauge = atbOverride ?: c.startAtb,
             isGhost = c.isGhost,
             canAttack = c.canAttack,
-            isUntargetable = c.isUntargetable
+            isUntargetable = c.isUntargetable,
+            spriteAlpha = c.spriteAlpha
         )
     }
 
@@ -1007,7 +1011,8 @@ class GameContentLoader(private val source: ContentSource) {
         isGuard = isGuard,
         manaRestorePct = manaRestorePct,
         aliases = aliases ?: emptyList(),
-        graphics = graphics?.toSpellGraphics()
+        graphics = graphics?.toSpellGraphics(),
+        cleansesDebuffs = cleansesDebuffs || status.equals("CLEANSE", ignoreCase = true) || status.equals("DISPEL", ignoreCase = true)
     )
 
     private fun ClassDto.toDef(spells: Map<String, Spell>): HeroClassDef = HeroClassDef(
@@ -1052,7 +1057,8 @@ class GameContentLoader(private val source: ContentSource) {
                 growth = (c.growth ?: GrowthDto()).toStatGrowth(),
                 isGhost = c.isGhost,
                 canAttack = c.canAttack,
-                isUntargetable = c.isUntargetable
+                isUntargetable = c.isUntargetable,
+                spriteAlpha = c.spriteAlpha
             )
         }
         val resolvedSprite = sprite?.toSpriteDefinition()

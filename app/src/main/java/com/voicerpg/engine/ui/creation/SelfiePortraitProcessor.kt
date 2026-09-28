@@ -25,6 +25,8 @@ import com.voicerpg.engine.model.EyeEffectConfig
 import com.voicerpg.engine.model.ScanlineConfig
 import com.voicerpg.engine.model.SelfieFilterConfig
 import com.voicerpg.engine.model.VignetteConfig
+import com.voicerpg.engine.engine.SaveManager
+import com.voicerpg.engine.ui.story.StoryAssetLoader
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
@@ -138,22 +140,49 @@ object SelfiePortraitProcessor {
         finalResult
     }
 
-    fun saveCustomPortrait(context: Context, bitmap: Bitmap): File {
-        val destFile = File(context.filesDir, CUSTOM_PORTRAIT_FILENAME)
+    fun getCustomPortraitFilename(slot: Int): String {
+        return if (slot == SaveManager.STORY_MODE_SLOT) {
+            "custom_hero_portrait_story.jpg"
+        } else {
+            "custom_hero_portrait_slot_$slot.jpg"
+        }
+    }
+
+    fun saveCustomPortrait(context: Context, bitmap: Bitmap, slot: Int = SaveManager.DEFAULT_SLOT): File {
+        val filename = getCustomPortraitFilename(slot)
+        val destFile = File(context.filesDir, filename)
         FileOutputStream(destFile).use { out ->
             bitmap.compress(Bitmap.CompressFormat.JPEG, 92, out)
         }
+        StoryAssetLoader.clearSlot(slot)
         return destFile
     }
 
-    fun getCustomPortraitFile(context: Context): File? {
-        val f = File(context.filesDir, CUSTOM_PORTRAIT_FILENAME)
-        return if (f.exists()) f else null
+    fun getCustomPortraitFile(context: Context, slot: Int = SaveManager.DEFAULT_SLOT): File? {
+        val filename = getCustomPortraitFilename(slot)
+        val f = File(context.filesDir, filename)
+        if (f.exists()) return f
+
+        // Backward-compatibility: if slot is DEFAULT_SLOT (1), check legacy single-file name
+        if (slot == SaveManager.DEFAULT_SLOT) {
+            val legacy = File(context.filesDir, CUSTOM_PORTRAIT_FILENAME)
+            if (legacy.exists()) {
+                try {
+                    legacy.copyTo(f, overwrite = true)
+                    legacy.delete()
+                    if (f.exists()) return f
+                } catch (_: Exception) {
+                    return legacy
+                }
+            }
+        }
+        return null
     }
 
-    fun deleteCustomPortrait(context: Context): Boolean {
-        val f = File(context.filesDir, CUSTOM_PORTRAIT_FILENAME)
-        return if (f.exists()) f.delete() else false
+    fun deleteCustomPortrait(context: Context, slot: Int = SaveManager.DEFAULT_SLOT): Boolean {
+        val f = getCustomPortraitFile(context, slot)
+        StoryAssetLoader.clearSlot(slot)
+        return f?.delete() ?: false
     }
 
     private fun cropAndScale(src: Bitmap, targetSize: Int): Bitmap {

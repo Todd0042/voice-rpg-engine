@@ -36,8 +36,11 @@ data class Spell(
     val isGuard: Boolean = false,
     val manaRestorePct: Float = 0f,
     val aliases: List<String> = emptyList(),
-    val graphics: SpellGraphics? = null
-)
+    val graphics: SpellGraphics? = null,
+    val cleansesDebuffs: Boolean = false
+) {
+    val isCleanse: Boolean get() = cleansesDebuffs || status.equals("CLEANSE", ignoreCase = true) || status.equals("DISPEL", ignoreCase = true)
+}
 
 enum class CharacterStance {
     READY,
@@ -67,7 +70,8 @@ data class PartyMember(
     val isGuarding: Boolean = false,
     val isGhost: Boolean = false,
     val canAttack: Boolean = true,
-    val isUntargetable: Boolean = false
+    val isUntargetable: Boolean = false,
+    val spriteAlpha: Float? = null
 ) {
     val isAlive: Boolean get() = (isGhost || currentHp > 0) && stance != CharacterStance.DEAD
     val isTurnReady: Boolean get() = isAlive && atbGauge >= 1.0f

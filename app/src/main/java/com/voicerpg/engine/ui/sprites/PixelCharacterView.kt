@@ -63,6 +63,7 @@ fun PixelCharacterView(
     stance: CharacterStance = CharacterStance.READY,
     isFlippedHorizontally: Boolean = false,
     isGhost: Boolean = false,
+    spriteAlpha: Float? = null,
     pixelSize: Dp = 2.2.dp,
     onClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier
@@ -80,6 +81,23 @@ fun PixelCharacterView(
         ),
         label = "crouch_cycle_$characterId"
     )
+
+    val isEthereal = isGhost || spriteAlpha != null
+    val baseAlpha = spriteAlpha ?: if (isGhost) 0.45f else 1.0f
+    val etherealPulse by infiniteTransition.animateFloat(
+        initialValue = -0.12f,
+        targetValue = 0.12f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1600, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "ethereal_pulse_$characterId"
+    )
+    val spriteFinalAlpha = if (isEthereal) {
+        (baseAlpha + etherealPulse).coerceIn(0.15f, 0.95f)
+    } else {
+        baseAlpha
+    }
 
     val currentFrame = when {
         isDead -> SpriteFrame.DAMAGED
@@ -102,9 +120,6 @@ fun PixelCharacterView(
     Column(
         modifier = modifier
             .offset(x = stepForwardOffset)
-            .graphicsLayer {
-                if (isGhost) alpha = 0.82f
-            }
             .clickable(enabled = !isDead && onClick != null) { onClick?.invoke() }
             .padding(horizontal = 4.dp),
         horizontalAlignment = Alignment.CenterHorizontally
@@ -218,7 +233,9 @@ fun PixelCharacterView(
                     if (isDead) {
                         rotationZ = if (isFlippedHorizontally) 90f else -90f
                         transformOrigin = TransformOrigin(0.5f, 0.85f)
-                        alpha = 0.55f
+                        alpha = if (isEthereal) (spriteFinalAlpha * 0.55f) else 0.55f
+                    } else if (isEthereal) {
+                        alpha = spriteFinalAlpha
                     }
                 },
             contentAlignment = Alignment.BottomCenter

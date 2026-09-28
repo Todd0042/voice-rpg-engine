@@ -24,7 +24,8 @@ data class PlayerCustomization(
     val heroClassId: String = "",
     val title: String = "The Awakened Hero",
     val auraColor: AuraColor = AuraColor.SAPPHIRE_FROST,
-    val voiceAffinityBonusSchool: SpellSchool = SpellSchool.PHYSICAL
+    val voiceAffinityBonusSchool: SpellSchool = SpellSchool.PHYSICAL,
+    val customPortraitAsset: String? = null
 ) {
     val heroClass get() = GameContent.classById(heroClassId)
 }

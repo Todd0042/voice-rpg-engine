@@ -151,6 +151,11 @@ class SaveManager(private val context: Context? = null) {
     fun deleteSave(slot: Int = currentSlot): Boolean {
         val validSlot = sanitizeSlot(slot)
         inMemorySlots.remove(validSlot)
+        context?.let { ctx ->
+            try {
+                com.voicerpg.engine.ui.creation.SelfiePortraitProcessor.deleteCustomPortrait(ctx, validSlot)
+            } catch (_: Exception) {}
+        }
         val file = getSaveFile(validSlot)
         return if (file != null) {
             file.delete()

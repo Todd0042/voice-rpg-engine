@@ -21,6 +21,7 @@ import com.voicerpg.engine.model.GameScreen
 import com.voicerpg.engine.model.MetaCommand
 import com.voicerpg.engine.model.PartyMember
 import com.voicerpg.engine.model.PlayerCustomization
+import com.voicerpg.engine.ui.story.StoryAssetLoader
 import com.voicerpg.engine.model.SaveSlotInfo
 import com.voicerpg.engine.model.SaveSummary
 import com.voicerpg.engine.model.SavedCharacterStats
@@ -356,16 +357,30 @@ class StoryViewModel(
 
         if (!fresh && hasStorySave && existingStorySave != null && !isCompleted) {
             continueGame(storySlot)
+            _state.value = _state.value.copy(
+                isPureStoryMode = true,
+                isStoryAutoPlayPaused = false
+            )
+            scheduleStoryModeNextStep(_state.value.currentNode, delayMs = 1200L)
         } else {
             saveManager.deleteSave(storySlot)
-            startNewGame(PlayerCustomization(), storySlot)
+            val manifest = GameContent.manifest
+            val defaultName = manifest.defaultHeroName.ifBlank { "Hero" }
+            val defaultTitle = manifest.defaultHeroTitle.ifBlank { "The Awakened Hero" }
+            val defaultPlayer = PlayerCustomization(name = defaultName, title = defaultTitle)
+            saveManager.createInitialSave(defaultPlayer, storySlot)
+            saveManager.currentSlot = storySlot
+            StoryAssetLoader.activeSlot = storySlot
+            _state.value = _state.value.copy(
+                gameScreen = GameScreen.CHARACTER_CREATION,
+                previousScreen = GameScreen.TITLE,
+                isNewGameFlow = true,
+                currentSlot = storySlot,
+                isPureStoryMode = true,
+                isStoryAutoPlayPaused = false,
+                player = defaultPlayer
+            )
         }
-
-        _state.value = _state.value.copy(
-            isPureStoryMode = true,
-            isStoryAutoPlayPaused = false
-        )
-        scheduleStoryModeNextStep(_state.value.currentNode, delayMs = 1200L)
     }
 
     fun scheduleStoryModeNextStep(node: DialogueNode, delayMs: Long = 1200L) {
@@ -488,6 +503,7 @@ class StoryViewModel(
     fun continueGame(slot: Int? = null) {
         val targetSlot = if (slot == SaveManager.STORY_MODE_SLOT) SaveManager.STORY_MODE_SLOT else (slot ?: _state.value.currentSlot).coerceIn(1, SaveManager.MAX_SLOTS)
         saveManager.currentSlot = targetSlot
+        StoryAssetLoader.activeSlot = targetSlot
         val existingSave = saveManager.load(targetSlot) ?: return
         val restoredScene = StoryScript.ALL_SCENES[existingSave.currentSceneId] ?: StoryScript.INITIAL_SCENE
         val rawRestoredNode = StoryScript.ALL_NODES[existingSave.currentNodeId] ?: StoryScript.INITIAL_NODE
@@ -523,7 +539,7 @@ class StoryViewModel(
             )
         }
 
-        val isStoryMode = targetSlot == SaveManager.STORY_MODE_SLOT || _state.value.isPureStoryMode
+        val isStoryMode = targetSlot == SaveManager.STORY_MODE_SLOT
         _state.value = _state.value.copy(
             currentScene = restoredScene,
             currentNode = formatNodeForPlayer(restoredNode, existingSave.player),
@@ -566,8 +582,9 @@ class StoryViewModel(
      * Selects an active save slot and refreshes the preview summary.
      */
     fun selectSlot(slot: Int) {
-        val validSlot = slot.coerceIn(1, SaveManager.MAX_SLOTS)
+        val validSlot = saveManager.sanitizeSlot(slot)
         saveManager.currentSlot = validSlot
+        StoryAssetLoader.activeSlot = validSlot
         val summary = saveManager.getSlotSummary(validSlot)
         _state.value = _state.value.copy(
             currentSlot = validSlot,
@@ -581,8 +598,9 @@ class StoryViewModel(
      * Deletes the specified save slot and updates slot listings.
      */
     fun deleteSlot(slot: Int) {
-        val validSlot = slot.coerceIn(1, SaveManager.MAX_SLOTS)
+        val validSlot = saveManager.sanitizeSlot(slot)
         saveManager.deleteSave(validSlot)
+        StoryAssetLoader.clearSlot(validSlot)
         val allSlots = saveManager.getAllSlotInfos()
         val activeSlot = _state.value.currentSlot
         val summary = saveManager.getSlotSummary(activeSlot)
@@ -611,16 +629,22 @@ class StoryViewModel(
      * Starts the new game wizard flow from the Title Screen, optionally targeting a slot.
      */
     fun startNewGameFlow(slot: Int? = null) {
-        if (slot != null) {
-            selectSlot(slot)
-        }
+        val targetSlot = if (slot != null) saveManager.sanitizeSlot(slot) else _state.value.currentSlot
+        selectSlot(targetSlot)
         cancelPendingAutoAdvance()
         combatNarrator.stop()
         speechManager.cancel()
+        val manifest = GameContent.manifest
+        val defaultName = manifest.defaultHeroName.ifBlank { "Hero" }
+        val defaultTitle = manifest.defaultHeroTitle.ifBlank { "The Awakened Hero" }
+        StoryAssetLoader.activeSlot = targetSlot
         _state.value = _state.value.copy(
             gameScreen = GameScreen.AUDIO_SETUP,
             previousScreen = GameScreen.TITLE,
-            isNewGameFlow = true
+            isNewGameFlow = true,
+            currentSlot = targetSlot,
+            isPureStoryMode = (targetSlot == SaveManager.STORY_MODE_SLOT),
+            player = PlayerCustomization(name = defaultName, title = defaultTitle)
         )
     }
 
@@ -680,6 +704,7 @@ class StoryViewModel(
         cancelPendingAutoAdvance()
         val targetSlot = if (slot == SaveManager.STORY_MODE_SLOT) SaveManager.STORY_MODE_SLOT else (slot ?: _state.value.currentSlot).coerceIn(1, SaveManager.MAX_SLOTS)
         saveManager.currentSlot = targetSlot
+        StoryAssetLoader.activeSlot = targetSlot
         val initialSave = saveManager.createInitialSave(customization, targetSlot)
         val initialNode = formatNodeForPlayer(StoryScript.INITIAL_NODE, customization)
         val initialScene = StoryScript.INITIAL_SCENE
@@ -691,7 +716,7 @@ class StoryViewModel(
             sceneName = initialScene.name,
             isNarrator = initialNode.speaker.isNarrator
         )
-        val isStoryMode = targetSlot == SaveManager.STORY_MODE_SLOT || _state.value.isPureStoryMode
+        val isStoryMode = targetSlot == SaveManager.STORY_MODE_SLOT
         _state.value = StoryState(
             currentScene = initialScene,
             currentNode = initialNode,
@@ -718,8 +743,9 @@ class StoryViewModel(
 
     fun resetGame(slot: Int? = null) {
         cancelPendingAutoAdvance()
-        val targetSlot = if (slot == SaveManager.STORY_MODE_SLOT) SaveManager.STORY_MODE_SLOT else (slot ?: _state.value.currentSlot).coerceIn(1, SaveManager.MAX_SLOTS)
+        val targetSlot = if (slot != null) saveManager.sanitizeSlot(slot) else _state.value.currentSlot
         saveManager.deleteSave(targetSlot)
+        StoryAssetLoader.clearSlot(targetSlot)
         val allSlots = saveManager.getAllSlotInfos()
         val summary = saveManager.getSlotSummary(targetSlot)
         _state.value = _state.value.copy(
@@ -1500,7 +1526,11 @@ class StoryViewModel(
         if (node.id == "epilogue_credits" || node.setFlagOnEnter == "game_completed") {
             val restartKeywords = listOf("play again", "new game", "start over", "restart", "awaken", "embark", "begin again")
             if (restartKeywords.any { lower.contains(it) }) {
-                startNewGame(_state.value.player)
+                if (_state.value.isPureStoryMode) {
+                    startPureStoryMode(fresh = true)
+                } else {
+                    startNewGameFlow(_state.value.currentSlot)
+                }
                 return
             }
         }
