@@ -306,14 +306,14 @@ fun CharacterCreationScreen(
 
             // Header
             Text(
-                text = "⚔️ TEMPLATE CHARACTER CREATION ⚔️",
+                text = manifest.creationTitle ?: "⚔️ CHARACTER CREATION ⚔️",
                 color = LogosGold,
                 fontSize = 18.sp,
                 fontWeight = FontWeight.Black,
                 fontFamily = FontFamily.Monospace
             )
             Text(
-                text = "Template Character Setup & Initial Loadout",
+                text = manifest.creationSubtitle ?: "Character Setup & Initial Loadout",
                 color = Color.LightGray,
                 fontSize = 11.sp,
                 fontFamily = FontFamily.Monospace
@@ -540,10 +540,11 @@ fun CharacterCreationScreen(
                     .border(2.dp, auraColorVal, RoundedCornerShape(12.dp))
                     .padding(14.dp)
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
                     // Portrait Bust
                     Box(
                         modifier = Modifier
@@ -646,7 +647,66 @@ fun CharacterCreationScreen(
                         }
                     }
                 }
+
+                if (selfieConfig.isEnabled) {
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(RetroBlack)
+                                .border(1.dp, LogosGold, RoundedCornerShape(6.dp))
+                                .clickable {
+                                    if (!selfieConfig.disclaimerText.isNullOrBlank()) {
+                                        showWarningDialog = true
+                                    } else {
+                                        showSourceDialog = true
+                                    }
+                                }
+                                .padding(vertical = 8.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "📷 SNAP SELFIE / PHOTO",
+                                color = LogosGold,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = FontFamily.Monospace
+                            )
+                        }
+
+                        if (hasCustomPortrait) {
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(RetroBlack)
+                                    .border(1.dp, Color.Gray, RoundedCornerShape(6.dp))
+                                    .clickable {
+                                        SelfiePortraitProcessor.deleteCustomPortrait(context, slot)
+                                        StoryAssetLoader.clearSlot(slot)
+                                        customPortraitBitmap = defaultHeroBitmap
+                                        hasCustomPortrait = false
+                                        combatNarrator?.speak("Portrait reset to default.", force = true)
+                                    }
+                                    .padding(horizontal = 10.dp, vertical = 8.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "↺ RESET DEFAULT",
+                                    color = Color.LightGray,
+                                    fontSize = 11.sp,
+                                    fontFamily = FontFamily.Monospace
+                                )
+                            }
+                        }
+                    }
+                }
             }
+        }
 
             Spacer(modifier = Modifier.height(16.dp))
 
