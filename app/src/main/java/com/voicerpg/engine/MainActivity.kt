@@ -259,7 +259,12 @@ class MainActivity : ComponentActivity() {
                                 onSelectSlot = { slot -> storyViewModel.selectSlot(slot) },
                                 onDeleteSlot = { slot -> storyViewModel.deleteSlot(slot) },
                                 onContinueSlot = { slot -> storyViewModel.continueGame(slot) },
+                                onContinueSlotAuto = { slot -> storyViewModel.continueGame(slot, startInAutoPlay = true) },
                                 onNewGameInSlot = { slot -> storyViewModel.startNewGameFlow(slot) },
+                                isMiniGameTestMenuOpen = storyState.isMiniGameTestMenuOpen,
+                                onOpenMiniGameTestMenu = { storyViewModel.openMiniGameTestMenu() },
+                                onCloseMiniGameTestMenu = { storyViewModel.closeMiniGameTestMenu() },
+                                onLaunchMiniGame = { id -> storyViewModel.triggerMiniGame(id) },
                                 onAudioSetup = { storyViewModel.openAudioSetup() },
                                 onOptions = { combatViewModel.openOptions() },
                                 storyModeSummary = storyViewModel.getStoryModeSaveSummary(),
@@ -346,26 +351,11 @@ class MainActivity : ComponentActivity() {
                                 id = "minigame",
                                 title = "Mini-Game"
                             )
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .background(com.voicerpg.engine.ui.theme.RetroBlack)
-                                    .padding(24.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                    Text(
-                                        text = activeConfig.title,
-                                        color = com.voicerpg.engine.ui.theme.LogosGold,
-                                        fontSize = 18.sp,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                    Spacer(modifier = Modifier.height(16.dp))
-                                    Button(onClick = { storyViewModel.onSkipMiniGame() }) {
-                                        Text("CONTINUE (AUTO SIMULATE)")
-                                    }
-                                }
-                            }
+                            com.voicerpg.engine.ui.minigame.MiniGameContainerScreen(
+                                config = activeConfig,
+                                onFinish = { outcome -> storyViewModel.onMiniGameFinished(outcome) },
+                                onSkip = { storyViewModel.onSkipMiniGame() }
+                            )
                         }
                         GameScreen.ASSET_VIEWER -> {
                             com.voicerpg.engine.ui.gallery.AssetViewerScreen(
@@ -383,6 +373,7 @@ class MainActivity : ComponentActivity() {
                         isOpen = combatState.isOptionsOpen,
                         isEyesFreeMode = isEyesFreeMode,
                         isNarrationEnabled = isNarrationEnabled,
+                        isAutoPlayEnabled = storyState.isPureStoryMode,
                         isCombatNarrationEnabled = isCombatNarrationEnabled,
                         isPocketGuardEnabled = isPocketGuardEnabled,
                         isReadChoicesEnabled = isReadChoicesEnabled,
@@ -402,6 +393,9 @@ class MainActivity : ComponentActivity() {
                         onToggleNarration = {
                             combatNarrator.toggleNarration()
                             storyViewModel.persistCurrentState()
+                        },
+                        onToggleAutoPlay = {
+                            storyViewModel.toggleAutoPlay()
                         },
                         onToggleCombatNarration = {
                             combatNarrator.toggleCombatNarrationEnabled()

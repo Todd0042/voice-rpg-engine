@@ -14,6 +14,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.defaultMinSize
@@ -338,11 +340,17 @@ fun StoryScreen(
                                     modifier = Modifier
                                         .clip(RoundedCornerShape(6.dp))
                                         .background(Color(0xFFC62828))
-                                        .clickable { storyViewModel.returnToTitle() }
+                                        .clickable {
+                                            if (storyState.currentSlot == com.voicerpg.engine.engine.SaveManager.STORY_MODE_SLOT) {
+                                                storyViewModel.returnToTitle()
+                                            } else {
+                                                storyViewModel.setPureStoryMode(false)
+                                            }
+                                        }
                                         .padding(horizontal = 8.dp, vertical = 5.dp)
                                 ) {
                                     Text(
-                                        text = "EXIT",
+                                        text = if (storyState.currentSlot == com.voicerpg.engine.engine.SaveManager.STORY_MODE_SLOT) "EXIT" else "STOP",
                                         color = Color.White,
                                         fontSize = 10.sp,
                                         fontWeight = FontWeight.Bold,
@@ -393,6 +401,32 @@ fun StoryScreen(
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
+                        if (GameContent.metrics.isNotEmpty() && storyState.dynamicMetrics.isNotEmpty()) {
+                            @OptIn(ExperimentalLayoutApi::class)
+                            FlowRow(
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                verticalArrangement = Arrangement.spacedBy(1.dp),
+                                modifier = Modifier.padding(top = 1.dp)
+                            ) {
+                                for (metric in GameContent.metrics.values) {
+                                    val currVal = storyState.dynamicMetrics[metric.id] ?: metric.initialValue
+                                    val chipColor = try {
+                                        Color(android.graphics.Color.parseColor(metric.displayColor))
+                                    } catch (_: Exception) {
+                                        Color(0xFF4CAF50)
+                                    }
+                                    Text(
+                                        text = "${metric.label}: ${currVal.toInt()}%",
+                                        color = chipColor,
+                                        fontSize = 8.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        fontFamily = FontFamily.Monospace,
+                                        softWrap = false,
+                                        maxLines = 1
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
 
@@ -452,11 +486,32 @@ fun StoryScreen(
                         }
                     }
 
-                    // Row 2: Skip/Fast-Forward + Battle Sandbox
+                    // Row 2: Auto-Play Toggle + Skip/Fast-Forward
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
+                        // Auto-Play Toggle Button (Available for all slots)
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(btnHeight)
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(if (storyState.isPureStoryMode) Color(0xFF4A148C) else RetroPanel.copy(alpha = 0.92f))
+                                .border(1.dp, if (storyState.isPureStoryMode) Color(0xFFCE93D8) else RetroBorder, RoundedCornerShape(6.dp))
+                                .clickable { storyViewModel.toggleAutoPlay() },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = if (storyState.isPureStoryMode) "🤖 AUTO: ON" else "🤖 AUTO",
+                                color = if (storyState.isPureStoryMode) Color(0xFFF3E5F5) else LogosGold,
+                                fontSize = 8.5.sp,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = FontFamily.Monospace,
+                                maxLines = 1
+                            )
+                        }
+
                         // Skip / Fast-Forward Button
                         Box(
                             modifier = Modifier
@@ -471,28 +526,7 @@ fun StoryScreen(
                             Text(
                                 text = if (storyState.isFastForwarding) "⏹️ STOP" else "⏩ SKIP",
                                 color = if (storyState.isFastForwarding) Color.White else LogosGold,
-                                fontSize = 9.sp,
-                                fontWeight = FontWeight.Bold,
-                                fontFamily = FontFamily.Monospace,
-                                maxLines = 1
-                            )
-                        }
-
-                        // Switch to Combat Sandbox Button
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(btnHeight)
-                                .clip(RoundedCornerShape(6.dp))
-                                .background(Color(0xFF37474F).copy(alpha = 0.92f))
-                                .border(1.dp, Color(0xFF78909C), RoundedCornerShape(6.dp))
-                                .clickable { storyViewModel.switchToCombat() },
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = "⚔️ BTL",
-                                color = Color.White,
-                                fontSize = 9.sp,
+                                fontSize = 8.5.sp,
                                 fontWeight = FontWeight.Bold,
                                 fontFamily = FontFamily.Monospace,
                                 maxLines = 1
@@ -632,6 +666,27 @@ fun StoryScreen(
                         ) {
                             Text(
                                 text = "⚔️ COMMENCE BATTLE (TAP OR SAY 'FIREBALL')",
+                                fontFamily = FontFamily.Monospace,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 12.sp
+                            )
+                        }
+                    }
+
+                    // Mini-Game Trigger Prompt if node triggers a mini-game
+                    if (currentNode.triggerMiniGameId != null) {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Button(
+                            onClick = { storyViewModel.advanceDialogue() },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color(0xFF00897B),
+                                contentColor = Color.White
+                            ),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                text = "🎮 START MINI-GAME (TAP OR SAY 'START')",
                                 fontFamily = FontFamily.Monospace,
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 12.sp
@@ -792,6 +847,27 @@ fun StoryScreen(
                         ) {
                             Text(
                                 text = "⚔️ COMMENCE BATTLE (TAP OR SAY 'FIREBALL')",
+                                fontFamily = FontFamily.Monospace,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 11.sp
+                            )
+                        }
+                    }
+
+                    // Mini-Game Trigger Prompt if node triggers a mini-game
+                    if (currentNode.triggerMiniGameId != null) {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Button(
+                            onClick = { storyViewModel.advanceDialogue() },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color(0xFF00897B),
+                                contentColor = Color.White
+                            ),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                text = "🎮 START MINI-GAME (TAP OR SAY 'START')",
                                 fontFamily = FontFamily.Monospace,
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 11.sp
@@ -993,6 +1069,7 @@ private fun RetroSpeechBubble(
                     val promptText = when {
                         node.id == "epilogue_credits" -> "👑 PLAY AGAIN"
                         node.triggerBattleEncounterId != null -> "⚔️ TO BATTLE"
+                        node.triggerMiniGameId != null -> "🎮 TO MINI-GAME"
                         isEyesFreeMode && node.nextNodeId != null -> "⏩ AUTO NEXT (1.5s)"
                         node.nextNodeId != null -> "▼ NEXT"
                         isEyesFreeMode -> "⏩ AUTO CAMP (1.5s)"

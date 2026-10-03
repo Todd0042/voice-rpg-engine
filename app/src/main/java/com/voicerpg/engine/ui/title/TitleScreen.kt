@@ -14,6 +14,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -99,11 +100,16 @@ fun TitleScreen(
     onSelectSlot: (Int) -> Unit = {},
     onDeleteSlot: (Int) -> Unit = {},
     onContinueSlot: (Int) -> Unit = { onContinue() },
+    onContinueSlotAuto: (Int) -> Unit = { onContinueSlot(it) },
     onNewGameInSlot: (Int) -> Unit = { onNewGame() },
     onAudioSetup: () -> Unit,
     onOptions: () -> Unit,
     onTutorial: () -> Unit,
     onAssetViewer: () -> Unit = {},
+    isMiniGameTestMenuOpen: Boolean = false,
+    onOpenMiniGameTestMenu: () -> Unit = {},
+    onCloseMiniGameTestMenu: () -> Unit = {},
+    onLaunchMiniGame: (String) -> Unit = {},
     storyModeSummary: SaveSummary? = null,
     onPureStoryMode: (fresh: Boolean) -> Unit = {},
     onStartListening: () -> Unit,
@@ -569,6 +575,38 @@ fun TitleScreen(
                         )
                     }
                 }
+
+                // Mini-Game Testing Arcade Button (Only if game defines minigames)
+                if (GameContent.minigames.isNotEmpty()) {
+                    Button(
+                        onClick = onOpenMiniGameTestMenu,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .border(1.dp, RetroBorder, RoundedCornerShape(8.dp)),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = RetroDeepSlate.copy(alpha = 0.85f)
+                        ),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "🕹️",
+                                fontSize = 16.sp
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "MINI-GAME ARCADE (QA)",
+                                color = Color.White,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = FontFamily.Monospace
+                            )
+                        }
+                    }
+                }
             }
 
             Spacer(modifier = Modifier.height(24.dp))
@@ -798,6 +836,10 @@ fun TitleScreen(
                     showSlotArchivesDialog = false
                     onContinueSlot(slot)
                 },
+                onSelectAndAutoPlay = { slot ->
+                    showSlotArchivesDialog = false
+                    onContinueSlotAuto(slot)
+                },
                 onSelectAndNewGame = { slot ->
                     showSlotArchivesDialog = false
                     onNewGameInSlot(slot)
@@ -808,6 +850,18 @@ fun TitleScreen(
                 onDismiss = {
                     showSlotArchivesDialog = false
                 }
+            )
+        }
+
+        // Mini-Game Testing Arcade Dialog (QA)
+        if (isMiniGameTestMenuOpen && GameContent.minigames.isNotEmpty()) {
+            MiniGameTestMenuDialog(
+                minigames = GameContent.minigames.values.toList(),
+                onSelectGame = { gameId ->
+                    onCloseMiniGameTestMenu()
+                    onLaunchMiniGame(gameId)
+                },
+                onDismiss = onCloseMiniGameTestMenu
             )
         }
     }
@@ -823,6 +877,7 @@ fun SaveSlotDialog(
     currentSlot: Int,
     isNewGameMode: Boolean,
     onSelectAndLoad: (Int) -> Unit,
+    onSelectAndAutoPlay: (Int) -> Unit = {},
     onSelectAndNewGame: (Int) -> Unit,
     onDeleteSlot: (Int) -> Unit,
     onDismiss: () -> Unit
@@ -1021,6 +1076,28 @@ fun SaveSlotDialog(
                                                     text = "RESUME",
                                                     color = HolyYellow,
                                                     fontSize = 11.sp,
+                                                    fontFamily = FontFamily.Monospace,
+                                                    fontWeight = FontWeight.Bold
+                                                )
+                                            }
+                                        }
+
+                                        Button(
+                                            onClick = { onSelectAndAutoPlay(slotInfo.slotIndex) },
+                                            modifier = Modifier
+                                                .weight(0.85f)
+                                                .border(1.dp, FrostCyan.copy(alpha = 0.8f), RoundedCornerShape(6.dp)),
+                                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0F2B3E)),
+                                            shape = RoundedCornerShape(6.dp)
+                                        ) {
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.Center
+                                            ) {
+                                                Text(
+                                                    text = "🤖 AUTO",
+                                                    color = FrostCyan,
+                                                    fontSize = 10.5.sp,
                                                     fontFamily = FontFamily.Monospace,
                                                     fontWeight = FontWeight.Bold
                                                 )
@@ -1255,6 +1332,166 @@ fun SaveSlotDialog(
                             )
                         }
                     }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Generic Mini-Game Testing Arcade Dialog (QA).
+ * Dynamically lists all mini-games registered in GameContent.minigames.
+ */
+@Composable
+fun MiniGameTestMenuDialog(
+    minigames: List<com.voicerpg.engine.model.MiniGameConfig>,
+    onSelectGame: (String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(16.dp))
+                .border(2.dp, Color(0xFFFFA726), RoundedCornerShape(16.dp)),
+            color = RetroBlack.copy(alpha = 0.98f)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(18.dp)
+                    .verticalScroll(rememberScrollState()),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                // Header
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "🕹️ MINI-GAME ARCADE",
+                            color = Color(0xFFFFA726),
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Black,
+                            fontFamily = FontFamily.Monospace,
+                            letterSpacing = 1.sp
+                        )
+                        Text(
+                            text = "Test interactive challenges directly (QA Mode)",
+                            color = Color.LightGray.copy(alpha = 0.8f),
+                            fontSize = 10.sp,
+                            fontFamily = FontFamily.Monospace
+                        )
+                    }
+                    Button(
+                        onClick = onDismiss,
+                        modifier = Modifier.size(32.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
+                        contentPadding = PaddingValues(0.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = "Close",
+                            tint = Color.LightGray,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                minigames.forEach { item ->
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 5.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(RetroDeepSlate.copy(alpha = 0.9f))
+                            .border(1.dp, Color(0xFFFFA726).copy(alpha = 0.6f), RoundedCornerShape(10.dp))
+                            .padding(12.dp)
+                    ) {
+                        Column(modifier = Modifier.fillMaxWidth()) {
+                            if (item.department.isNotBlank()) {
+                                Text(
+                                    text = item.department,
+                                    color = Color(0xFFFFA726),
+                                    fontSize = 9.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    fontFamily = FontFamily.Monospace
+                                )
+                                Spacer(modifier = Modifier.height(2.dp))
+                            }
+                            Text(
+                                text = item.title,
+                                color = Color.White,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = FontFamily.Monospace
+                            )
+                            if (item.description.isNotBlank()) {
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = item.description,
+                                    color = Color.LightGray.copy(alpha = 0.85f),
+                                    fontSize = 10.sp,
+                                    lineHeight = 14.sp,
+                                    fontFamily = FontFamily.Monospace
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(10.dp))
+                            Button(
+                                onClick = { onSelectGame(item.id) },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(34.dp)
+                                    .border(1.dp, Color(0xFFFFA726), RoundedCornerShape(6.dp)),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = Color(0xFFFFA726).copy(alpha = 0.25f)
+                                ),
+                                shape = RoundedCornerShape(6.dp)
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.PlayArrow,
+                                        contentDescription = null,
+                                        tint = Color(0xFFFFA726),
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = "PLAY ${item.title.uppercase()} ➔",
+                                        color = Color.White,
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        fontFamily = FontFamily.Monospace
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                Button(
+                    onClick = onDismiss,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .border(1.dp, RetroBorder, RoundedCornerShape(8.dp)),
+                    colors = ButtonDefaults.buttonColors(containerColor = RetroDeepSlate),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text(
+                        text = "BACK TO TITLE",
+                        color = Color.White,
+                        fontSize = 11.sp,
+                        fontFamily = FontFamily.Monospace
+                    )
                 }
             }
         }

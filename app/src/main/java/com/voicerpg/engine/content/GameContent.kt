@@ -71,7 +71,10 @@ data class ManifestDto(
     val resonance: ResonanceProfileDto? = null,
     val ttsReplacements: Map<String, String>? = null,
     val selfieConfig: SelfieFilterConfig? = null,
-    val allowClassSelectionInCreation: Boolean? = null
+    val allowClassSelectionInCreation: Boolean? = null,
+    val creationNameLabel: String? = null,
+    val creationAestheticsLabel: String? = null,
+    val creationStatusSubtitle: String? = null
 )
 
 data class ResonanceProfileDto(
@@ -597,7 +600,10 @@ data class GameManifest(
     val resonanceProfile: ResonanceProfile = ResonanceProfile.CLASSIC,
     val ttsReplacements: Map<String, String> = emptyMap(),
     val selfieConfig: SelfieFilterConfig = SelfieFilterConfig(),
-    val allowClassSelectionInCreation: Boolean = true
+    val allowClassSelectionInCreation: Boolean = true,
+    val creationNameLabel: String? = null,
+    val creationAestheticsLabel: String? = null,
+    val creationStatusSubtitle: String? = null
 ) {
     fun resolveDefaultHeroName(): String = resolveTemplateTokens(defaultHeroName)
 
@@ -1155,7 +1161,10 @@ class GameContentLoader(private val source: ContentSource) {
                 resonanceProfile = manifestDto.resonance?.toProfile() ?: ResonanceProfile.CLASSIC,
                 ttsReplacements = manifestDto.ttsReplacements ?: emptyMap(),
                 selfieConfig = selfieConfig,
-                allowClassSelectionInCreation = manifestDto.allowClassSelectionInCreation ?: true
+                allowClassSelectionInCreation = manifestDto.allowClassSelectionInCreation ?: true,
+                creationNameLabel = manifestDto.creationNameLabel,
+                creationAestheticsLabel = manifestDto.creationAestheticsLabel,
+                creationStatusSubtitle = manifestDto.creationStatusSubtitle
             ),
             characters = characters,
             classes = classes,
