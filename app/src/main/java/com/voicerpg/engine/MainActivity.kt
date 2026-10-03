@@ -19,10 +19,20 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Button
+import androidx.compose.material3.Text
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.lifecycleScope
 import com.voicerpg.engine.audio.CombatNarrator
 import com.voicerpg.engine.audio.MusicManager
@@ -258,6 +268,7 @@ class MainActivity : ComponentActivity() {
                                     tutorialBattleViewModel.resetTutorial()
                                     storyViewModel.openTutorial()
                                 },
+                                onAssetViewer = { storyViewModel.openAssetViewer() },
                                 onStartListening = {
                                     speechManager.startListening(
                                         onResult = { storyViewModel.handleStoryVoiceInput(it) }
@@ -327,6 +338,41 @@ class MainActivity : ComponentActivity() {
                                 onContinueStory = {
                                     combatNarrator.stop()
                                     combatViewModel.onContinueStory?.invoke()
+                                }
+                            )
+                        }
+                        GameScreen.MINI_GAME -> {
+                            val activeConfig = storyState.activeMiniGameConfig ?: com.voicerpg.engine.model.MiniGameConfig(
+                                id = "minigame",
+                                title = "Mini-Game"
+                            )
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(com.voicerpg.engine.ui.theme.RetroBlack)
+                                    .padding(24.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Text(
+                                        text = activeConfig.title,
+                                        color = com.voicerpg.engine.ui.theme.LogosGold,
+                                        fontSize = 18.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Spacer(modifier = Modifier.height(16.dp))
+                                    Button(onClick = { storyViewModel.onSkipMiniGame() }) {
+                                        Text("CONTINUE (AUTO SIMULATE)")
+                                    }
+                                }
+                            }
+                        }
+                        GameScreen.ASSET_VIEWER -> {
+                            com.voicerpg.engine.ui.gallery.AssetViewerScreen(
+                                musicManager = musicManager,
+                                speechManager = speechManager,
+                                onBack = {
+                                    storyViewModel.returnFromAssetViewer()
                                 }
                             )
                         }

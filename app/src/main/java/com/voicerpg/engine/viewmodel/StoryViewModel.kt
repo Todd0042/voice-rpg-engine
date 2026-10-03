@@ -26,6 +26,9 @@ import com.voicerpg.engine.model.SaveSlotInfo
 import com.voicerpg.engine.model.SaveSummary
 import com.voicerpg.engine.model.SavedCharacterStats
 import com.voicerpg.engine.model.StoryScene
+import com.voicerpg.engine.model.MiniGameConfig
+import com.voicerpg.engine.model.MiniGameOutcome
+import com.voicerpg.engine.engine.MiniGameSimulator
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -59,7 +62,10 @@ data class StoryState(
     val isBacklogRecapActive: Boolean = true,
     val isNewGameFlow: Boolean = false,
     val isPureStoryMode: Boolean = false,
-    val isStoryAutoPlayPaused: Boolean = false
+    val isStoryAutoPlayPaused: Boolean = false,
+    val dynamicMetrics: Map<String, Float> = emptyMap(),
+    val activeHubNodeId: String? = null,
+    val activeMiniGameConfig: MiniGameConfig? = null
 )
 
 class StoryViewModel(
@@ -1169,6 +1175,107 @@ class StoryViewModel(
         }
     }
 
+    fun openAssetViewer() {
+        cancelPendingAutoAdvance()
+        cancelPendingStoryMode()
+        combatNarrator.stop()
+        speechManager.cancel()
+        _state.value = _state.value.copy(
+            previousScreen = _state.value.gameScreen,
+            gameScreen = GameScreen.ASSET_VIEWER
+        )
+    }
+
+    fun returnFromAssetViewer() {
+        val rawTarget = _state.value.previousScreen
+        val returnTarget = if (rawTarget == null || rawTarget == GameScreen.ASSET_VIEWER) {
+            GameScreen.TITLE
+        } else {
+            rawTarget
+        }
+        _state.value = _state.value.copy(
+            previousScreen = null,
+            gameScreen = returnTarget
+        )
+        if (returnTarget == GameScreen.TITLE) {
+            musicManager?.playTrack(com.voicerpg.engine.audio.MusicManager.TRACK_TITLE)
+        } else if (returnTarget == GameScreen.STORY_EXPLORATION) {
+            musicManager?.playTrack(_state.value.currentScene.musicAsset)
+        }
+    }
+
+    fun triggerMiniGame(miniGameId: String) {
+        cancelPendingAutoAdvance()
+        cancelPendingStoryMode()
+        val config = GameContent.minigameById(miniGameId) ?: MiniGameConfig(
+            id = miniGameId,
+            title = miniGameId.replace('_', ' ').replaceFirstChar { it.uppercase() }
+        )
+        if (_state.value.isPureStoryMode) {
+            val outcome = MiniGameSimulator.simulate(
+                config = config,
+                skillModifier = 1.0f,
+                fatigueModifier = 1.0f
+            )
+            onMiniGameFinished(outcome)
+        } else {
+            speechManager.cancel()
+            combatNarrator.stop()
+            val prev = _state.value.gameScreen
+            _state.value = _state.value.copy(
+                gameScreen = GameScreen.MINI_GAME,
+                previousScreen = prev,
+                activeMiniGameConfig = config
+            )
+        }
+    }
+
+    fun onSkipMiniGame() {
+        val config = _state.value.activeMiniGameConfig ?: MiniGameConfig(id = "minigame", title = "Mini-Game")
+        val outcome = MiniGameSimulator.simulate(
+            config = config,
+            skillModifier = 1.0f,
+            fatigueModifier = 1.0f
+        )
+        onMiniGameFinished(outcome)
+    }
+
+    fun onMiniGameFinished(outcome: MiniGameOutcome) {
+        cancelPendingAutoAdvance()
+        cancelPendingStoryMode()
+
+        if (_state.value.previousScreen == GameScreen.TITLE) {
+            _state.value = _state.value.copy(
+                gameScreen = GameScreen.TITLE,
+                previousScreen = null,
+                activeMiniGameConfig = null
+            )
+            return
+        }
+
+        val lastNode = _state.value.currentNode
+        val updatedMetrics = _state.value.dynamicMetrics.toMutableMap()
+        outcome.metricDeltas.forEach { (k, v) ->
+            val cur = updatedMetrics[k] ?: 50f
+            updatedMetrics[k] = (cur + v).coerceIn(0f, 100f)
+        }
+
+        _state.value = _state.value.copy(
+            gameScreen = GameScreen.STORY_EXPLORATION,
+            previousScreen = null,
+            activeMiniGameConfig = null,
+            dynamicMetrics = updatedMetrics
+        )
+
+        val nextNodeId = lastNode.nextNodeId
+        if (!nextNodeId.isNullOrBlank()) {
+            val nextNode = GameContent.nodes[nextNodeId]
+            if (nextNode != null) {
+                applyNodeTransition(nextNode)
+            }
+        }
+    }
+
     private var fastForwardJob: Job? = null
 
     fun startFastForward() {
@@ -1346,6 +1453,10 @@ class StoryViewModel(
                 }
                 lower.contains("options") || lower.contains("settings") -> {
                     onOpenOptions?.invoke()
+                    return
+                }
+                lower.contains("asset viewer") || lower.contains("gallery") || lower.contains("jukebox") || lower.contains("music player") || lower.contains("view assets") || lower.contains("soundtrack") -> {
+                    openAssetViewer()
                     return
                 }
             }

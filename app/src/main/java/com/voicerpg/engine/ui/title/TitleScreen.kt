@@ -103,6 +103,7 @@ fun TitleScreen(
     onAudioSetup: () -> Unit,
     onOptions: () -> Unit,
     onTutorial: () -> Unit,
+    onAssetViewer: () -> Unit = {},
     storyModeSummary: SaveSummary? = null,
     onPureStoryMode: (fresh: Boolean) -> Unit = {},
     onStartListening: () -> Unit,
@@ -536,6 +537,38 @@ fun TitleScreen(
                         )
                     }
                 }
+
+                // 6. Asset Viewer & Jukebox Button
+                Button(
+                    onClick = onAssetViewer,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .border(1.dp, RetroBorder, RoundedCornerShape(8.dp)),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = RetroDeepSlate.copy(alpha = 0.85f)
+                    ),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.GraphicEq,
+                            contentDescription = null,
+                            tint = HolyYellow,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "ASSET VIEWER & JUKEBOX",
+                            color = Color.White,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = FontFamily.Monospace
+                        )
+                    }
+                }
             }
 
             Spacer(modifier = Modifier.height(24.dp))
@@ -569,9 +602,9 @@ fun TitleScreen(
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
                         text = if (isListening) {
-                            "🎤 Listening... Speak 'Continue', 'New Game', 'Tutorial', or 'Options'"
+                            "🎤 Listening... Speak 'Continue', 'New Game', 'Asset Viewer', or 'Options'"
                         } else {
-                            "🎤 Speak 'Continue', 'New Game', 'Tutorial', or Tap to Talk"
+                            "🎤 Speak 'Continue', 'New Game', 'Asset Viewer', or Tap to Talk"
                         },
                         color = if (isListening) Color.White else Color.LightGray,
                         fontSize = 11.sp,
