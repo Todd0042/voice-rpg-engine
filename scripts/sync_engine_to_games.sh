@@ -57,7 +57,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 if [ ${#CUSTOM_TARGETS[@]} -eq 0 ]; then
-    TARGET_REPOS=("echoes-of-logos" "wallys-world" "commander-america-rpg")
+    TARGET_REPOS=("echoes-of-logos" "wallys-world" "commander-america-rpg" "superstore-saga")
 else
     TARGET_REPOS=("${CUSTOM_TARGETS[@]}")
 fi
@@ -77,6 +77,13 @@ SHARED_PACKAGES=(
     "ui/gallery"
     "ui/vfx"
     "ui/theme"
+    "ui/title"
+    "ui/pocket"
+    "ui/sprites"
+    "ui/environment"
+    "ui/minigame"
+    "localization"
+    "template"
     "viewmodel"
     "content"
 )
