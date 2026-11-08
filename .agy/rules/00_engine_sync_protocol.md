@@ -24,7 +24,14 @@ This rule governs `voice-rpg-engine` and all derived game forks (`echoes-of-logo
 
 ---
 
-## 3. Strict Content Neutrality in the Engine
+## 3. Opt-In Features & Zero-Forced Adoption Principle
+- **Games Do Not Have to Use All Features**: Downstream games are never required to adopt every engine feature (e.g. selfie avatar generation, parallel campaign tracks, mini-games, or offline translation banners).
+- **Graceful Defaults & Backward Compatibility**: Any new engine capability, model field, or configuration must provide sensible default values (e.g. `null`, empty list, or disabled by default).
+- Downstream games must be able to pull engine updates cleanly and maintain full compilation and test passing without modifying their game-specific logic or adopting features irrelevant to their design.
+
+---
+
+## 4. Strict Content Neutrality in the Engine
 - **No Story or Character Leaks**: `voice-rpg-engine` must NEVER hardcode story chapters, specific character names, dialogue, encounters, or custom art/audio.
 - All game-specific narrative lives strictly in JSON files under `app/src/main/assets/game/**` in each respective game repository.
 

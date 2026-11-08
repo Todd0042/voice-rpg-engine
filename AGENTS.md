@@ -71,3 +71,4 @@ Driving `StoryViewModel`/`TutorialBattleViewModel`/`CombatViewModel` in tests th
   ./scripts/sync_engine_to_games.sh --verify
   ```
   All derived games must cleanly accept the update and pass their unit test suites with zero regression.
+- **Opt-In Features & Compatibility**: Downstream games are **never required to utilize every engine feature** (e.g. selfie generation, parallel story tracks, mini-games). Engine capabilities must provide sensible defaults and remain backwards-compatible so any game can pull updates cleanly without breaking existing logic or adopting unwanted features.
