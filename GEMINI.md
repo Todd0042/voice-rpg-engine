@@ -8,7 +8,7 @@ This repository is the **standalone, reusable engine** for voice-commanded JRPGs
 
 ## 1. Content Neutrality (THE core rule)
 
-- **Engine code never references game content.** `app/src/main` must not hardcode character names, story chapters, spell names, dialogue, encounters, or art/music filenames. The completed game (`voice-rpg-android` / *Echoes of the Logos*) is a **separate repo and must never be reintroduced here**.
+- **Engine code never references game content.** `app/src/main` must not hardcode character names, story chapters, spell names, dialogue, encounters, or art/music filenames. The completed game (`echoes-of-logos` / *Echoes of the Logos*) is a **separate repo and must never be reintroduced here**.
 - All content lives in `app/src/main/assets/game/**` as JSON, loaded at runtime by `GameContent`:
   - `manifest.json` (title, starting scene/node, default encounter, victory/defeat lines)
   - `characters/*.json`, `classes/*.json`, `spells/spells.json`
