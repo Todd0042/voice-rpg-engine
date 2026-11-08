@@ -14,7 +14,8 @@
 [![16 KB Page Size](https://img.shields.io/badge/16%20KB-Compatible-success.svg)](https://developer.android.com/16kb-page-size)
 [![Kotlin](https://img.shields.io/badge/Kotlin-2.0.21-7F52FF.svg?logo=kotlin&logoColor=white)](https://kotlinlang.org)
 [![Jetpack Compose](https://img.shields.io/badge/UI-Jetpack%20Compose%202024.10.01-4285F4.svg?logo=jetpackcompose&logoColor=white)](https://developer.android.com/jetpack/compose)
-[![Unit Tests](https://img.shields.io/badge/Unit%20Tests-234%20Passing-39ff14.svg)](app/src/test/java/com/voicerpg/engine/)
+[![Android CI](https://github.com/Todd0042/voice-rpg-engine/actions/workflows/android_ci.yml/badge.svg)](https://github.com/Todd0042/voice-rpg-engine/actions)
+[![Unit Tests](https://img.shields.io/badge/Unit%20Tests-238%20Passing-39ff14.svg)](app/src/test/java/com/voicerpg/engine/)
 [![Support on Ko-fi](https://img.shields.io/badge/Ko--fi-Support%20Creator-F16061?style=flat&logo=ko-fi&logoColor=white)](https://ko-fi.com/todd0042)
 
 > **A high-performance, modular native Android game engine designed for building audio-first, voice-commanded retro JRPGs. Every aspect of gameplay—incantations, tactical ATB party combat, visual novel exploration, dialogue choices, and system toggles—can be operated hands-free via natural voice or via retro touch controls.**
@@ -105,6 +106,7 @@ Designed for commuters, walkers, and visually impaired players, **Pocket Mode** 
 
 The engine relies on [`SpeechManager.kt`](app/src/main/java/com/voicerpg/engine/audio/SpeechManager.kt) and [`IntentParser.kt`](app/src/main/java/com/voicerpg/engine/engine/IntentParser.kt) to manage a hands-free conversational loop:
 - **Zero-Overlap Audio Arbitration:** Android `TextToSpeech` narration and `SpeechRecognizer` listening never overlap. The microphone automatically arms the moment speech synthesis concludes.
+- **100% On-Device Speech Processing:** Employs `EXTRA_PREFER_OFFLINE` with hardware-accelerated on-device recognition (`SpeechRecognizer.createOnDeviceSpeechRecognizer`) on Android 12+ (API 31+) to guarantee privacy, zero cloud roundtrips, and offline gameplay.
 - **Dynamic Entity Matching:** [`IntentParser.kt`](app/src/main/java/com/voicerpg/engine/engine/IntentParser.kt) prioritizes live party instances (`party.any { memberMatchesUtterance }`) and active alive enemy instances before falling back to legacy archetype keywords.
 
 ---
@@ -194,9 +196,9 @@ The included sync utility [`scripts/sync_engine_to_games.sh`](scripts/sync_engin
 
 ## 9. Automated Unit Verification Suite
 
-The engine features an automated suite of **234 unit tests** covering intent parsing, multilingual resonance incantations, ATB timeline priority, and save state integrity:
+The engine features an automated suite of **238 unit tests** across 31 test files, covering intent parsing, multilingual resonance incantations, ATB timeline priority, save state integrity, and the JVM **Balance Harness** ([`BalanceHarnessTest.kt`](app/src/test/java/com/voicerpg/engine/combat/BalanceHarnessTest.kt)):
 ```bash
-# Run full unit test suite:
+# Run full unit test suite (including headless Balance Harness):
 ./gradlew testDebugUnitTest
 
 # Build debug APK:

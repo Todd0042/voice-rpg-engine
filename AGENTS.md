@@ -59,3 +59,15 @@ Driving `StoryViewModel`/`TutorialBattleViewModel`/`CombatViewModel` in tests th
 - **Every app built from this engine MUST be its own unique Android app and its own unique game:** its own `applicationId` in `app/build.gradle.kts`, its own app label/icon in `app/src/main/res/`, and its own game content (JSON + assets under `app/src/main/assets/game/`). Never ship an app that keeps the engine's reference `applicationId`, the engine's app name, another game's `applicationId`, or another game's name/branding.
 - **Why:** Android treats `applicationId` as the install identity. Two APKs that share an `applicationId` silently replace each other on the same device — the newest install overwrites the existing one and wipes its app data. This is exactly what happened to *Commander America* when the engine reference app was installed: both used `com.voicerpg.engine`, so building this repo replaced that game on the phone.
 - **Before building or installing any derivative:** change `applicationId` (and, when feasible, the `namespace`) in `app/build.gradle.kts` to an identifier you own, and give the app its own label, icon, and content. Reusing the engine's reference id **or** any other game's `applicationId` is a rule violation — the resulting app must never overwrite or impersonate another VoiceRPG title.
+
+---
+
+## 9. Multi-Repo Upstream-First & Distribution Protocol
+
+- **Engine vs. Game Boundary**: The shared codebase (`com.voicerpg.engine.*`) and shared multilingual catalogs live here in `voice-rpg-engine`.
+- **Forks Must Upstream**: If working inside a game fork (`echoes-of-logos`, `wallys-world`, `commander-america-rpg`), all engine improvements must be committed upstream to `voice-rpg-engine` (or pulled via `./scripts/sync_engine_to_games.sh --pull-from <game_repo> --verify`). Never keep divergent engine code in a game repo.
+- **Engine Pushes Downstream**: Whenever this engine repository changes, run:
+  ```bash
+  ./scripts/sync_engine_to_games.sh --verify
+  ```
+  All derived games must cleanly accept the update and pass their unit test suites with zero regression.
