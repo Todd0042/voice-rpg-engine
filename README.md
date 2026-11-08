@@ -103,20 +103,20 @@ Designed for commuters, walkers, and visually impaired players, **Pocket Mode** 
 
 ## 1. Hands-Free Voice Recognition & Continuous State Loop
 
-The engine relies on [`SpeechManager.kt`](file:///home/todd/Documents/GitHub/voice-rpg-engine/app/src/main/java/com/voicerpg/engine/audio/SpeechManager.kt) and [`IntentParser.kt`](file:///home/todd/Documents/GitHub/voice-rpg-engine/app/src/main/java/com/voicerpg/engine/engine/IntentParser.kt) to manage a hands-free conversational loop:
+The engine relies on [`SpeechManager.kt`](app/src/main/java/com/voicerpg/engine/audio/SpeechManager.kt) and [`IntentParser.kt`](app/src/main/java/com/voicerpg/engine/engine/IntentParser.kt) to manage a hands-free conversational loop:
 - **Zero-Overlap Audio Arbitration:** Android `TextToSpeech` narration and `SpeechRecognizer` listening never overlap. The microphone automatically arms the moment speech synthesis concludes.
-- **Dynamic Entity Matching:** [`IntentParser.kt`](file:///home/todd/Documents/GitHub/voice-rpg-engine/app/src/main/java/com/voicerpg/engine/engine/IntentParser.kt) prioritizes live party instances (`party.any { memberMatchesUtterance }`) and active alive enemy instances before falling back to legacy archetype keywords.
+- **Dynamic Entity Matching:** [`IntentParser.kt`](app/src/main/java/com/voicerpg/engine/engine/IntentParser.kt) prioritizes live party instances (`party.any { memberMatchesUtterance }`) and active alive enemy instances before falling back to legacy archetype keywords.
 
 ---
 
 ## 2. Resonance Engine & Acoustic-Poetic Scoring Math
 
-Spoken spell incantations are evaluated by [`ResonanceEngine.kt`](file:///home/todd/Documents/GitHub/voice-rpg-engine/app/src/main/java/com/voicerpg/engine/engine/ResonanceEngine.kt) using a compound acoustic and linguistic formula:
+Spoken spell incantations are evaluated by [`ResonanceEngine.kt`](app/src/main/java/com/voicerpg/engine/engine/ResonanceEngine.kt) using a compound acoustic and linguistic formula:
 
 $$\text{Resonance Score} = S_{\text{acoustic}} + S_{\text{poetic}} + S_{\text{length}} + S_{\text{novelty}}$$
 
 - **Acoustic Energy ($S_{\text{acoustic}}$):** Peak decibel volume (up to 30 pts) and dynamic pitch contour variation (up to 25 pts).
-- **Poetic Roots ($S_{\text{poetic}}$):** Thesaurus roots matched via [`SpellThesaurus.kt`](file:///home/todd/Documents/GitHub/voice-rpg-engine/app/src/main/java/com/voicerpg/engine/engine/SpellThesaurus.kt) (+10 to +22 pts).
+- **Poetic Roots ($S_{\text{poetic}}$):** Thesaurus roots matched via [`SpellThesaurus.kt`](app/src/main/java/com/voicerpg/engine/engine/SpellThesaurus.kt) (+10 to +22 pts).
 - **Cadence & Length ($S_{\text{length}}$):** Word count tiers reward deliberate cadence ($\le 2$: 0 pts, $\le 4$: 10 pts, $\le 7$: 20 pts, $\le 11$: 32 pts, $> 11$: 45 pts).
 - **Tiers & Multipliers:**
   - **NOVICE (0–39%):** 1.0x power
@@ -129,7 +129,7 @@ $$\text{Resonance Score} = S_{\text{acoustic}} + S_{\text{poetic}} + S_{\text{le
 
 ## 3. 5-Category Tactical Spell Combat & ATB Timeline
 
-All character and enemy abilities inherit from standardized categories defined in [`CombatModels.kt`](file:///home/todd/Documents/GitHub/voice-rpg-engine/app/src/main/java/com/voicerpg/engine/model/CombatModels.kt):
+All character and enemy abilities inherit from standardized categories defined in [`CombatModels.kt`](app/src/main/java/com/voicerpg/engine/model/CombatModels.kt):
 - `ATTACK`: Direct single-target damage spells.
 - `AOE_ATTACK`: Full-flank sweep attacks.
 - `HEAL`: Restorative recovery spells (party-wide with 0.65 split).
@@ -140,7 +140,7 @@ All character and enemy abilities inherit from standardized categories defined i
 
 ## 4. Opt-In Multi-Track Campaign Architecture
 
-Games can define parallel campaign branches using `CampaignTrackDef` in [`SaveModels.kt`](file:///home/todd/Documents/GitHub/voice-rpg-engine/app/src/main/java/com/voicerpg/engine/model/SaveModels.kt) registered via `GameContent.campaignTracks`:
+Games can define parallel campaign branches using `CampaignTrackDef` in [`SaveModels.kt`](app/src/main/java/com/voicerpg/engine/model/SaveModels.kt) registered via `GameContent.campaignTracks`:
 ```kotlin
 data class CampaignTrackDef(
     val id: String,
@@ -157,7 +157,7 @@ When populated, the Title Screen automatically displays a stylish track selector
 
 ## 5. On-Device Translation Banner & Fallback Dictionaries
 
-[`BuiltInDictionaries.kt`](file:///home/todd/Documents/GitHub/voice-rpg-engine/app/src/main/java/com/voicerpg/engine/localization/BuiltInDictionaries.kt) bundles complete offline term matrices for Spanish (`es`), German (`de`), French (`fr`), Portuguese (`pt`), and Italian (`it`). The dynamic [`LanguageModelDownloadBanner.kt`](file:///home/todd/Documents/GitHub/voice-rpg-engine/app/src/main/java/com/voicerpg/engine/ui/setup/LanguageModelDownloadBanner.kt) allows on-demand Google MLKit model downloading with immediate offline fallback.
+[`BuiltInDictionaries.kt`](app/src/main/java/com/voicerpg/engine/localization/BuiltInDictionaries.kt) bundles complete offline term matrices for Spanish (`es`), German (`de`), French (`fr`), Portuguese (`pt`), and Italian (`it`). The dynamic [`LanguageModelDownloadBanner.kt`](app/src/main/java/com/voicerpg/engine/ui/setup/LanguageModelDownloadBanner.kt) allows on-demand Google MLKit model downloading with immediate offline fallback.
 
 ---
 
@@ -172,16 +172,16 @@ Integrated on-device selfie segmentation and pixel-art synthesis:
 ## 7. Scaffolding Templates for New Game Development
 
 The `com.voicerpg.engine.template` package provides clean starter blueprints for rapid game creation:
-- [`TemplateHero.kt`](file:///home/todd/Documents/GitHub/voice-rpg-engine/app/src/main/java/com/voicerpg/engine/template/TemplateHero.kt): Hero stats, starting kits, and affinities.
-- [`TemplateEnemy.kt`](file:///home/todd/Documents/GitHub/voice-rpg-engine/app/src/main/java/com/voicerpg/engine/template/TemplateEnemy.kt): Enemy archetypes and boss phases.
-- [`TemplateEncounters.kt`](file:///home/todd/Documents/GitHub/voice-rpg-engine/app/src/main/java/com/voicerpg/engine/template/TemplateEncounters.kt): Turn-based encounter structures.
-- [`TemplateStory.kt`](file:///home/todd/Documents/GitHub/voice-rpg-engine/app/src/main/java/com/voicerpg/engine/template/TemplateStory.kt): Branching dialogue trees and choice hubs.
+- [`TemplateHero.kt`](app/src/main/java/com/voicerpg/engine/template/TemplateHero.kt): Hero stats, starting kits, and affinities.
+- [`TemplateEnemy.kt`](app/src/main/java/com/voicerpg/engine/template/TemplateEnemy.kt): Enemy archetypes and boss phases.
+- [`TemplateEncounters.kt`](app/src/main/java/com/voicerpg/engine/template/TemplateEncounters.kt): Turn-based encounter structures.
+- [`TemplateStory.kt`](app/src/main/java/com/voicerpg/engine/template/TemplateStory.kt): Branching dialogue trees and choice hubs.
 
 ---
 
 ## 8. Multi-Repo Distribution Pipeline
 
-The included sync utility [`scripts/sync_engine_to_games.sh`](file:///home/todd/Documents/GitHub/voice-rpg-engine/scripts/sync_engine_to_games.sh) enables one-command distribution of engine enhancements to derived game repositories:
+The included sync utility [`scripts/sync_engine_to_games.sh`](scripts/sync_engine_to_games.sh) enables one-command distribution of engine enhancements to derived game repositories:
 ```bash
 # Preview changes across all downstream games:
 ./scripts/sync_engine_to_games.sh --dry-run
