@@ -76,6 +76,7 @@ fun OptionsDialog(
     onMusicVolumeChange: (Float) -> Unit = {},
     onOpenVoiceSettings: (() -> Unit)? = null,
     onOpenVoiceAssignment: (() -> Unit)? = null,
+    onOpenLanguageSelection: (() -> Unit)? = null,
     onApplyPreset: (PlaystylePreset) -> Unit = {},
     onTriggerCheaterDialogue: () -> Unit = {},
     isDebugWarpEnabled: Boolean = true,
@@ -419,6 +420,56 @@ fun OptionsDialog(
                                     )
                                 }
                             }
+                        }
+                    }
+                }
+
+                if (onOpenLanguageSelection != null) {
+                    val currentLangCode = com.voicerpg.engine.localization.TranslationManager.currentLanguage.value
+                    val currentRegCode = com.voicerpg.engine.localization.TranslationManager.currentRegion.value
+                    val langOpt = com.voicerpg.engine.model.LanguageCatalog.getLanguage(currentLangCode)
+                    val dialectDesc = if (currentRegCode.isNotBlank()) " ($currentRegCode)" else ""
+
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(RetroPanel.copy(alpha = 0.8f))
+                            .border(1.dp, LogosGold, RoundedCornerShape(8.dp))
+                            .clickable { onOpenLanguageSelection() }
+                            .padding(10.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "🌐 Language & Dialect",
+                                    color = LogosGold,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    fontFamily = FontFamily.Monospace
+                                )
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = "Current: ${langOpt.nativeName} - ${langOpt.displayName}$dialectDesc",
+                                    color = Color.LightGray,
+                                    fontSize = 10.sp,
+                                    lineHeight = 13.sp,
+                                    fontFamily = FontFamily.Monospace
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "CHANGE ➔",
+                                color = LogosGold,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = FontFamily.Monospace
+                            )
                         }
                     }
                 }

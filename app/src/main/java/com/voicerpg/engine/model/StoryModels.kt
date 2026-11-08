@@ -111,6 +111,9 @@ data class StoryScene(
 )
 
 enum class GameScreen {
+    LANGUAGE_SELECTION,
+    DIALECT_SELECTION,
+    LANGUAGE_DOWNLOAD_STANDBY,
     TITLE,
     TUTORIAL,
     AUDIO_SETUP,

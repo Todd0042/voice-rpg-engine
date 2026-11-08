@@ -111,7 +111,7 @@ fun TitleScreen(
     onCloseMiniGameTestMenu: () -> Unit = {},
     onLaunchMiniGame: (String) -> Unit = {},
     storyModeSummary: SaveSummary? = null,
-    onPureStoryMode: (fresh: Boolean) -> Unit = {},
+    onPureStoryMode: (fresh: Boolean, campaignTrackId: String?) -> Unit = { _, _ -> },
     onStartListening: () -> Unit,
     onStopListening: () -> Unit,
     manifest: GameManifest = GameManifest(
@@ -131,6 +131,7 @@ fun TitleScreen(
     var showOverwriteDialog by remember { mutableStateOf(false) }
     var showSlotArchivesDialog by remember { mutableStateOf(false) }
     var showStoryModePromptDialog by remember { mutableStateOf(false) }
+    var showStoryModeTrackDialog by remember { mutableStateOf(false) }
     var slotDialogIsNewGameMode by remember { mutableStateOf(false) }
 
     val configuration = androidx.compose.ui.platform.LocalConfiguration.current
@@ -415,8 +416,10 @@ fun TitleScreen(
                     onClick = {
                         if (storyModeSummary != null) {
                             showStoryModePromptDialog = true
+                        } else if (manifest.campaignTracks.size > 1) {
+                            showStoryModeTrackDialog = true
                         } else {
-                            onPureStoryMode(true)
+                            onPureStoryMode(true, null)
                         }
                     },
                     modifier = Modifier
@@ -768,7 +771,7 @@ fun TitleScreen(
                         Button(
                             onClick = {
                                 showStoryModePromptDialog = false
-                                onPureStoryMode(false)
+                                onPureStoryMode(false, null)
                             },
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -788,7 +791,11 @@ fun TitleScreen(
                         Button(
                             onClick = {
                                 showStoryModePromptDialog = false
-                                onPureStoryMode(true)
+                                if (manifest.campaignTracks.size > 1) {
+                                    showStoryModeTrackDialog = true
+                                } else {
+                                    onPureStoryMode(true, null)
+                                }
                             },
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -807,6 +814,96 @@ fun TitleScreen(
 
                         Button(
                             onClick = { showStoryModePromptDialog = false },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .border(1.dp, RetroBorder, RoundedCornerShape(8.dp)),
+                            colors = ButtonDefaults.buttonColors(containerColor = RetroDeepSlate),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Text(
+                                text = "CANCEL",
+                                color = Color.LightGray,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = FontFamily.Monospace
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        // Multi-Track Campaign Selector Dialog (Data-driven for games with multiple storylines)
+        if (showStoryModeTrackDialog && manifest.campaignTracks.size > 1) {
+            Dialog(onDismissRequest = { showStoryModeTrackDialog = false }) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(RetroBlack.copy(alpha = 0.98f))
+                        .border(2.dp, LogosGold, RoundedCornerShape(12.dp))
+                        .padding(20.dp)
+                ) {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Text(
+                            text = "SELECT CAMPAIGN TRACK",
+                            color = LogosGold,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Black,
+                            fontFamily = FontFamily.Monospace,
+                            textAlign = TextAlign.Center
+                        )
+
+                        Text(
+                            text = "Choose which storyline track to play in Pure Story Mode:\n(Regular battles are auto-won, story advances automatically)",
+                            color = Color.LightGray,
+                            fontSize = 10.sp,
+                            fontFamily = FontFamily.Monospace,
+                            textAlign = TextAlign.Center,
+                            lineHeight = 15.sp
+                        )
+
+                        manifest.campaignTracks.forEach { track ->
+                            Button(
+                                onClick = {
+                                    showStoryModeTrackDialog = false
+                                    onPureStoryMode(true, track.id)
+                                },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .border(1.5.dp, LogosGold, RoundedCornerShape(8.dp)),
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E1C00)),
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Column(
+                                    modifier = Modifier.padding(vertical = 4.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally
+                                ) {
+                                    Text(
+                                        text = "${track.displayName.uppercase()} (${track.badgeText})",
+                                        color = LogosGold,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Black,
+                                        fontFamily = FontFamily.Monospace
+                                    )
+                                    if (track.rosterDescription.isNotBlank() || track.subtitle.isNotBlank()) {
+                                        Text(
+                                            text = track.rosterDescription.ifBlank { track.subtitle },
+                                            color = Color.LightGray,
+                                            fontSize = 9.sp,
+                                            fontFamily = FontFamily.Monospace
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        Button(
+                            onClick = { showStoryModeTrackDialog = false },
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .border(1.dp, RetroBorder, RoundedCornerShape(8.dp)),

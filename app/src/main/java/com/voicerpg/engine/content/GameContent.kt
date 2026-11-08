@@ -74,7 +74,8 @@ data class ManifestDto(
     val allowClassSelectionInCreation: Boolean? = null,
     val creationNameLabel: String? = null,
     val creationAestheticsLabel: String? = null,
-    val creationStatusSubtitle: String? = null
+    val creationStatusSubtitle: String? = null,
+    val campaignTracks: List<com.voicerpg.engine.model.CampaignTrackDef>? = null
 )
 
 data class ResonanceProfileDto(
@@ -569,6 +570,44 @@ data class ThesaurusFileDto(
     val schools: Map<String, List<String>>? = null
 )
 
+data class TargetingDictionaryDto(
+    val ordinals: Map<String, List<String>>? = null,
+    val positionals: Map<String, List<String>>? = null,
+    val groups: Map<String, List<String>>? = null
+)
+
+data class CommandCatalogDto(
+    val locale: String = "en",
+    val metaCommands: Map<String, List<String>>? = null,
+    val targeting: TargetingDictionaryDto? = null,
+    val actions: Map<String, List<String>>? = null,
+    val progressionPhrases: List<String>? = null,
+    val continueStoryPhrases: List<String>? = null,
+    val restartBattlePhrases: List<String>? = null,
+    val systemConfirmations: Map<String, String>? = null
+) {
+    fun toCatalog(): com.voicerpg.engine.model.CommandCatalog {
+        val resolvedMeta = metaCommands?.mapNotNull { (key, phrases) ->
+            runCatching { com.voicerpg.engine.model.MetaCommand.valueOf(key) }.getOrNull()?.let { it to phrases }
+        }?.toMap() ?: emptyMap()
+        val resolvedOrdinals = targeting?.ordinals?.mapNotNull { (key, phrases) ->
+            key.toIntOrNull()?.let { it to phrases }
+        }?.toMap() ?: emptyMap()
+        return com.voicerpg.engine.model.CommandCatalog(
+            locale = locale,
+            metaCommands = resolvedMeta,
+            ordinals = resolvedOrdinals,
+            positionals = targeting?.positionals ?: emptyMap(),
+            groups = targeting?.groups ?: emptyMap(),
+            actions = actions ?: emptyMap(),
+            progressionPhrases = progressionPhrases ?: emptyList(),
+            continueStoryPhrases = continueStoryPhrases ?: emptyList(),
+            restartBattlePhrases = restartBattlePhrases ?: emptyList(),
+            systemConfirmations = systemConfirmations ?: emptyMap()
+        )
+    }
+}
+
 // =============================================================================
 // RESOLVED ENGINE MODELS
 // =============================================================================
@@ -603,7 +642,8 @@ data class GameManifest(
     val allowClassSelectionInCreation: Boolean = true,
     val creationNameLabel: String? = null,
     val creationAestheticsLabel: String? = null,
-    val creationStatusSubtitle: String? = null
+    val creationStatusSubtitle: String? = null,
+    val campaignTracks: List<com.voicerpg.engine.model.CampaignTrackDef> = emptyList()
 ) {
     fun resolveDefaultHeroName(): String = resolveTemplateTokens(defaultHeroName)
 
@@ -856,7 +896,8 @@ class GameContentPack(
     val thesaurusRoots: Map<SpellSchool, List<String>> = emptyMap(),
     val metrics: Map<String, MetricDefinition> = emptyMap(),
     val incidents: Map<String, IncidentDefinition> = emptyMap(),
-    val minigames: Map<String, MiniGameConfig> = emptyMap()
+    val minigames: Map<String, MiniGameConfig> = emptyMap(),
+    val commandCatalogs: Map<String, com.voicerpg.engine.model.CommandCatalog> = emptyMap()
 ) {
     val heroCharacter: GameCharacter? = characters.values.firstOrNull { it.role == CharacterRole.HERO }
 
@@ -1124,6 +1165,10 @@ class GameContentLoader(private val source: ContentSource) {
             .map { it.toConfig() }
             .associateBy { it.id }
 
+        val commandCatalogs = source.listFiles("commands").mapNotNull { file ->
+            read("commands/$file", CommandCatalogDto::class.java)?.toCatalog()
+        }.associateBy { it.locale }
+
         val narrator = characters["narrator"]?.speaker
             ?: characters.values.firstOrNull { it.role == CharacterRole.NARRATOR }?.speaker
             ?: DialogueSpeaker.NARRATOR
@@ -1164,7 +1209,8 @@ class GameContentLoader(private val source: ContentSource) {
                 allowClassSelectionInCreation = manifestDto.allowClassSelectionInCreation ?: true,
                 creationNameLabel = manifestDto.creationNameLabel,
                 creationAestheticsLabel = manifestDto.creationAestheticsLabel,
-                creationStatusSubtitle = manifestDto.creationStatusSubtitle
+                creationStatusSubtitle = manifestDto.creationStatusSubtitle,
+                campaignTracks = manifestDto.campaignTracks ?: emptyList()
             ),
             characters = characters,
             classes = classes,
@@ -1182,7 +1228,8 @@ class GameContentLoader(private val source: ContentSource) {
             thesaurusRoots = thesaurusRoots,
             metrics = metrics,
             incidents = incidents,
-            minigames = minigames
+            minigames = minigames,
+            commandCatalogs = commandCatalogs
         )
         return if (pack.scenes.isEmpty() || pack.nodes.isEmpty()) EmergencyFallback.build() else pack
     }
@@ -1614,6 +1661,97 @@ object GameContent {
     fun createDuoParty(): List<PartyMember> = pack.createDuoParty()
     fun createMinion(idSuffix: String, name: String = "Template Minion", subtitle: String = "Minion", hp: Int = 150): Enemy =
         pack.createMinion(idSuffix, name, subtitle, hp)
+
+    val commandCatalogs: Map<String, com.voicerpg.engine.model.CommandCatalog> get() = pack.commandCatalogs
+
+    fun commandCatalogFor(locale: String): com.voicerpg.engine.model.CommandCatalog {
+        return pack.commandCatalogs[locale]
+            ?: pack.commandCatalogs["en"]
+            ?: DEFAULT_COMMAND_CATALOG
+    }
+
+    fun resolveMetaCommand(utterance: String, locale: String = "en"): com.voicerpg.engine.model.MetaCommand {
+        val active = commandCatalogFor(locale).resolveMetaCommand(utterance)
+        if (active != com.voicerpg.engine.model.MetaCommand.NONE) return active
+        if (locale != "en") {
+            return commandCatalogFor("en").resolveMetaCommand(utterance)
+        }
+        return com.voicerpg.engine.model.MetaCommand.NONE
+    }
+
+    fun resolveOrdinal(utterance: String, locale: String = "en"): Int {
+        val active = commandCatalogFor(locale).resolveOrdinal(utterance)
+        if (active != -1) return active
+        if (locale != "en") {
+            return commandCatalogFor("en").resolveOrdinal(utterance)
+        }
+        return -1
+    }
+
+    fun hasAction(utterance: String, actionName: String, locale: String = "en"): Boolean {
+        if (commandCatalogFor(locale).hasAction(utterance, actionName)) return true
+        if (locale != "en") {
+            return commandCatalogFor("en").hasAction(utterance, actionName)
+        }
+        return false
+    }
+
+    fun hasGroup(utterance: String, groupName: String, locale: String = "en"): Boolean {
+        if (commandCatalogFor(locale).hasGroup(utterance, groupName)) return true
+        if (locale != "en") {
+            return commandCatalogFor("en").hasGroup(utterance, groupName)
+        }
+        return false
+    }
+
+    val DEFAULT_COMMAND_CATALOG = com.voicerpg.engine.model.CommandCatalog(
+        locale = "en",
+        metaCommands = mapOf(
+            com.voicerpg.engine.model.MetaCommand.STATUS_REPORT to listOf("status", "report", "health", "vitals", "how are we", "status report", "check status"),
+            com.voicerpg.engine.model.MetaCommand.CHECK_ENEMIES to listOf("enemies", "targets", "foes", "check enemies", "who is left", "enemy report"),
+            com.voicerpg.engine.model.MetaCommand.CHECK_PARTY to listOf("party", "team", "friends", "allies", "check party", "companion report"),
+            com.voicerpg.engine.model.MetaCommand.OPEN_OPTIONS to listOf("options", "menu", "settings", "open options", "audio options"),
+            com.voicerpg.engine.model.MetaCommand.TOGGLE_EYES_FREE to listOf("pocket mode", "screen off", "eyes free", "pocket", "lock screen", "screenless"),
+            com.voicerpg.engine.model.MetaCommand.HELP to listOf("help", "what can i say", "commands", "how to play", "tutorial")
+        ),
+        ordinals = mapOf(
+            0 to listOf("first", "one", "1", "left", "leader", "1st"),
+            1 to listOf("second", "two", "2", "middle", "2nd"),
+            2 to listOf("third", "three", "3", "right", "rear", "3rd"),
+            3 to listOf("fourth", "four", "4", "4th"),
+            4 to listOf("fifth", "five", "5", "5th"),
+            5 to listOf("sixth", "six", "6", "6th")
+        ),
+        groups = mapOf(
+            "self" to listOf("me", "myself", "self"),
+            "party" to listOf("party", "team", "everyone", "us", "allies"),
+            "all" to listOf("all", "every enemy", "both", "all enemies")
+        ),
+        actions = mapOf(
+            "heal" to listOf("heal", "mend", "restore", "cure", "help"),
+            "attack" to listOf("attack", "strike", "hit", "slash", "smite")
+        ),
+        progressionPhrases = listOf(
+            "next", "continue", "proceed", "go on", "forward", "onward", "advance",
+            "ahead", "let's go", "lets go", "lead on", "lead the way", "tell me more",
+            "what happened", "and then", "yes", "okay", "alright", "sure", "step forward",
+            "we will", "indeed", "speak on", "i am listening", "what lies ahead",
+            "very well", "make haste", "into the fray", "fight", "attack", "strike"
+        ),
+        continueStoryPhrases = listOf(
+            "commence story", "commence", "story", "continue", "onward", "proceed", "advance",
+            "next", "glory", "glory awaits", "forward", "press on", "victory", "venture forth",
+            "let's go", "leave", "done", "journey", "march", "we ride", "head out", "explore",
+            "continue story", "next chapter", "march onward", "press forward", "lead on",
+            "to the next", "venture onward", "awaken"
+        ),
+        restartBattlePhrases = listOf(
+            "restart battle", "restart", "rematch", "retry", "fight again", "again", "redo",
+            "once more", "run it back", "try again", "arise", "rebattle", "face them again",
+            "challenge again", "not dead yet", "rise again", "strike again", "re-battle",
+            "one more time", "restart fight", "reset"
+        )
+    )
 }
 
 /** Parses "#RRGGBB" or "#AARRGGBB" into a Compose color without touching android.graphics. */

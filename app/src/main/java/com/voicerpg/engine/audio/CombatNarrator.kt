@@ -57,12 +57,31 @@ class CombatNarrator(
             }
         }
 
+        val DEFAULT_BUILTIN_PREFERRED_VOICE_IDS: Map<String, String> = mapOf(
+            "commander_america" to "en-us-x-iob-local",
+            "elon" to "en-us-x-tpc-local",
+            "narrator_karoline" to "en-us-x-tpf-local",
+            "narrator_kayleigh" to "en-us-x-sfg-local",
+            "narrator_hulk" to "en-gb-x-gbd-local",
+            "pelosi" to "en-us-x-tpf-local",
+            "kamala" to "en-us-x-sfg-local",
+            "obama" to "en-us-x-iog-local",
+            "biden" to "en-us-x-iol-local",
+            "rocket_man" to "en-au-x-aub-local",
+            "media_anchor" to "en-us-x-tpd-local",
+            "cedric" to "en-gb-x-gbd-local",
+            "aethel" to "en-gb-x-gba-local",
+            "lyra" to "en-us-x-tpf-local",
+            "zephyr" to "en-us-x-tpc-local",
+            "malakor" to "en-us-x-tpd-local"
+        )
+
         /**
          * Fallback preferred voice packs per speaker, declared by the active game's
          * character data files (assets/game/characters/<name>.json).
          */
         val PREFERRED_VOICE_IDS: Map<String, String>
-            get() = com.voicerpg.engine.content.GameContent.preferredVoiceIds
+            get() = com.voicerpg.engine.content.GameContent.preferredVoiceIds.ifEmpty { DEFAULT_BUILTIN_PREFERRED_VOICE_IDS }
 
         /**
          * Resolves the voice a speaker should use: a persisted player override wins when its
@@ -76,7 +95,9 @@ class CombatNarrator(
             preferredByDefault: Map<String, String>
         ): String? {
             persistedAssignments[speakerId]?.let { if (it in installedNames) return it }
-            preferredByDefault[speakerId]?.let { if (it in installedNames) return it }
+            val preferredVoice = com.voicerpg.engine.content.GameContent.preferredVoiceIds[speakerId]
+                ?: preferredByDefault[speakerId]
+            preferredVoice?.let { if (it in installedNames) return it }
             return heuristicName
         }
 
@@ -177,6 +198,53 @@ class CombatNarrator(
 
     private val _isCombatActive = MutableStateFlow(false)
     val isCombatActive: StateFlow<Boolean> = _isCombatActive.asStateFlow()
+
+    private val _selectedLanguage = MutableStateFlow("en")
+    val selectedLanguage: StateFlow<String> = _selectedLanguage.asStateFlow()
+
+    private val _selectedRegion = MutableStateFlow("")
+    val selectedRegion: StateFlow<String> = _selectedRegion.asStateFlow()
+
+    fun setSelectedLanguage(langCode: String) {
+        val clean = langCode.lowercase().take(2)
+        _selectedLanguage.value = clean
+        updateTtsLocale()
+    }
+
+    fun setSelectedRegion(regionCode: String) {
+        _selectedRegion.value = regionCode.uppercase(Locale.ROOT).trim()
+        updateTtsLocale()
+    }
+
+    fun setSelectedLanguageAndRegion(langCode: String, regionCode: String = "") {
+        val clean = langCode.lowercase().take(2)
+        _selectedLanguage.value = clean
+        _selectedRegion.value = regionCode.uppercase(Locale.ROOT).trim()
+        updateTtsLocale()
+    }
+
+    private fun updateTtsLocale() {
+        tts?.let { engine ->
+            val lang = _selectedLanguage.value
+            val reg = _selectedRegion.value
+            val locale = if (reg.isNotBlank()) {
+                Locale(lang, reg)
+            } else {
+                Locale(lang)
+            }
+            try {
+                engine.setLanguage(locale)
+            } catch (_: Exception) {}
+            assignCharacterVoices(engine)
+        }
+    }
+
+    fun isTtsLanguageAvailable(langCode: String, regionCode: String = ""): Boolean {
+        val engine = tts ?: return false
+        val locale = if (regionCode.isNotBlank()) Locale(langCode, regionCode) else Locale(langCode)
+        val result = engine.isLanguageAvailable(locale)
+        return result != TextToSpeech.LANG_NOT_SUPPORTED && result != TextToSpeech.LANG_MISSING_DATA
+    }
 
     fun setCombatActive(active: Boolean) {
         _isCombatActive.value = active
@@ -737,7 +805,8 @@ class CombatNarrator(
         pendingSpeechOnDone = onDone
         _isSpeaking.value = true
 
-        val speechText = normalizeTtsText(text)
+        val translatedText = com.voicerpg.engine.localization.TranslationManager.translate(text)
+        val speechText = normalizeTtsText(translatedText)
         val params = Bundle().apply {
             putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, 1.0f)
         }

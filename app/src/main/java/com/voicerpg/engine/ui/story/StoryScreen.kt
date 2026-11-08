@@ -32,6 +32,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentHeight
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
@@ -1139,15 +1140,21 @@ private fun VoiceInputPromptBar(
                 !hasChoices -> "Tap or say 'Next' to continue"
                 else -> "Tap choice or speak your decision"
             },
+            modifier = Modifier
+                .weight(1f)
+                .padding(end = 8.dp),
             color = if (isStandby) Color(0xFFFFD54F) else Color.Gray,
             fontSize = 9.sp,
-            fontFamily = FontFamily.Monospace
+            fontFamily = FontFamily.Monospace,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
         )
 
         // Hands-free Mic Quick Tap
         Box(
             modifier = Modifier
-                .clip(CircleShape)
+                .wrapContentWidth()
+                .clip(RoundedCornerShape(16.dp))
                 .background(
                     when {
                         isListening -> Color(0xFFEF5350)
@@ -1155,9 +1162,9 @@ private fun VoiceInputPromptBar(
                         else -> RetroPanel
                     }
                 )
-                .border(1.dp, if (isStandby) Color(0xFFFFD54F) else LogosGold, CircleShape)
+                .border(1.dp, if (isStandby) Color(0xFFFFD54F) else LogosGold, RoundedCornerShape(16.dp))
                 .clickable { onStartListening() }
-                .padding(horizontal = 8.dp, vertical = 4.dp)
+                .padding(horizontal = 10.dp, vertical = 6.dp)
         ) {
             Text(
                 text = when {
@@ -1166,9 +1173,11 @@ private fun VoiceInputPromptBar(
                     else -> "🎤 SPEAK"
                 },
                 color = if (isStandby) Color(0xFFFFD54F) else LogosGold,
-                fontSize = 9.sp,
+                fontSize = 9.5.sp,
                 fontWeight = FontWeight.Bold,
-                fontFamily = FontFamily.Monospace
+                fontFamily = FontFamily.Monospace,
+                maxLines = 1,
+                softWrap = false
             )
         }
     }
@@ -1221,7 +1230,9 @@ private fun DialogueChoiceItem(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Row(
-                modifier = Modifier.weight(1f),
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(end = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
@@ -1243,49 +1254,60 @@ private fun DialogueChoiceItem(
                 )
             }
 
-            if (isCompleted) {
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(4.dp))
-                        .background(Color(0x334CAF50))
-                        .border(1.dp, Color(0xFF4CAF50), RoundedCornerShape(4.dp))
-                        .padding(horizontal = 5.dp, vertical = 2.dp)
-                ) {
-                    Text(
-                        text = "✓ DONE",
-                        color = Color(0xFF81C784),
-                        fontSize = 8.sp,
-                        fontFamily = FontFamily.Monospace,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-            } else if (isLocked) {
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(4.dp))
-                        .background(Color(0x33B0BEC5))
-                        .border(1.dp, Color(0xFF546E7A), RoundedCornerShape(4.dp))
-                        .padding(horizontal = 5.dp, vertical = 2.dp)
-                ) {
-                    Text(
-                        text = "🔒 LOCKED",
-                        color = Color(0xFF90A4AE),
-                        fontSize = 8.sp,
-                        fontFamily = FontFamily.Monospace,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-            } else {
-                // Spoken keyword cue
-                val keywordHint = choice.voiceKeywords.firstOrNull() ?: ""
-                if (keywordHint.isNotBlank()) {
-                    Text(
-                        text = "Say \"$keywordHint\"",
-                        color = Color(0xFF80D8FF),
-                        fontSize = 8.sp,
-                        fontFamily = FontFamily.Monospace,
-                        fontWeight = FontWeight.Bold
-                    )
+            Box(
+                modifier = Modifier.wrapContentWidth(),
+                contentAlignment = Alignment.CenterEnd
+            ) {
+                if (isCompleted) {
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(Color(0x334CAF50))
+                            .border(1.dp, Color(0xFF4CAF50), RoundedCornerShape(4.dp))
+                            .padding(horizontal = 5.dp, vertical = 2.dp)
+                    ) {
+                        Text(
+                            text = "✓ DONE",
+                            color = Color(0xFF81C784),
+                            fontSize = 8.sp,
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            softWrap = false
+                        )
+                    }
+                } else if (isLocked) {
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(Color(0x33B0BEC5))
+                            .border(1.dp, Color(0xFF546E7A), RoundedCornerShape(4.dp))
+                            .padding(horizontal = 5.dp, vertical = 2.dp)
+                    ) {
+                        Text(
+                            text = "🔒 LOCKED",
+                            color = Color(0xFF90A4AE),
+                            fontSize = 8.sp,
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            softWrap = false
+                        )
+                    }
+                } else {
+                    // Spoken keyword cue
+                    val keywordHint = choice.voiceKeywords.firstOrNull() ?: ""
+                    if (keywordHint.isNotBlank()) {
+                        Text(
+                            text = "Say \"$keywordHint\"",
+                            color = Color(0xFF80D8FF),
+                            fontSize = 8.sp,
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            softWrap = false
+                        )
+                    }
                 }
             }
         }

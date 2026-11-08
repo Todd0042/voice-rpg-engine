@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
@@ -242,8 +243,26 @@ class MainActivity : ComponentActivity() {
             }
 
             VoiceRPGTheme {
-                Box(modifier = Modifier.fillMaxSize()) {
-                    when (storyState.gameScreen) {
+                val downloadStatus by com.voicerpg.engine.localization.TranslationManager.downloadStatus.collectAsState()
+                val downloadProgress by com.voicerpg.engine.localization.TranslationManager.downloadProgress.collectAsState()
+                val downloadTargetName by com.voicerpg.engine.localization.TranslationManager.downloadTargetName.collectAsState()
+
+                Column(modifier = Modifier.fillMaxSize()) {
+                    androidx.compose.animation.AnimatedVisibility(
+                        visible = downloadStatus != com.voicerpg.engine.localization.ModelDownloadStatus.IDLE,
+                        enter = androidx.compose.animation.expandVertically() + androidx.compose.animation.fadeIn(),
+                        exit = androidx.compose.animation.shrinkVertically() + androidx.compose.animation.fadeOut()
+                    ) {
+                        com.voicerpg.engine.ui.setup.LanguageModelDownloadBanner(
+                            status = downloadStatus,
+                            progress = downloadProgress,
+                            languageName = downloadTargetName,
+                            onDismiss = { com.voicerpg.engine.localization.TranslationManager.dismissDownloadBanner() }
+                        )
+                    }
+
+                    Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                        when (storyState.gameScreen) {
                         GameScreen.TITLE -> {
                             val speechState by speechManager.speechState.collectAsState()
                             TitleScreen(
@@ -268,7 +287,7 @@ class MainActivity : ComponentActivity() {
                                 onAudioSetup = { storyViewModel.openAudioSetup() },
                                 onOptions = { combatViewModel.openOptions() },
                                 storyModeSummary = storyViewModel.getStoryModeSaveSummary(),
-                                onPureStoryMode = { fresh -> storyViewModel.startPureStoryMode(fresh) },
+                                onPureStoryMode = { fresh, trackId -> storyViewModel.startPureStoryMode(fresh, trackId) },
                                 onTutorial = {
                                     tutorialBattleViewModel.resetTutorial()
                                     storyViewModel.openTutorial()
@@ -307,6 +326,46 @@ class MainActivity : ComponentActivity() {
                                     } else {
                                         storyViewModel.returnFromAudioSetup()
                                     }
+                                },
+                                onOpenLanguageSelection = {
+                                    storyViewModel.openLanguageSelection(fromOptions = false)
+                                }
+                            )
+                        }
+                        GameScreen.LANGUAGE_SELECTION -> {
+                            com.voicerpg.engine.ui.setup.LanguageSelectionScreen(
+                                currentLanguageCode = storyState.pendingSelectedLanguage,
+                                canCancel = storyState.previousScreen != null,
+                                onLanguageSelected = { langCode ->
+                                    storyViewModel.onLanguageChosen(langCode)
+                                },
+                                onCancel = {
+                                    storyViewModel.cancelLanguageSelection()
+                                }
+                            )
+                        }
+                        GameScreen.DIALECT_SELECTION -> {
+                            com.voicerpg.engine.ui.setup.DialectSelectionScreen(
+                                languageCode = storyState.pendingSelectedLanguage,
+                                initialRegionCode = storyState.pendingSelectedRegion,
+                                combatNarrator = combatNarrator,
+                                onBack = {
+                                    storyViewModel.returnToLanguageSelection()
+                                },
+                                onConfirm = { langCode, regionCode ->
+                                    storyViewModel.onDialectConfirmed(langCode, regionCode)
+                                }
+                            )
+                        }
+                        GameScreen.LANGUAGE_DOWNLOAD_STANDBY -> {
+                            com.voicerpg.engine.ui.setup.LanguageDownloadStandbyScreen(
+                                languageCode = storyState.pendingSelectedLanguage,
+                                regionCode = storyState.pendingSelectedRegion,
+                                onDownloadComplete = { langCode, regionCode ->
+                                    storyViewModel.applyLanguageAndFinish(langCode, regionCode)
+                                },
+                                onChangeLanguage = {
+                                    storyViewModel.returnToLanguageSelection()
                                 }
                             )
                         }
@@ -484,6 +543,10 @@ class MainActivity : ComponentActivity() {
                             combatViewModel.closeOptions()
                             storyViewModel.openAudioSetup()
                         },
+                        onOpenLanguageSelection = {
+                            combatViewModel.closeOptions()
+                            storyViewModel.openLanguageSelection(fromOptions = true)
+                        },
                         onTriggerCheaterDialogue = {
                             combatNarrator.speak(
                                 "Cheater detected! You have invoked the ancient Konami incantation to bend time and space. Do you boldly embrace your dishonor?",
@@ -639,6 +702,7 @@ class MainActivity : ComponentActivity() {
                     }
                 }
             }
+        }
         }
     }
 

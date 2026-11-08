@@ -175,12 +175,22 @@ class ResonanceEngine(
         )
     }
 
+    companion object {
+        private val VOCATIVE_REGEX = Regex("""\b(o|oh|ó|ô)\b""")
+    }
+
     private fun hasPoeticIndicators(text: String): Boolean {
         val lower = text.lowercase()
+        if (VOCATIVE_REGEX.containsMatchIn(lower)) return true
         val poeticTerms = listOf(
-            "o ", "spirits of", "descend", "arise", "by the power",
+            "spirits of", "descend", "arise", "by the power",
             "unto", "thou", "hark", "awaken", "primordial", "celestial",
-            "hearken", "from the void", "unleash", "shall burn", "solar core"
+            "hearken", "from the void", "unleash", "shall burn", "solar core",
+            "espiritus de", "desciendan", "por el poder", "desata", "desaten",
+            "geister von", "steigt herab", "durch die macht", "entfessle", "entfesselt", "urzeitlich", "himmlisch",
+            "esprits de", "descendez", "par le pouvoir", "dechaine", "dechainez", "celeste",
+            "espiritos de", "descam", "pelo poder", "liberte", "libertar",
+            "spiriti di", "scendete", "per il potere", "scatena", "scatenate", "primordiale", "celestiale"
         )
         return poeticTerms.any { lower.contains(it) }
     }
@@ -190,13 +200,24 @@ class ResonanceEngine(
         val terms = listOf(
             "now", "quick", "fast", "stay", "clear",
             "focus", "survive", "don't", "keep", "come on", "together", "dig deep",
-            "ready", "let's go", "hurry"
+            "ready", "let's go", "hurry",
+            "ahora", "rapido", "vamos", "pronto", "foco",
+            "jetzt", "schnell", "beeilung", "los",
+            "maintenant", "vite", "allons", "courage",
+            "agora", "rapido", "forca", "ora", "presto"
         )
         return terms.any { lower.contains(it) }
     }
 
     private fun countSyllables(word: String): Int {
-        val clean = word.lowercase().replace(Regex("[^a-z]"), "")
+        val normalized = java.text.Normalizer.normalize(word.lowercase(), java.text.Normalizer.Form.NFD)
+            .replace(Regex("\\p{M}"), "")
+        val clean = normalized.replace(Regex("[^a-z]"), "")
+        if (clean.isEmpty()) {
+            // CJK / non-Latin characters count directly as phonetic moras/syllables
+            val nonLatinCount = word.filter { Character.isLetter(it) }.length
+            return nonLatinCount.coerceAtLeast(1)
+        }
         if (clean.length <= 3) return 1
         var count = 0
         var prevIsVowel = false

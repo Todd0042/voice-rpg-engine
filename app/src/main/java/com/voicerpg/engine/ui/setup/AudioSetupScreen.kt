@@ -77,6 +77,7 @@ fun AudioSetupScreen(
     isNewGameFlow: Boolean = false,
     onBack: (() -> Unit)? = null,
     onVoiceChanged: () -> Unit = {},
+    onOpenLanguageSelection: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -293,6 +294,73 @@ fun AudioSetupScreen(
             )
 
             Spacer(modifier = Modifier.height(14.dp))
+
+            // =============================================================
+            // Language & Regional Dialect Selection
+            // =============================================================
+            if (onOpenLanguageSelection != null) {
+                val currentLang = com.voicerpg.engine.localization.TranslationManager.currentLanguage.value
+                val currentReg = com.voicerpg.engine.localization.TranslationManager.currentRegion.value
+                val langOpt = com.voicerpg.engine.model.LanguageCatalog.getLanguage(currentLang)
+                val dialectDesc = if (currentReg.isNotBlank()) " ($currentReg)" else ""
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(RetroPanel.copy(alpha = 0.9f))
+                        .border(1.dp, FrostCyan, RoundedCornerShape(12.dp))
+                        .clickable { onOpenLanguageSelection() }
+                        .padding(14.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "🌐 LANGUAGE & DIALECT",
+                                color = FrostCyan,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Black,
+                                fontFamily = FontFamily.Monospace
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = "Current: ${langOpt.nativeName} - ${langOpt.displayName}$dialectDesc",
+                                color = Color.White,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = FontFamily.Monospace
+                            )
+                            Text(
+                                text = "Tap to switch to any of 59 supported languages & regional accents.",
+                                color = Color.LightGray,
+                                fontSize = 10.sp,
+                                fontFamily = FontFamily.Monospace
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(FrostCyan)
+                                .padding(horizontal = 10.dp, vertical = 6.dp)
+                        ) {
+                            Text(
+                                text = "CHANGE ➔",
+                                color = RetroBlack,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = FontFamily.Monospace
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+            }
 
             // =============================================================
             // Card 1: The Fellowship & Why Multiple Voices Matter

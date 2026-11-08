@@ -16,6 +16,21 @@ enum class AuraColor(
 }
 
 /**
+ * Data-driven storyline track definition (e.g. Track A, Track B).
+ * Games with multiple storylines or perspectives configure these in manifest or GameContent.
+ */
+data class CampaignTrackDef(
+    val id: String = "track_a",
+    val displayName: String = "Main Campaign",
+    val subtitle: String = "",
+    val startNodeId: String = "",
+    val startSceneId: String = "",
+    val rosterDescription: String = "",
+    val badgeText: String = "1P",
+    val voiceKeywords: List<String> = emptyList()
+)
+
+/**
  * Player-created hero identity. Hero classes are data-driven: [heroClassId]
  * resolves against assets/game/classes/<name>.json via the content registry.
  */
@@ -25,7 +40,8 @@ data class PlayerCustomization(
     val title: String = "The Awakened Hero",
     val auraColor: AuraColor = AuraColor.SAPPHIRE_FROST,
     val voiceAffinityBonusSchool: SpellSchool = SpellSchool.PHYSICAL,
-    val customPortraitAsset: String? = null
+    val customPortraitAsset: String? = null,
+    val campaignTrackId: String = "track_a"
 ) {
     val heroClass get() = GameContent.classById(heroClassId)
 }
@@ -111,5 +127,9 @@ data class GameSaveData(
     val voiceAssignments: Map<String, String> = emptyMap(),
 
     // 8. Dynamic Simulation & Metric Tracking (Data-driven and opt-in per game)
-    val dynamicMetrics: Map<String, Float> = emptyMap()
+    val dynamicMetrics: Map<String, Float> = emptyMap(),
+
+    // 9. Multilingual Localization Options
+    val selectedLanguage: String = "en",
+    val selectedRegion: String = ""
 )
