@@ -256,10 +256,17 @@ for target in "${TARGET_REPOS[@]}"; do
             else
                 mkdir -p "${DST_ASSET}"
                 rsync -av --update "${SRC_ASSET}/" "${DST_ASSET}/" > /dev/null
-                echo "    [+] Synced asset: assets/game/${asset}"
             fi
         fi
     done
+
+    # Sync root MainActivity.kt
+    if [ "$DRY_RUN" = true ]; then
+        echo "    [dry-run] cp ${ENGINE_ROOT}/app/src/main/java/com/voicerpg/engine/MainActivity.kt -> ${TARGET_DIR}/app/src/main/java/com/voicerpg/engine/MainActivity.kt"
+    else
+        cp "${ENGINE_ROOT}/app/src/main/java/com/voicerpg/engine/MainActivity.kt" "${TARGET_DIR}/app/src/main/java/com/voicerpg/engine/MainActivity.kt"
+        echo "    [+] Synced root Activity: MainActivity.kt"
+    fi
 
     if [ "$RUN_VERIFY" = true ] && [ "$DRY_RUN" = false ]; then
         echo "    [*] Running unit tests in ${target}..."
