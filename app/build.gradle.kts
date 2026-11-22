@@ -93,8 +93,10 @@ dependencies {
     implementation("com.google.mlkit:translate:17.0.3")
 
     // Optional on-device TFLite stylization
-    implementation("org.tensorflow:tensorflow-lite:2.16.1")
-    implementation("org.tensorflow:tensorflow-lite-support:0.4.4")
+    // LiteRT (TensorFlow Lite's successor; same org.tensorflow.lite API). Its native library is 16 KB
+    // page aligned; org.tensorflow:tensorflow-lite:2.16.1's libtensorflowlite_jni.so was 4 KB aligned
+    // and fails to load on 16 KB page devices.
+    implementation("com.google.ai.edge.litert:litert:1.4.2")
 
     // Testing
     testImplementation("junit:junit:4.13.2")
