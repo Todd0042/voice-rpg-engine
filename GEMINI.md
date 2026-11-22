@@ -63,6 +63,10 @@ Driving `StoryViewModel`/`TutorialBattleViewModel`/`CombatViewModel` in tests th
 
 - Always run the full unit suite: `./gradlew testDebugUnitTest` (must be clean).
 - Compilation of engine code: `./gradlew compileDebugKotlin` (must be clean).
+- **16 KB page size** (Play blocks apps that fail it): after adding or upgrading any dependency, build the
+  APK and run `bash scripts/check_16kb.sh app/build/outputs/apk/debug/app-debug.apk` (CI runs it too).
+  A failing `.so` comes from a dependency: upgrade it to a 16 KB-aligned version (TensorFlow Lite was
+  replaced by LiteRT for this reason). Never ship a 4 KB-aligned library.
 - GitHub releases / ADB device installs are the **game project's** choice; do not auto-create releases or install without being asked.
 
 ## 8. Unique App Identity (every app is its own unique game)
