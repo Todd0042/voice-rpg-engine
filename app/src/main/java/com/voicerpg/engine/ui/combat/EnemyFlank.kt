@@ -19,6 +19,7 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.unit.dp
 import com.voicerpg.engine.model.CharacterStance
 import com.voicerpg.engine.model.Enemy
+import com.voicerpg.engine.ui.fx.CombatantFx
 import com.voicerpg.engine.ui.sprites.PixelCharacterView
 
 @Composable
@@ -27,6 +28,7 @@ fun EnemyFlank(
     onSelectEnemy: (Enemy) -> Unit,
     onPositionEnemy: ((String, Offset) -> Unit)? = null,
     arenaCoordinates: LayoutCoordinates? = null,
+    fxOf: ((String) -> CombatantFx)? = null,
     modifier: Modifier = Modifier
 ) {
     val isLargeHorde = enemies.size > 3
@@ -49,6 +51,7 @@ fun EnemyFlank(
                     onSelectEnemy = onSelectEnemy,
                     onPositionEnemy = onPositionEnemy,
                     arenaCoordinates = arenaCoordinates,
+                    fx = fxOf?.invoke(enemy.id),
                     modifier = Modifier.offset(x = staggerX)
                 )
             }
@@ -77,7 +80,8 @@ fun EnemyFlank(
                         depthScale = depthScale,
                         onSelectEnemy = onSelectEnemy,
                         onPositionEnemy = onPositionEnemy,
-                        arenaCoordinates = arenaCoordinates
+                        arenaCoordinates = arenaCoordinates,
+                        fx = fxOf?.invoke(enemy.id)
                     )
                 }
             }
@@ -95,7 +99,8 @@ fun EnemyFlank(
                         depthScale = depthScale,
                         onSelectEnemy = onSelectEnemy,
                         onPositionEnemy = onPositionEnemy,
-                        arenaCoordinates = arenaCoordinates
+                        arenaCoordinates = arenaCoordinates,
+                        fx = fxOf?.invoke(enemy.id)
                     )
                 }
             }
@@ -111,6 +116,7 @@ private fun EnemyCard(
     onSelectEnemy: (Enemy) -> Unit,
     onPositionEnemy: ((String, Offset) -> Unit)? = null,
     arenaCoordinates: LayoutCoordinates? = null,
+    fx: CombatantFx? = null,
     modifier: Modifier = Modifier
 ) {
     val stance = when {
@@ -149,6 +155,7 @@ private fun EnemyCard(
         isFlippedHorizontally = true,
         pixelSize = if (isCompact) 1.65.dp else 2.2.dp,
         depthScale = depthScale,
+        fx = fx,
         onClick = if (enemy.isAlive) { { onSelectEnemy(enemy) } } else null,
         modifier = modifier.onGloballyPositioned { cardCoords = it }
     )

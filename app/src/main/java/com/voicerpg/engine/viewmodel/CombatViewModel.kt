@@ -413,8 +413,6 @@ class CombatViewModel(
         if (dot > 0) {
             val newHp = (member.currentHp - dot).coerceAtLeast(0)
             fell = newHp <= 0
-            val (sx, sy) = partyFloatSlot(heroId)
-            val fct = FloatingCombatText(text = "-$dot", color = Color(0xFF9CCC65), startX = sx, startY = sy)
             val aliveBefore = aliveIds()
             _state.value = _state.value.copy(
                 party = _state.value.party.map {
@@ -424,14 +422,10 @@ class CombatViewModel(
                         stance = if (fell) CharacterStance.DEAD else it.stance,
                         atbGauge = if (fell) 0f else it.atbGauge
                     ) else it
-                },
-                floatingTexts = _state.value.floatingTexts + fct
+                }
             )
+            cue(BattleCue.Impact(heroId, fromParty = false, hits = listOf(BattleCue.Hit(heroId, dot)), isTick = true))
             announceFallen(aliveBefore)
-            activeScope.launch {
-                delay(1200)
-                _state.value = _state.value.copy(floatingTexts = _state.value.floatingTexts.filter { it.id != fct.id })
-            }
             combatNarrator.speak("${member.name} suffers $dot damage from ongoing effects.", force = false)
         } else {
             _state.value = _state.value.copy(
@@ -487,20 +481,14 @@ class CombatViewModel(
                 val selfNewHp = (livingSelf.currentHp - dot).coerceAtLeast(0)
                 val died = dot > 0 && selfNewHp <= 0
                 if (dot > 0) {
-                    val (sx, sy) = enemyFloatSlot(enemy.id)
-                    val dotFct = FloatingCombatText(text = "-$dot", color = Color(0xFFFFAB40), startX = sx, startY = sy)
                     val aliveBefore = aliveIds()
                     _state.value = _state.value.copy(
                         enemies = _state.value.enemies.map {
                             if (it.id == enemy.id) it.copy(currentHp = selfNewHp, atbGauge = if (died) 0f else it.atbGauge, statuses = advanced) else it
-                        },
-                        floatingTexts = _state.value.floatingTexts + dotFct
+                        }
                     )
+                    cue(BattleCue.Impact(enemy.id, fromParty = true, hits = listOf(BattleCue.Hit(enemy.id, dot)), isTick = true))
                     announceFallen(aliveBefore)
-                    activeScope.launch {
-                        delay(1200)
-                        _state.value = _state.value.copy(floatingTexts = _state.value.floatingTexts.filterNot { f -> f.id == dotFct.id })
-                    }
                     combatNarrator.speak("${enemy.name} suffers $dot damage from ongoing effects.", force = false)
                 } else {
                     _state.value = _state.value.copy(
@@ -638,7 +626,6 @@ class CombatViewModel(
             val moveShake = enemyGraphics?.screenShake ?: 0f
 
             val moveStatusId = StatusId.fromNameOrNull(move.applyStatus)
-            val newFloats = mutableListOf<FloatingCombatText>()
             val hits = mutableListOf<BattleCue.Hit>()
             var totalDamage = 0
             var anyFallen = false
@@ -672,8 +659,6 @@ class CombatViewModel(
                             StatusSystem.apply(moveStatusId, "ADEPT", EnemyFamily.FLESH, damage.toFloat())
                         }
                     } else null
-                    val (hx, hy) = partyFloatSlot(hero.id)
-                    newFloats += FloatingCombatText(text = "-$damage", color = Color(0xFFFF1744), startX = hx, startY = hy)
                     hero.copy(
                         currentHp = newHp,
                         currentMp = if (isFallen) 0 else hero.currentMp,
@@ -699,8 +684,7 @@ class CombatViewModel(
             val aliveBefore = aliveIds()
             _state.value = _state.value.copy(
                 enemies = updatedEnemies,
-                party = updatedParty,
-                floatingTexts = _state.value.floatingTexts + newFloats
+                party = updatedParty
             )
             val impact = BattleCue.Impact(
                 sourceId = enemy.id,
@@ -710,14 +694,6 @@ class CombatViewModel(
             )
             cue(impact)
             announceFallen(aliveBefore)
-
-            activeScope.launch {
-                delay(1200)
-                val idsToRemove = newFloats.map { f -> f.id }.toSet()
-                _state.value = _state.value.copy(
-                    floatingTexts = _state.value.floatingTexts.filterNot { f -> f.id in idsToRemove }
-                )
-            }
 
             hold(impact)
 
@@ -1988,25 +1964,12 @@ class CombatViewModel(
      */
     private fun applyAttuneAction(member: PartyMember, spell: Spell): List<BattleCue.Hit> {
         val restore = (member.maxMp * spell.manaRestorePct).roundToInt().coerceAtLeast(1)
-        val (ax, ay) = partyFloatSlot(member.id)
         sfxManager.playSpellCast()
-        val fct = FloatingCombatText(
-            text = "+$restore MP",
-            color = Color(0xFF4FC3F7),
-            startX = ax,
-            startY = ay,
-            isHeal = true
-        )
         _state.value = _state.value.copy(
             party = _state.value.party.map {
                 if (it.id == member.id) it.copy(currentMp = (it.currentMp + restore).coerceAtMost(it.maxMp)) else it
-            },
-            floatingTexts = _state.value.floatingTexts + fct
+            }
         )
-        activeScope.launch {
-            delay(1400)
-            _state.value = _state.value.copy(floatingTexts = _state.value.floatingTexts.filterNot { it.id == fct.id })
-        }
         combatNarrator.speak("${member.name} breathes slow and steady; $restore mana returns.", force = false)
         return listOf(BattleCue.Hit(member.id, restore, kind = BattleCue.HitKind.MANA))
     }
@@ -2102,33 +2065,9 @@ class CombatViewModel(
             } else hero
         }
 
-        val newFloatingTexts = targetsToHeal.flatMap { targetHero ->
-            val (hx, hy) = partyFloatSlot(targetHero.id)
-            val list = mutableListOf<FloatingCombatText>()
-            if (healAmount > 0) {
-                list.add(
-                    FloatingCombatText(
-                        text = "+$healAmount HP",
-                        color = Color(0xFF00E676),
-                        startX = hx,
-                        startY = hy,
-                        isHeal = true,
-                        isCrit = resonance.tier == ResonanceTier.TRANSCENDENTAL || resonance.tier == ResonanceTier.MYTHIC
-                    )
-                )
-            }
-            if ((spell.cleansesDebuffs || spell.isCleanse) && targetHero.statuses.any { it.isDebuffOnTarget }) {
-                list.add(
-                    FloatingCombatText(
-                        text = "CLEANSED ✨",
-                        color = Color(0xFF80D8FF),
-                        startX = hx,
-                        startY = hy - (if (healAmount > 0) 30f else 0f)
-                    )
-                )
-            }
-            list
-        }
+        val cleansedAny = (spell.cleansesDebuffs || spell.isCleanse) && targetsToHeal.any { t -> t.statuses.any { it.isDebuffOnTarget } }
+        val cleanseNote = if (cleansedAny) FloatingCombatText(text = "CLEANSED ✨", color = Color(0xFF80D8FF), startX = 0f, startY = 0f) else null
+        val newFloatingTexts = listOfNotNull(cleanseNote)
 
         _state.value = _state.value.copy(
             party = updatedParty,
@@ -2259,35 +2198,7 @@ class CombatViewModel(
             updatedEnemies.map { it.copy(isTargeted = it.id == nextAlive?.id) }
         } else updatedEnemies
 
-        val isSuper = resonance.tier == ResonanceTier.TRANSCENDENTAL || resonance.tier == ResonanceTier.MYTHIC
-        val newFloatingTexts = hits.map { hit ->
-            val (ex, ey) = enemyFloatSlot(hit.enemy.id)
-            FloatingCombatText(
-                text = "-${hit.damage}",
-                color = when {
-                    hit.affinity >= 1.5f -> Color(0xFFFFD700)
-                    isSuper -> Color(0xFFFFC400)
-                    hit.affinity < 0.95f -> Color(0xFF90A4AE)
-                    else -> Color(0xFFFF5252)
-                },
-                startX = ex,
-                startY = ey,
-                isCrit = isSuper || hit.affinity >= 1.5f
-            )
-        }
-
-        _state.value = _state.value.copy(
-            enemies = finalEnemies,
-            floatingTexts = _state.value.floatingTexts + newFloatingTexts
-        )
-
-        activeScope.launch {
-            delay(1200)
-            val idsToRemove = newFloatingTexts.map { it.id }.toSet()
-            _state.value = _state.value.copy(
-                floatingTexts = _state.value.floatingTexts.filterNot { it.id in idsToRemove }
-            )
-        }
+        _state.value = _state.value.copy(enemies = finalEnemies)
 
         // Clear flash
         activeScope.launch {

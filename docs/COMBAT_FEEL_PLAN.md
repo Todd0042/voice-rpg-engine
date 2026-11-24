@@ -139,6 +139,14 @@ the games that are ready (see §3). Letters map to the suggestions list (A–J).
 - Turn, mana and "charging" messages move out of the arena into a status line above the console
   (they currently reuse `FloatingCombatText`).
 
+**Status: done (2026-11-24).** Hit-stop 60-180 ms by tier (enemy blows 70, boss ultimates 140; at most
+60 with Reduce motion), white sprite flash, knockback 8-14 dp with spring-back, squash on hit; Transcendental
+adds 450 ms slow motion, a zoom punch and a full-screen flash (max 3/s; none with **Reduce flashing**, now in
+Options and saved). Numbers come from the director (pop/receipt/comic per `damageNumberStyle`; `labels`
+configurable), area hits stagger 60 ms; damage-over-time ticks are `Impact` cues with `isTick` (number only).
+All other messages moved to a status line above the console. `presentation.json` now carries the full §1.4
+schema.
+
 ### M3: Voice charge-up (A), the signature feature
 - While listening: `rmsLevel` → `ChargeLevel` cues → caster aura (radius, brightness, particle
   rate), the arena background dims to 70%, and a synthesized charge hum (new `SfxManager.chargeHum(level)`,

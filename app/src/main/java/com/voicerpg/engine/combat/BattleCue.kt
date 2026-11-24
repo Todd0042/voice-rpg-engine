@@ -58,7 +58,9 @@ sealed interface BattleCue {
         val fromParty: Boolean,
         val hits: List<Hit>,
         val tier: ResonanceTier = ResonanceTier.BASIC,
-        val shake: Float = 0f
+        val shake: Float = 0f,
+        /** A damage-over-time tick: a number, no freeze or knockback. */
+        val isTick: Boolean = false
     ) : BattleCue
 
     data class Hit(val targetId: String, val amount: Int, val affinity: Float = 1f, val kind: HitKind = HitKind.DAMAGE)

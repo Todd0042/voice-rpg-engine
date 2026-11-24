@@ -68,6 +68,8 @@ fun PixelCharacterView(
     spriteAlpha: Float? = null,
     pixelSize: Dp = 2.2.dp,
     depthScale: Float = 1f,
+    /** Live battle effects (flash, knockback, squash, glow, intent, charge bar), from the FX director. */
+    fx: com.voicerpg.engine.ui.fx.CombatantFx? = null,
     onClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
@@ -125,18 +127,34 @@ fun PixelCharacterView(
         label = "step_offset_$characterId"
     )
 
+    val facing = if (isFlippedHorizontally) -1f else 1f
     Column(
         modifier = modifier
             .offset(x = stepForwardOffset)
             .graphicsLayer {
-                scaleX = depthScale
-                scaleY = depthScale
+                // Knockback, squash/stretch and the attack lean are read here (layer-only: no relayout).
+                val squash = fx?.squash ?: 0f
+                translationX = ((fx?.knockback ?: 0f) + facing * 10f * (fx?.lean ?: 0f)).dp.toPx()
+                scaleX = depthScale * (1f + 0.18f * squash)
+                scaleY = depthScale * (1f - 0.18f * squash)
+                rotationZ = facing * 6f * (fx?.lean ?: 0f)
                 transformOrigin = TransformOrigin(0.5f, 1.0f)
+                alpha = if (fx?.hidden == true) 0f else 1f
             }
             .clickable(enabled = !isDead && onClick != null) { onClick?.invoke() }
             .padding(horizontal = 4.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
+        // Telegraphed intent (what this enemy is about to do)
+        val intent = fx?.intent
+        if (intent != null && !isDead) {
+            Text(
+                text = intent,
+                fontSize = 14.sp,
+                modifier = Modifier.padding(bottom = 1.dp)
+            )
+        }
+
         // Targeted Indicator / Floating Name
         if (isTargeted && !isDead) {
             Text(
@@ -235,6 +253,27 @@ fun PixelCharacterView(
                 )
             }
 
+            // Boss ultimate charge (red, fills as it charges)
+            val charge = fx?.ultimateCharge
+            if (charge != null) {
+                Spacer(modifier = Modifier.height(1.dp))
+                Box(
+                    modifier = Modifier
+                        .width(48.dp)
+                        .height(4.dp)
+                        .clip(RoundedCornerShape(2.dp))
+                        .background(Color(0xFF3B0A0A))
+                        .border(0.5.dp, Color(0xFFFF1744), RoundedCornerShape(2.dp))
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth(charge.coerceIn(0f, 1f))
+                            .fillMaxHeight()
+                            .background(Color(0xFFFF1744))
+                    )
+                }
+            }
+
             Text(
                 text = "$currentHp/$maxHp",
                 color = Color(0xFFD0D8DC),
@@ -304,6 +343,23 @@ fun PixelCharacterView(
                 }
             }
 
+            // Wind-up / charge aura behind the sprite
+            val glow = fx?.glow
+            if (glow != null && !isDead) {
+                Canvas(modifier = Modifier.size(width = spriteWidth + 28.dp, height = spriteHeight + 16.dp)) {
+                    val strength = (fx.glowStrength).coerceIn(0f, 1f)
+                    drawOval(
+                        brush = Brush.radialGradient(
+                            colors = listOf(glow.copy(alpha = 0.55f * strength), glow.copy(alpha = 0.18f * strength), Color.Transparent),
+                            center = Offset(size.width / 2f, size.height * 0.55f),
+                            radius = size.maxDimension * (0.45f + 0.15f * strength)
+                        ),
+                        topLeft = Offset.Zero,
+                        size = size
+                    )
+                }
+            }
+
             Canvas(
                 modifier = Modifier.size(
                     width = spriteWidth,
@@ -311,6 +367,7 @@ fun PixelCharacterView(
                 )
             ) {
                 val pPx = pixelSize.toPx()
+                val flash = fx?.flash ?: 0f
                 val numCols = matrix.firstOrNull()?.length ?: 12
 
                 for (row in matrix.indices) {
@@ -320,8 +377,9 @@ fun PixelCharacterView(
                         if (char != '.') {
                             val color = palette[char] ?: Color.Magenta
                             val targetCol = if (isFlippedHorizontally) (numCols - 1 - col) else col
+                            val base = if (stance == CharacterStance.DAMAGED && flash == 0f) Color(0xFFFF5252) else color
                             drawRect(
-                                color = if (stance == CharacterStance.DAMAGED) Color(0xFFFF5252) else color,
+                                color = if (flash > 0f) androidx.compose.ui.graphics.lerp(base, Color.White, flash) else base,
                                 topLeft = Offset(targetCol * pPx, row * pPx),
                                 size = Size(pPx, pPx)
                             )
