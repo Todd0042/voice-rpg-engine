@@ -161,6 +161,17 @@ When populated, the Title Screen automatically displays a stylish track selector
 
 [`BuiltInDictionaries.kt`](app/src/main/java/com/voicerpg/engine/localization/BuiltInDictionaries.kt) bundles complete offline term matrices for Spanish (`es`), German (`de`), French (`fr`), Portuguese (`pt`), and Italian (`it`). The dynamic [`LanguageModelDownloadBanner.kt`](app/src/main/java/com/voicerpg/engine/ui/setup/LanguageModelDownloadBanner.kt) allows on-demand Google MLKit model downloading with immediate offline fallback.
 
+### Offline phrase dictionaries: engine UI vs. game story
+
+[`TranslationManager.kt`](app/src/main/java/com/voicerpg/engine/localization/TranslationManager.kt) translates a phrase by exact match in two JSON dictionaries per language before falling back to ML Kit:
+
+| File | Holds | Owned by |
+|---|---|---|
+| `assets/game/localization/strings_<lang>.json` | Phrases the engine's own screens show (menus, setup, combat UI): 403 per language | **Engine**: synced byte-identical into every game |
+| `assets/game/translations/strings_<lang>.json` | The game's story, spell, enemy and place phrases | **Each game**: never synced; its entries win over the engine's |
+
+`TranslationDictionaryContractTest` fails if the engine file picks up a phrase the engine never shows, so one game's story text can't ship in every game again.
+
 ---
 
 ## 6. MLKit & TFLite Selfie Character Creation

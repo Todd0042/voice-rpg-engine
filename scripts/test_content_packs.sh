@@ -70,6 +70,14 @@ for game in "${GAMES[@]}"; do
         failed=1
         continue
     fi
+    # Asset folders the engine owns (ENGINE_OWNED_PATHS in sync_engine_to_games.sh) come from this
+    # engine, exactly as a sync would leave them; the game's copies may be from an older engine.
+    for owned in commands localization; do
+        rm -rf "$run/app/src/main/assets/game/$owned"
+        if [ -d "$ENGINE_ROOT/app/src/main/assets/game/$owned" ]; then
+            cp -a "$ENGINE_ROOT/app/src/main/assets/game/$owned" "$run/app/src/main/assets/game/"
+        fi
+    done
 
     echo "[*] ${game}: running engine tests on content from ${source_desc}"
     log="$run/gradle-test.log"

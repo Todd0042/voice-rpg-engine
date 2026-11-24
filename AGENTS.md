@@ -86,6 +86,10 @@ Every game (`echoes-of-logos`, `wallys-world`, `commander-america-rpg`, `superst
 `assets/game/commands/**`, `assets/game/localization/**`, `app/src/test/java/com/voicerpg/engine/**` and
 `app/src/test/fixtures/template-pack/**`. In a game they are read-only.
 
+- **Translations:** `assets/game/localization/` holds only phrases the engine's own screens show
+  (`TranslationDictionaryContractTest` enforces it). A game's story and content phrases go in its own
+  `assets/game/translations/strings_<lang>.json`, which `TranslationManager` loads over the engine's.
+
 - **Engine changes happen here, never in a game.** Keep them content-neutral: a game needs different
   behaviour → a JSON field with a default that leaves the other games unchanged (opt-in, §3 of the
   sync protocol).
