@@ -1,6 +1,5 @@
 package com.voicerpg.engine.combat
 
-import com.voicerpg.engine.model.ResonanceTier
 import kotlin.math.roundToLong
 
 /**
@@ -19,11 +18,10 @@ data class CombatTiming(val scale: Float = 1f) {
         // A release holds for exactly the flight time it was launched with (already scaled).
         if (cue is BattleCue.Release) return cue.travelMs
         return scaled(when (cue) {
-            is BattleCue.ResonanceReveal -> when {
-                !cue.showBanner -> 250
-                cue.resonance.tier == ResonanceTier.TRANSCENDENTAL -> 1200
-                else -> 1000
-            }
+            // A typed chant gets a short simulated charge; a spoken one lasts as long as the voice.
+            is BattleCue.ChargeStart -> if (cue.typed) 350 else 0
+            // The reveal lands with the impact: the impact's hold lets it shine.
+            is BattleCue.ResonanceReveal -> 0
             is BattleCue.Impact -> if (cue.fromParty) (if (pocket) 300 else 700) else 300
             is BattleCue.PhaseShift -> 400
             // Buffs, summons and guards are followed by their TurnEnd hold too; these are the extra pause.
@@ -35,6 +33,8 @@ data class CombatTiming(val scale: Float = 1f) {
             is BattleCue.Guard -> if (pocket) 0 else 100
             is BattleCue.TurnEnd -> if (cue.fromParty) 200 else if (pocket) 300 else 250
             is BattleCue.Release,
+            is BattleCue.ChargeLevel,
+            is BattleCue.ChargeEnd,
             is BattleCue.BattleStart,
             is BattleCue.Death,
             is BattleCue.Reinforcements,
@@ -45,9 +45,6 @@ data class CombatTiming(val scale: Float = 1f) {
     /** Projectile flight from caster to target. */
     fun travelMs(fromParty: Boolean, isBossUltimate: Boolean): Long =
         scaled(if (fromParty) 420 else if (isBossUltimate) 550 else 350)
-
-    /** The resonance banner's exit animation, after its [BattleCue.ResonanceReveal] hold. */
-    val bannerExitMs: Long get() = scaled(220)
 
     private fun scaled(ms: Int): Long = (ms * scale).roundToLong()
 

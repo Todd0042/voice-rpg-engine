@@ -30,6 +30,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.LayoutCoordinates
@@ -233,6 +234,13 @@ fun RetroBattleScreen(
                         partyCount = state.party.size,
                         enemyCount = state.enemies.size,
                         modifier = Modifier.fillMaxSize()
+                    )
+
+                    // The backdrop darkens while a chant charges (the combatants stay lit)
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .drawBehind { drawRect(Color.Black.copy(alpha = director.dim)) }
                     )
 
                     // SNES OBJ Layer: Combatants anchored onto the floor stage

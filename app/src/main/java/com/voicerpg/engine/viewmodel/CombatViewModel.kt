@@ -50,6 +50,10 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -124,6 +128,47 @@ class CombatViewModel(
 
     private fun aliveIds(): Set<String> =
         (_state.value.party.filter { it.isAlive }.map { it.id } + _state.value.enemies.filter { it.isAlive }.map { it.id }).toSet()
+
+    // ---- Voice charge-up: while the active hero is heard, the charge follows the microphone -------------
+    private var chargeJob: Job? = null
+    private var chargingId: String? = null
+
+    private fun startChargeWatcher() {
+        chargeJob?.cancel()
+        chargeJob = activeScope.launch {
+            combine(
+                speechManager.speechState,
+                _state.map { it.phase to it.activePartyMemberId }.distinctUntilChanged()
+            ) { speech, (phase, activeId) ->
+                if (speech == com.voicerpg.engine.audio.SpeechState.Listening && phase == CombatPhase.PLAYER_INPUT) activeId else null
+            }.distinctUntilChanged().collectLatest { casterId ->
+                endCharge()
+                if (casterId == null) return@collectLatest
+                chargingId = casterId
+                cue(BattleCue.ChargeStart(casterId, typed = false))
+                sfxManager.startChargeHum()
+                var lastSent = -1L
+                var lastLevel = -1f
+                speechManager.rmsLevel.collect { level ->
+                    val now = System.currentTimeMillis()
+                    // Small wobbles at most every 50 ms; a real jump (a shout) goes through at once.
+                    if (now - lastSent >= CHARGE_LEVEL_INTERVAL_MS || kotlin.math.abs(level - lastLevel) >= CHARGE_LEVEL_JUMP) {
+                        lastSent = now
+                        lastLevel = level
+                        cue(BattleCue.ChargeLevel(casterId, level))
+                    }
+                    sfxManager.setChargeLevel(level)
+                }
+            }
+        }
+    }
+
+    private fun endCharge() {
+        val id = chargingId ?: return
+        chargingId = null
+        sfxManager.stopChargeHum()
+        cue(BattleCue.ChargeEnd(id))
+    }
 
     /** Announces a [BattleCue.Death] for everyone alive in [before] who has fallen since. */
     private fun announceFallen(before: Set<String>) {
@@ -1139,7 +1184,7 @@ class CombatViewModel(
 
     fun submitTypedChant(text: String, forcedAcoustic: com.voicerpg.engine.model.AcousticProfile? = null) {
         speechManager.cancel()
-        processIncantation(text, forcedAcoustic)
+        processIncantation(text, forcedAcoustic, typed = true)
     }
 
     fun toggleEyesFreeMode(): Boolean {
@@ -1551,7 +1596,8 @@ class CombatViewModel(
         }
     }
 
-    fun processIncantation(utterance: String, forcedAcoustic: com.voicerpg.engine.model.AcousticProfile? = null) {
+    /** [typed]: the chant was typed (or chosen automatically), so it gets a short simulated charge. */
+    fun processIncantation(utterance: String, forcedAcoustic: com.voicerpg.engine.model.AcousticProfile? = null, typed: Boolean = false) {
         val lower = utterance.lowercase().trim()
         if (lower.isBlank()) return
 
@@ -1839,6 +1885,10 @@ class CombatViewModel(
                 phase = CombatPhase.INCANTATION_RESOLVING,
                 activePartyMemberId = activeHero.id
             )
+            if (typed) {
+                beat(BattleCue.ChargeStart(activeHero.id, typed = true))
+                cue(BattleCue.ChargeEnd(activeHero.id))
+            }
 
             val acoustic = forcedAcoustic ?: speechManager.getLatestAcousticProfile()
             val resonance = resonanceEngine.evaluate(
@@ -1853,23 +1903,16 @@ class CombatViewModel(
 
             _state.value = _state.value.copy(
                 lastResonance = resonance,
-                isLogosBannerVisible = showBanner,
                 party = _state.value.party.map {
                     if (it.id == activeHero.id) it.copy(stance = CharacterStance.CASTING) else it
                 }
             )
 
-            // 2. Reveal the resonance: the banner holds the screen, then clears before the spell fires.
+            // 2. The cast: the voice is scored now, but revealed when the spell lands (step 4).
             sfxManager.playSpellCast()
             sfxManager.playSoundBite(parsed.spell.soundBites.ifEmpty {
                 com.voicerpg.engine.content.GameContent.characterById(activeHero.id)?.soundBites ?: emptyList()
             })
-            if (isSuperLogos) sfxManager.playLogosFanfare()
-            beat(BattleCue.ResonanceReveal(activeHero.id, resonance, showBanner))
-            if (showBanner) {
-                _state.value = _state.value.copy(isLogosBannerVisible = false)
-                delay(timing.bannerExitMs)
-            }
 
             // 3. Release: the spell flies from the caster to its targets.
             _state.value = _state.value.copy(phase = CombatPhase.SPELL_VFX_PLAYING)
@@ -1923,6 +1966,10 @@ class CombatViewModel(
                 tier = resonance.tier,
                 shake = parsed.spell.graphics?.screenShake ?: 0f
             )
+            // The resonance reveal lands with the blow: banner, fanfare and impact are one moment.
+            _state.value = _state.value.copy(isLogosBannerVisible = showBanner)
+            if (isSuperLogos) sfxManager.playLogosFanfare()
+            cue(BattleCue.ResonanceReveal(activeHero.id, resonance, showBanner))
             cue(impact)
             announceFallen(aliveBefore)
             hold(impact)
@@ -2268,6 +2315,9 @@ class CombatViewModel(
         conclusionWatchdogJob = null
         atbJob?.cancel()
         atbJob = null
+        chargeJob?.cancel()
+        chargeJob = null
+        endCharge()
         combatNarrator.setCombatActive(false)
         _state.update { it.copy(phase = CombatPhase.INACTIVE) }
     }
@@ -2426,6 +2476,7 @@ class CombatViewModel(
         )
         cue(BattleCue.BattleStart(currentEncounterId))
         startAtbLoop()
+        startChargeWatcher()
     }
 
     fun restartBattle() {
@@ -2464,6 +2515,7 @@ class CombatViewModel(
         )
         cue(BattleCue.BattleStart(currentEncounterId))
         startAtbLoop()
+        startChargeWatcher()
     }
 
     fun cleanup() {
@@ -2472,6 +2524,8 @@ class CombatViewModel(
         conclusionWatchdogJob?.cancel()
         conclusionWatchdogJob = null
         atbJob?.cancel()
+        chargeJob?.cancel()
+        endCharge()
         speechManager.destroy()
         combatNarrator.destroy()
     }
@@ -2487,5 +2541,9 @@ class CombatViewModel(
 
         /** Particle burst of an enemy move that declares none in its graphics. */
         const val ENEMY_IMPACT_PARTICLES = 15
+
+        /** How often a charge passes the live voice level on (the hum follows every sample). */
+        const val CHARGE_LEVEL_INTERVAL_MS = 50L
+        const val CHARGE_LEVEL_JUMP = 0.15f
     }
 }

@@ -156,6 +156,13 @@ schema.
 - The resonance meter fills live while speaking, then snaps to the scored value on release.
 - Typed chants (`submitTypedChant`) play a short simulated charge, so the beat still exists.
 
+**Status: done (2026-11-24).** The view model watches the microphone: while the active hero's turn is
+listening it emits `ChargeStart`/`ChargeLevel`/`ChargeEnd` (small changes at most every 50 ms, jumps at once)
+and drives `SfxManager`'s streaming charge hum. The director dims the backdrop to 70% and grows a gold aura
+and rising motes on the caster. The pre-hit banner wait is gone: Release → (flight) → ResonanceReveal + banner
++ fanfare + Impact as one moment. Typed and automatic chants hold a 350 ms simulated charge. The console's
+meter follows the voice while listening ("CHARGING…") and snaps to the scored value.
+
 ### M4: Telegraphs and title cards (E)
 - An enemy picks its move **when its gauge reaches 75%** (`EnemyBrain.pickMove` moves earlier
   and is stored as `plannedMove`). An intent icon shows above it (attack, AoE, buff, summon, drain,

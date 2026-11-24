@@ -20,7 +20,18 @@ sealed interface BattleCue {
     /** A battle (or a restart) begins: the arena is cleared of leftover effects. */
     data class BattleStart(val encounterId: String?) : BattleCue
 
-    /** A hero's voice was scored. Held on screen before the spell flies ([CombatTiming.holdMs]). */
+    /**
+     * The active hero is charging a chant: while the microphone hears them ([typed] false: the level
+     * follows the voice through [ChargeLevel]), or a short simulated charge for a typed chant.
+     */
+    data class ChargeStart(val casterId: String, val typed: Boolean) : BattleCue
+
+    /** Live voice level 0..1 while charging. */
+    data class ChargeLevel(val casterId: String, val level: Float) : BattleCue
+
+    data class ChargeEnd(val casterId: String) : BattleCue
+
+    /** A hero's voice was scored; revealed together with the [Impact] it powers. */
     data class ResonanceReveal(val casterId: String, val resonance: ResonanceResult, val showBanner: Boolean) : BattleCue
 
     /** An enemy chose its move. Buffs and summons hold the stage for a moment; attacks follow at once. */

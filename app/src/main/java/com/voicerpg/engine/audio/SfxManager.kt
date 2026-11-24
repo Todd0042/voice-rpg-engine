@@ -119,6 +119,63 @@ class SfxManager(private val context: Context? = null) {
         }
     }
 
+    // ---- Charge hum: a continuous tone that follows the voice while a chant charges -----------------
+    @Volatile private var humLevel = 0f
+    private var humJob: kotlinx.coroutines.Job? = null
+
+    /** Starts the hum (no-op without an audio context, i.e. in unit tests). */
+    fun startChargeHum() {
+        if (context == null || isMuted || humJob?.isActive == true) return
+        humLevel = 0f
+        humJob = scope.launch { streamHum() }
+    }
+
+    /** 0..1: pitch rises and the hum swells with the voice. */
+    fun setChargeLevel(level: Float) {
+        humLevel = level.coerceIn(0f, 1f)
+    }
+
+    fun stopChargeHum() {
+        humJob?.cancel()
+        humJob = null
+        humLevel = 0f
+    }
+
+    private suspend fun streamHum() {
+        val chunk = sampleRate / 50 // 20 ms
+        val track = try {
+            AudioTrack.Builder()
+                .setAudioAttributes(AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_GAME).setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION).build())
+                .setAudioFormat(AudioFormat.Builder().setEncoding(AudioFormat.ENCODING_PCM_16BIT).setSampleRate(sampleRate).setChannelMask(AudioFormat.CHANNEL_OUT_MONO).build())
+                .setBufferSizeInBytes(chunk * 2 * 4)
+                .setTransferMode(AudioTrack.MODE_STREAM)
+                .build()
+        } catch (_: Exception) { return }
+        val buffer = ShortArray(chunk)
+        var phase = 0.0
+        var level = 0f
+        try {
+            track.play()
+            while (kotlinx.coroutines.currentCoroutineContext()[kotlinx.coroutines.Job]?.isActive == true) {
+                for (i in 0 until chunk) {
+                    level += (humLevel - level) * 0.002f // glide, no clicks
+                    val freq = 90.0 + 260.0 * level
+                    phase += 2.0 * Math.PI * freq / sampleRate
+                    if (phase > 2.0 * Math.PI) phase -= 2.0 * Math.PI
+                    val saw = (phase / Math.PI - 1.0).toFloat()
+                    val tone = 0.65f * sin(phase).toFloat() + 0.35f * saw
+                    val amp = 0.04f + 0.22f * level
+                    buffer[i] = (tone * amp * Short.MAX_VALUE).toInt().coerceIn(Short.MIN_VALUE.toInt(), Short.MAX_VALUE.toInt()).toShort()
+                }
+                track.write(buffer, 0, chunk)
+            }
+        } catch (_: Exception) {
+        } finally {
+            runCatching { track.stop() }
+            track.release()
+        }
+    }
+
     private fun playPcm(pcmData: ShortArray) {
         try {
             val audioTrack = AudioTrack.Builder()

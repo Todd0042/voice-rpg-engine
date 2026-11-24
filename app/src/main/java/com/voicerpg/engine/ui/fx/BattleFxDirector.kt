@@ -65,6 +65,19 @@ class BattleFxDirector(private val positionOf: (String) -> Offset) {
     /** Damage and heal numbers in flight. */
     val numbers = mutableStateListOf<DamageNumber>()
 
+    /** 0..0.3: the arena backdrop darkens while a chant charges. */
+    var dim by mutableFloatStateOf(0f)
+        private set
+
+    /** The charging caster (null when nobody charges) and its smoothed voice level 0..1. */
+    var chargingId: String? = null
+        private set
+    var chargeLevel = 0f
+        private set
+    private var chargeTarget = 0f
+    private var chargeTyped = false
+    private var moteDebt = 0f
+
     private val combatants = HashMap<String, CombatantFx>()
     private val pending = mutableListOf<Pair<Float, () -> Unit>>()
     private var zoomStart = -1f
@@ -77,6 +90,18 @@ class BattleFxDirector(private val positionOf: (String) -> Offset) {
     fun play(cue: BattleCue) {
         when (cue) {
             is BattleCue.BattleStart -> clear()
+            is BattleCue.ChargeStart -> {
+                chargingId = cue.casterId
+                chargeTyped = cue.typed
+                chargeLevel = 0f
+                chargeTarget = if (cue.typed) TYPED_CHARGE_LEVEL else 0f
+                fxOf(cue.casterId).glow = CHARGE_GLOW
+            }
+            is BattleCue.ChargeLevel -> if (cue.casterId == chargingId) chargeTarget = cue.level.coerceIn(0f, 1f)
+            is BattleCue.ChargeEnd -> {
+                if (cue.casterId == chargingId) chargingId = null
+                fxOf(cue.casterId).let { it.glow = null; it.glowStrength = 0f }
+            }
             is BattleCue.ResonanceReveal -> when {
                 cue.resonance.bonusPercent >= SUPER_BONUS ->
                     kick(if (cue.resonance.tier == ResonanceTier.TRANSCENDENTAL) 30f else 18f, direction = 0f)
@@ -104,12 +129,31 @@ class BattleFxDirector(private val positionOf: (String) -> Offset) {
         shake.step(step.realSeconds)
         for (c in combatants.values) c.step(step.realSeconds, step.fxSeconds)
         if (numbers.isNotEmpty()) numbers.removeAll { time - it.bornAt > DamageNumber.LIFETIME }
+        stepCharge(step.realSeconds)
         if (screenFlash > 0f) screenFlash = (screenFlash - step.realSeconds / SCREEN_FLASH_SECONDS).coerceAtLeast(0f)
         if (zoomStart >= 0f) {
             val t = (time - zoomStart) / ZOOM_SECONDS
             if (t >= 1f) { zoom = 1f; zoomStart = -1f } else zoom = 1f + ZOOM_PEAK * sin(PI.toFloat() * t)
         }
         frameTick = frameNanos
+    }
+
+    private fun stepCharge(dt: Float) {
+        val caster = chargingId
+        val dimTarget = if (caster != null) MAX_DIM else 0f
+        dim += (dimTarget - dim) * (dt * 8f).coerceAtMost(1f)
+        if (dim < 0.002f) dim = 0f
+        if (caster == null) { chargeLevel = 0f; return }
+        val rate = if (chargeTyped) 3f else 14f // typed: a steady ramp; voice: follows quickly
+        chargeLevel += (chargeTarget - chargeLevel) * (dt * rate).coerceAtMost(1f)
+        fxOf(caster).glowStrength = 0.25f + 0.75f * chargeLevel
+        moteDebt += dt * MAX_MOTES_PER_SECOND * chargeLevel
+        val motes = moteDebt.toInt()
+        if (motes > 0) {
+            moteDebt -= motes
+            val at = positionOf(caster)
+            particles.emit(com.voicerpg.engine.model.SpellSchool.HOLY, at.x, at.y, count = motes, isLogos = false)
+        }
     }
 
     /** How long [cue] freezes the arena: by tier for the party's blows, short for enemies'. */
@@ -204,6 +248,9 @@ class BattleFxDirector(private val positionOf: (String) -> Offset) {
         zoom = 1f
         zoomStart = -1f
         screenFlash = 0f
+        chargingId = null
+        chargeLevel = 0f
+        dim = 0f
     }
 
     private fun release(cue: BattleCue.Release) {
@@ -254,6 +301,10 @@ class BattleFxDirector(private val positionOf: (String) -> Offset) {
         const val ZOOM_SECONDS = 0.35f
         const val SCREEN_FLASH_SECONDS = 0.25f
         const val MAX_FLASHES_PER_SECOND = 3
+        const val MAX_DIM = 0.3f
+        const val TYPED_CHARGE_LEVEL = 0.8f
+        const val MAX_MOTES_PER_SECOND = 45f
+        val CHARGE_GLOW = Color(0xFFFFD54F)
         val GOLD = Color(0xFFFFD54F)
         val GREY = Color(0xFFB0BEC5)
         val AMBER = Color(0xFFFFAB00)
