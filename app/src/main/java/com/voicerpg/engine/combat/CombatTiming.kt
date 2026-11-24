@@ -35,6 +35,8 @@ data class CombatTiming(val scale: Float = 1f) {
             is BattleCue.TurnEnd -> if (cue.fromParty) 200 else if (pocket) 300 else 250
             is BattleCue.Release,
             is BattleCue.Telegraph,
+            is BattleCue.Stagger,
+            is BattleCue.Streak,
             is BattleCue.UltimateCharge,
             is BattleCue.TitleCard,
             is BattleCue.ChargeLevel,

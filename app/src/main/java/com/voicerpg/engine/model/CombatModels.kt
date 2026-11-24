@@ -135,7 +135,9 @@ data class Enemy(
     /** The move it telegraphed when its gauge passed 75% (M4), used on its next turn. */
     val plannedMove: String? = null,
     /** Charge turns left before a planned boss ultimate fires; 0 when not charging. */
-    val ultimateChargeLeft: Int = 0
+    val ultimateChargeLeft: Int = 0,
+    /** The round it was last staggered in (one stagger per enemy per round); 0 = never. */
+    val staggeredRound: Int = 0
 ) {
     val isAlive: Boolean get() = currentHp > 0
     val isTurnReady: Boolean get() = isAlive && atbGauge >= 1.0f

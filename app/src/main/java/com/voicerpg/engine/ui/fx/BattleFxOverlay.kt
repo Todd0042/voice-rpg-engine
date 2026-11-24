@@ -168,3 +168,27 @@ private fun TitleCardBody(text: String, style: com.voicerpg.engine.content.Prese
         )
     }
 }
+
+/** The resonance streak badge ("RESONANCE x3"), top right of the arena; it pulses when it grows. */
+@Composable
+fun StreakBadge(director: BattleFxDirector, modifier: Modifier = Modifier) {
+    val streak = director.streak ?: return
+    director.frameTick
+    val age = director.time - streak.bornAt
+    val pop = 1f + 0.35f * kotlin.math.exp(-age / 0.12f)
+    val label = director.presentation.streak.label.replace("{n}", streak.count.toString())
+    Box(modifier = modifier.fillMaxSize().padding(top = 8.dp, end = 10.dp), contentAlignment = Alignment.TopEnd) {
+        Text(
+            text = label,
+            color = Color(0xFFFFF59D),
+            fontSize = (11 + streak.count.coerceAtMost(6)).sp,
+            fontWeight = FontWeight.Black,
+            fontFamily = FontFamily.Monospace,
+            modifier = Modifier
+                .graphicsLayer { scaleX = pop; scaleY = pop }
+                .background(Color(0xCC4A148C), RoundedCornerShape(6.dp))
+                .border(1.dp, Color(0xFFFFD54F), RoundedCornerShape(6.dp))
+                .padding(horizontal = 8.dp, vertical = 3.dp)
+        )
+    }
+}

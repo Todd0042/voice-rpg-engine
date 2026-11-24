@@ -97,6 +97,15 @@ sealed interface BattleCue {
 
     enum class HitKind { DAMAGE, HEAL, MANA }
 
+    /**
+     * A bold chant rocked an enemy: its gauge was pushed back. [interruptedMove] names the boss ultimate it
+     * broke, if any.
+     */
+    data class Stagger(val enemyId: String, val interruptedMove: String?) : BattleCue
+
+    /** Consecutive strong casts: [count] ≥ 2 while it runs, 0 when it ends. Looks and sound only. */
+    data class Streak(val count: Int) : BattleCue
+
     /** A combatant fell (announced right after the [Impact] that felled it). */
     data class Death(val combatantId: String, val isEnemy: Boolean) : BattleCue
 

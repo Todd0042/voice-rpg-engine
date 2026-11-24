@@ -194,6 +194,15 @@ before firing. The view model takes a seedable `random`; tests: `EnemyTelegraphT
   stagger. Gate: no encounter becomes trivial by stagger-locking (cap 1 stagger per enemy per round).
 - Tests: the streak never changes damage numbers (property test over all tiers); stagger cap; interrupt rules.
 
+**Status: done (2026-11-24).** Stagger (MASTER+ on affinity ≥ 1.5: gauge −35%) and interrupt (MYTHIC+ on a
+boss holding its ultimate: plan cleared, "BROKEN!" title card, narrator line, stinger) share the cap of one per
+enemy per round (`Enemy.staggeredRound`). The streak counts casts at or above `streak.minTier`, resets on a
+weaker cast, a fallen hero or a new battle, and only changes looks and sound (badge, bigger bursts from 3,
+fanfare pitch +6% per step). Damage rolls now use the view model's injectable `random`, which makes the
+property test possible: `BoldVoiceTest` shows identical damage at every tier with and without a streak.
+Balance harness: not extended; the per-round cap bounds stagger to −0.35 gauge per enemy per round, which
+`BoldVoiceTest` enforces. Revisit if a boss fight feels stun-locked on device.
+
 ### M6: Death shatter and living sprites (C, H)
 - Shatter: on death, every opaque pixel of the sprite's current frame becomes a particle (color,
   velocity away from the hit, gravity, fade). The sprite grid is already data (`PixelSpriteData`), so

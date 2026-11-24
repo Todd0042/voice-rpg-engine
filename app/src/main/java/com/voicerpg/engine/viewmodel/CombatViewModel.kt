@@ -94,7 +94,7 @@ class CombatViewModel(
     val musicManager: com.voicerpg.engine.audio.MusicManager? = null,
     /** Every wait in a turn; [CombatTiming.INSTANT] in tests that don't measure time. */
     val timing: CombatTiming = CombatTiming.DEFAULT,
-    /** Enemy move choice; seed it in tests for repeatable battles. */
+    /** Enemy move choice and damage rolls; seed it in tests for repeatable battles. */
     private val random: Random = Random.Default,
     private val scopeOverride: CoroutineScope? = null
 ) : ViewModel() {
@@ -176,7 +176,76 @@ class CombatViewModel(
     /** Announces a [BattleCue.Death] for everyone alive in [before] who has fallen since. */
     private fun announceFallen(before: Set<String>) {
         val enemyIds = _state.value.enemies.map { it.id }.toSet()
-        for (id in before - aliveIds()) cue(BattleCue.Death(id, isEnemy = id in enemyIds))
+        for (id in before - aliveIds()) {
+            val isEnemy = id in enemyIds
+            cue(BattleCue.Death(id, isEnemy = isEnemy))
+            if (!isEnemy) endStreak() // a fallen hero ends the streak
+        }
+    }
+
+    // ---- Reward bold voices (M5) ---------------------------------------------------------------------
+    private var streak = 0
+
+    /** Consecutive casts at or above the game's streak tier. Changes looks and sound only, never damage. */
+    private fun updateStreak(tier: ResonanceTier) {
+        if (tier >= GameContent.presentation.streak.minTier) {
+            streak++
+            if (streak >= 2) cue(BattleCue.Streak(streak))
+        } else {
+            endStreak()
+        }
+    }
+
+    private fun endStreak() {
+        if (streak == 0) return
+        streak = 0
+        cue(BattleCue.Streak(0))
+    }
+
+    /** Is [enemy] a boss holding a planned ultimate (charging, or about to fire)? */
+    private fun holdsUltimate(enemy: Enemy): Boolean {
+        val planned = enemy.plannedMove ?: return false
+        if (!enemy.isBoss) return false
+        return enemy.ultimateChargeLeft > 0 ||
+            movesetOf(enemy).let { set -> (set.moves + set.phases.flatMap { it.addMoves }).any { it.name == planned && Intent.isUltimate(true, it) } }
+    }
+
+    /**
+     * After a hero's blow: a MASTER+ chant on a weakness pushes the target's gauge back; a MYTHIC+ hit on a
+     * boss holding its ultimate breaks it. At most one per enemy per round.
+     */
+    private fun applyBoldVoice(hits: List<BattleCue.Hit>, tier: ResonanceTier) {
+        val round = _state.value.roundNumber
+        val staggers = mutableListOf<BattleCue.Stagger>()
+        _state.update { prev ->
+            prev.copy(enemies = prev.enemies.map { e ->
+                val hit = hits.firstOrNull { it.targetId == e.id && it.kind == BattleCue.HitKind.DAMAGE && it.amount > 0 }
+                if (hit == null || !e.isAlive || e.staggeredRound == round) return@map e
+                val pushedBack = (e.atbGauge - STAGGER_GAUGE).coerceAtLeast(0f)
+                when {
+                    tier >= ResonanceTier.MYTHIC && holdsUltimate(e) -> {
+                        staggers += BattleCue.Stagger(e.id, interruptedMove = e.plannedMove)
+                        e.copy(atbGauge = pushedBack, plannedMove = null, ultimateChargeLeft = 0, staggeredRound = round)
+                    }
+                    tier >= ResonanceTier.MASTER && hit.affinity >= WEAKNESS_AFFINITY -> {
+                        staggers += BattleCue.Stagger(e.id, interruptedMove = null)
+                        e.copy(atbGauge = pushedBack, staggeredRound = round)
+                    }
+                    else -> e
+                }
+            })
+        }
+        for (s in staggers) {
+            cue(s)
+            if (s.interruptedMove != null) {
+                cue(BattleCue.TitleCard("BROKEN!", fromParty = true))
+                val name = _state.value.enemies.firstOrNull { it.id == s.enemyId }?.name ?: "The foe"
+                combatNarrator.speak("$name's ${s.interruptedMove} is broken!", force = true)
+                sfxManager.playStaggerStinger()
+            } else {
+                sfxManager.playStaggerStinger()
+            }
+        }
     }
 
     // Debug-only developer tools visibility. Kept OUT of CombatState so that
@@ -750,7 +819,8 @@ class CombatViewModel(
                         enemyAttack = enemy.baseAttack,
                         movePowerMult = move.powerMult * weakenedMult,
                         defenderGuarding = hero.isGuarding,
-                        defenderStatusMitigation = blessMitigation.coerceIn(0.5f, 1.25f)
+                        defenderStatusMitigation = blessMitigation.coerceIn(0.5f, 1.25f),
+                        random = random
                     )
                     totalDamage += damage
                     hits += BattleCue.Hit(hero.id, damage)
@@ -2031,10 +2101,13 @@ class CombatViewModel(
             )
             // The resonance reveal lands with the blow: banner, fanfare and impact are one moment.
             _state.value = _state.value.copy(isLogosBannerVisible = showBanner)
-            if (isSuperLogos) sfxManager.playLogosFanfare()
+            val streakBefore = streak
+            if (isSuperLogos) sfxManager.playLogosFanfare(pitch = 1f + 0.06f * streakBefore.coerceIn(0, 6))
             cue(BattleCue.ResonanceReveal(activeHero.id, resonance, showBanner))
             cue(impact)
             announceFallen(aliveBefore)
+            if (!isAttune && !isHeal) applyBoldVoice(hits, resonance.tier)
+            updateStreak(resonance.tier)
             hold(impact)
 
             // 5. Reset active hero's ATB gauge to 0 and record lastActedHeroId for round-robin rotation
@@ -2149,7 +2222,8 @@ class CombatViewModel(
                 spellBasePower = spell.basePower.toFloat(),
                 attackerLevel = caster.level,
                 resonanceMultiplier = resonance.damageMultiplier,
-                partyWide = targetsToHeal.size > 1
+                partyWide = targetsToHeal.size > 1,
+                random = random
             )
         } else 0
 
@@ -2240,7 +2314,8 @@ class CombatViewModel(
                     targetDefense = enemy.defense,
                     defenseMultiplier = StatusSystem.defenseMult(enemy.statuses),
                     attackerWeakened = weakenedCaster
-                )
+                ),
+                random
             )
             val effectiveDamage = if (_state.value.isPureStoryMode) {
                 (strike.damage * 2.5f).toInt().coerceAtLeast(100)
@@ -2525,6 +2600,7 @@ class CombatViewModel(
         turnsTakenInRound = 0
         lastActedHeroId = null
         lastActedFaction = CombatantFaction.NONE
+        streak = 0
         musicManager?.playCombatMusic()
         combatNarrator.setCombatActive(true)
 
@@ -2557,6 +2633,7 @@ class CombatViewModel(
         turnsTakenInRound = 0
         lastActedHeroId = null
         lastActedFaction = CombatantFaction.NONE
+        streak = 0
         _combatantPositions.clear()
         resonanceEngine.noveltyCache.clear()
         val initialParty = GameContent.createDuoParty()
@@ -2604,6 +2681,10 @@ class CombatViewModel(
 
         /** Particle burst of an enemy move that declares none in its graphics. */
         const val ENEMY_IMPACT_PARTICLES = 15
+
+        /** How far a stagger pushes an enemy's gauge back. */
+        const val STAGGER_GAUGE = 0.35f
+        const val WEAKNESS_AFFINITY = 1.5f
 
         /** Gauge at which an enemy picks and telegraphs its next move. */
         const val PLAN_AT_GAUGE = 0.75f

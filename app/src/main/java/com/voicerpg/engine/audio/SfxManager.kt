@@ -93,10 +93,11 @@ class SfxManager(private val context: Context? = null) {
         }
     }
 
-    fun playLogosFanfare() {
+    /** [pitch] > 1 raises the arpeggio (a running resonance streak climbs). */
+    fun playLogosFanfare(pitch: Float = 1f) {
         scope.launch {
             // Victorious arpeggio: C5 (523Hz), E5 (659Hz), G5 (784Hz), C6 (1046Hz)
-            val notes = listOf(523.25, 659.25, 783.99, 1046.50)
+            val notes = listOf(523.25, 659.25, 783.99, 1046.50).map { it * pitch }
             val noteDurationMs = 80
             val totalDurationMs = noteDurationMs * notes.size + 150
             val numSamples = (sampleRate * (totalDurationMs / 1000.0)).toInt()
@@ -114,6 +115,26 @@ class SfxManager(private val context: Context? = null) {
                     val sample = (tone * envelope * Short.MAX_VALUE * 0.4f).toInt()
                     buffer[i] = (buffer[i] + sample).coerceIn(Short.MIN_VALUE.toInt(), Short.MAX_VALUE.toInt()).toShort()
                 }
+            }
+            playPcm(buffer)
+        }
+    }
+
+    /** Stagger / broken ultimate: a sharp crack falling into a low thud. */
+    fun playStaggerStinger() {
+        if (isMuted) return
+        scope.launch {
+            val n = (sampleRate * 0.32).toInt()
+            val buffer = ShortArray(n)
+            var phase = 0.0
+            for (i in 0 until n) {
+                val t = i.toFloat() / n
+                val freq = 880.0 * (1.0 - t * 0.85)
+                phase += 2.0 * Math.PI * freq / sampleRate
+                val crack = (Random.nextFloat() * 2f - 1f) * (1f - t).let { it * it * it }
+                val tone = sin(phase).toFloat() * (1f - t)
+                val sample = ((0.55f * tone + 0.45f * crack) * Short.MAX_VALUE * 0.5f).toInt()
+                buffer[i] = sample.coerceIn(Short.MIN_VALUE.toInt(), Short.MAX_VALUE.toInt()).toShort()
             }
             playPcm(buffer)
         }

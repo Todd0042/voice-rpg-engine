@@ -66,6 +66,10 @@ class BattleFxDirector(private val positionOf: (String) -> Offset) {
     /** Damage and heal numbers in flight. */
     val numbers = mutableStateListOf<DamageNumber>()
 
+    /** A running resonance streak (badge), or null. */
+    var streak by mutableStateOf<ShownStreak?>(null)
+        private set
+
     /** The move name on screen, in the game's title-card style. */
     var titleCard by mutableStateOf<ShownTitleCard?>(null)
         private set
@@ -124,6 +128,8 @@ class BattleFxDirector(private val positionOf: (String) -> Offset) {
             is BattleCue.Release -> release(cue)
             is BattleCue.Impact -> impact(cue)
             is BattleCue.Reinforcements -> kick(12f, direction = 0f)
+            is BattleCue.Stagger -> stagger(cue)
+            is BattleCue.Streak -> streak = if (cue.count >= 2) ShownStreak(cue.count, time) else null
             is BattleCue.Death -> fxOf(cue.combatantId).let { it.intent = null; it.ultimateCharge = null; it.glow = null; it.leanTarget = 0f }
             is BattleCue.PhaseShift,
             is BattleCue.Guard,
@@ -150,6 +156,23 @@ class BattleFxDirector(private val positionOf: (String) -> Offset) {
             if (t >= 1f) { zoom = 1f; zoomStart = -1f } else zoom = 1f + ZOOM_PEAK * sin(PI.toFloat() * t)
         }
         frameTick = frameNanos
+    }
+
+    private fun stagger(cue: BattleCue.Stagger) {
+        val fx = fxOf(cue.enemyId)
+        fx.hit(direction = 1f, amplitudeDp = 18f * presentation.intensity.coerceAtLeast(0f) * (if (reduceMotion) 0.5f else 1f))
+        if (cue.interruptedMove != null) {
+            fx.intent = null
+            fx.ultimateCharge = null
+            fx.glow = null
+            kick(16f, direction = 1f)
+            clock.hitStop(if (reduceMotion) REDUCED_HIT_STOP_MS else 220L)
+        }
+        val at = positionOf(cue.enemyId)
+        numbers += DamageNumber(
+            id = nextNumberId++, targetId = cue.enemyId, text = if (cue.interruptedMove != null) "BROKEN!" else "STAGGER!",
+            color = STAGGER_COLOR, label = null, labelColor = STAGGER_COLOR, x = at.x, y = at.y - 40f, drift = 0f, big = true, bornAt = time
+        )
     }
 
     private fun enemyMove(cue: BattleCue.EnemyMove) {
@@ -285,12 +308,14 @@ class BattleFxDirector(private val positionOf: (String) -> Offset) {
         chargeLevel = 0f
         dim = 0f
         titleCard = null
+        streak = null
     }
 
     private fun release(cue: BattleCue.Release) {
         val caster = positionOf(cue.casterId)
         fxOf(cue.casterId).pulse()
-        val isLogos = cue.bonusPercent >= SUPER_BONUS
+        // A running streak makes the bursts bigger (looks only).
+        val isLogos = cue.bonusPercent >= SUPER_BONUS || (cue.fromParty && (streak?.count ?: 0) >= 3)
         if (cue.style == BattleCue.ReleaseStyle.ATTUNE) {
             particles.emit(cue.school, caster.x, caster.y, count = ATTUNE_PARTICLES, isLogos = isLogos)
             return
@@ -340,6 +365,7 @@ class BattleFxDirector(private val positionOf: (String) -> Offset) {
         const val MAX_MOTES_PER_SECOND = 45f
         val CHARGE_GLOW = Color(0xFFFFD54F)
         val ULTIMATE_GLOW = Color(0xFFFF1744)
+        val STAGGER_COLOR = Color(0xFFFF6E40)
         val GOLD = Color(0xFFFFD54F)
         val GREY = Color(0xFFB0BEC5)
         val AMBER = Color(0xFFFFAB00)
@@ -357,6 +383,9 @@ data class ShownTitleCard(val text: String, val fromParty: Boolean, val bornAt: 
         const val LIFETIME = 1.15f
     }
 }
+
+/** A resonance streak badge: [count] casts in a row, shown since [bornAt]. */
+data class ShownStreak(val count: Int, val bornAt: Float)
 
 /** Runs the director's frame loop and draws its projectiles and particles over the arena. */
 @Composable
