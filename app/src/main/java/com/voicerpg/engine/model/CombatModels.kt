@@ -142,7 +142,9 @@ data class Enemy(
     val scale: Float = 1f,
     /** Lines it may shout when it telegraphs a move (enemies.json `taunts`). */
     val taunts: List<String> = emptyList(),
-    val hitReaction: HitReaction = HitReaction.FLINCH
+    val hitReaction: HitReaction = HitReaction.FLINCH,
+    /** A portrait panel for its ultimate (enemies.json `cutIn`). */
+    val cutIn: CutInSpec? = null
 ) {
     val isAlive: Boolean get() = currentHp > 0
     val isTurnReady: Boolean get() = isAlive && atbGauge >= 1.0f
@@ -158,6 +160,12 @@ enum class HitReaction {
         fun parse(raw: String?): HitReaction = entries.firstOrNull { it.name.equals(raw?.trim(), ignoreCase = true) } ?: FLINCH
     }
 }
+
+/**
+ * A cut-in panel (characters' `combat.cutIn`, enemies' `cutIn`): portrait asset, colour (#RRGGBB) and an
+ * optional quote. Missing fields fall back to the character's portrait and theme colour.
+ */
+data class CutInSpec(val portrait: String? = null, val color: String? = null, val quote: String? = null)
 
 enum class TargetSelection {
     FIRST_ALIVE_ENEMY,

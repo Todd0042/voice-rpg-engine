@@ -24,6 +24,8 @@ data class CombatTiming(val scale: Float = 1f) {
             is BattleCue.ResonanceReveal -> 0
             is BattleCue.Impact -> if (cue.fromParty) (if (pocket) 300 else 700) else 300
             is BattleCue.PhaseShift -> 400
+            // Pocket mode skips the panel (its quote is spoken instead).
+            is BattleCue.CutIn -> if (pocket) 0 else 650
             // Buffs, summons and guards are followed by their TurnEnd hold too; these are the extra pause.
             is BattleCue.EnemyMove -> when (cue.kind) {
                 "SUMMON" -> if (pocket) 0 else 450

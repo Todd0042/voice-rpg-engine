@@ -65,6 +65,7 @@ import com.voicerpg.engine.ui.fx.DamageNumbersLayer
 import com.voicerpg.engine.ui.fx.ScreenFlashLayer
 import com.voicerpg.engine.ui.fx.TitleCardLayer
 import com.voicerpg.engine.ui.fx.StreakBadge
+import com.voicerpg.engine.ui.fx.CutInLayer
 import androidx.compose.ui.graphics.graphicsLayer
 import com.voicerpg.engine.viewmodel.CombatViewModel
 import kotlinx.coroutines.delay
@@ -300,6 +301,7 @@ fun RetroBattleScreen(
                     DamageNumbersLayer(director = director)
                     TitleCardLayer(director = director)
                     StreakBadge(director = director)
+                    CutInLayer(director = director)
                     ScreenFlashLayer(director = director)
 
                     // Logos Golden Banner Overlay (Top-Center Notification Style)

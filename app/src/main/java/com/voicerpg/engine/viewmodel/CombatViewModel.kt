@@ -202,6 +202,36 @@ class CombatViewModel(
         cue(BattleCue.Streak(0))
     }
 
+    // ---- Cut-ins (M7) ----------------------------------------------------------------------------------
+    private fun heroCutIn(member: PartyMember, tier: ResonanceTier): BattleCue.CutIn? {
+        if (tier < GameContent.presentation.cutIn.minTier) return null
+        val character = GameContent.characterById(member.id)
+        val spec = character?.combat?.cutIn
+        val portrait = spec?.portrait ?: character?.speaker?.portraitAsset
+            ?: if (member.id == "hero") GameContent.manifest.defaultHeroPortrait else null
+        val color = spec?.color?.let { com.voicerpg.engine.content.parseHexColor(it, member.avatarTint) }
+            ?: character?.speaker?.themeColor ?: member.avatarTint
+        return BattleCue.CutIn(member.id, member.name, tier, portrait, color, spec?.quote, isEnemy = false)
+    }
+
+    private fun enemyCutIn(enemy: Enemy): BattleCue.CutIn? {
+        val spec = enemy.cutIn ?: return null
+        return BattleCue.CutIn(
+            characterId = enemy.id, name = enemy.name, tier = ResonanceTier.TRANSCENDENTAL, portrait = spec.portrait,
+            color = spec.color?.let { com.voicerpg.engine.content.parseHexColor(it, enemy.spriteTint) } ?: enemy.spriteTint,
+            quote = spec.quote, isEnemy = true
+        )
+    }
+
+    /** Plays a cut-in; in pocket mode its quote is spoken instead of shown. */
+    private suspend fun playCutIn(cutIn: BattleCue.CutIn) {
+        cue(cutIn)
+        if (combatNarrator.isEyesFreeMode.value && !cutIn.quote.isNullOrBlank()) {
+            combatNarrator.speak("${cutIn.name}: ${cutIn.quote}", force = false)
+        }
+        hold(cutIn)
+    }
+
     /** Is [enemy] a boss holding a planned ultimate (charging, or about to fire)? */
     private fun holdsUltimate(enemy: Enemy): Boolean {
         val planned = enemy.plannedMove ?: return false
@@ -720,6 +750,7 @@ class CombatViewModel(
             )
             cue(moveCue)
             if (move.showsTitleCard) cue(BattleCue.TitleCard(move.name, fromParty = false))
+            if (isBossUltimate) enemyCutIn(refreshedSelf)?.let { playCutIn(it) }
 
             // SUMMON moves spawn codex-true minions instead of attacking.
             if (move.kind == "SUMMON") {
@@ -2051,6 +2082,9 @@ class CombatViewModel(
             sfxManager.playSoundBite(parsed.spell.soundBites.ifEmpty {
                 com.voicerpg.engine.content.GameContent.characterById(activeHero.id)?.soundBites ?: emptyList()
             })
+
+            // A MYTHIC+ voice earns a portrait cut-in before the spell flies.
+            heroCutIn(activeHero, resonance.tier)?.let { playCutIn(it) }
 
             // 3. Release: the spell flies from the caster to its targets.
             _state.value = _state.value.copy(phase = CombatPhase.SPELL_VFX_PLAYING)

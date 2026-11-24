@@ -230,6 +230,12 @@ drops frames).
 - Fallback when there is no portrait: a zoomed pixel sprite on the panel.
 - Enemy bosses can use the same cut-in for their ultimates (`enemies.json` `cutIn`).
 
+**Status: done (2026-11-24).** A hero cast at or above `cutIn.minTier` plays a `CutIn` before the release
+(650 ms, arena at 0.3× behind it): a diagonal panel in the character's colour with speed lines, the portrait
+(`combat.cutIn.portrait`, else the speaker's portrait, else the manifest's hero portrait; the hero's selfie
+portrait replaces it through `StoryAssetLoader`), name and `quote`; with no portrait, the zoomed pixel sprite.
+Bosses with `cutIn` in enemies.json get one for their ultimate. Pocket mode speaks the quote and skips the hold.
+
 ### M8: Audio (I)
 - Per-school synthesized impact sets (fire crackle, ice shatter, wind whoosh, thunder, holy chime,
   shadow thrum, physical thud) with ±8% random pitch. A low-passed "whomp" layer during hit-stop

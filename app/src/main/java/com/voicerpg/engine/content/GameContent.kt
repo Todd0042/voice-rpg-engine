@@ -138,7 +138,9 @@ data class CharacterCombatDto(
     val spriteAlpha: Float? = null,
     val spellIds: List<String>? = null,
     val spells: List<SpellDto>? = null,
-    val growth: GrowthDto? = null
+    val growth: GrowthDto? = null,
+    /** Portrait panel for MYTHIC+ casts: { portrait, color, quote }. */
+    val cutIn: com.voicerpg.engine.model.CutInSpec? = null
 )
 
 data class SpellGrantDto(
@@ -341,7 +343,8 @@ data class EnemyDto(
     val scale: Float? = null,
     val taunts: List<String>? = null,
     /** flinch | stagger | comic_spin */
-    val hitReaction: String? = null
+    val hitReaction: String? = null,
+    val cutIn: com.voicerpg.engine.model.CutInSpec? = null
 )
 
 data class EnemyFileDto(val enemies: List<EnemyDto>? = null)
@@ -811,7 +814,8 @@ data class CharacterCombat(
     val isGhost: Boolean = false,
     val canAttack: Boolean = true,
     val isUntargetable: Boolean = false,
-    val spriteAlpha: Float? = null
+    val spriteAlpha: Float? = null,
+    val cutIn: com.voicerpg.engine.model.CutInSpec? = null
 )
 
 data class SpriteDefinition(
@@ -913,7 +917,8 @@ data class EnemyTemplate(
     val soundBites: List<String> = emptyList(),
     val scale: Float = if (isBoss) 2.0f else 1.0f,
     val taunts: List<String> = emptyList(),
-    val hitReaction: com.voicerpg.engine.model.HitReaction = com.voicerpg.engine.model.HitReaction.FLINCH
+    val hitReaction: com.voicerpg.engine.model.HitReaction = com.voicerpg.engine.model.HitReaction.FLINCH,
+    val cutIn: com.voicerpg.engine.model.CutInSpec? = null
 ) {
     fun toEnemy(
         instanceId: String? = null,
@@ -949,7 +954,8 @@ data class EnemyTemplate(
             soundBites = soundBites,
             scale = scale,
             taunts = taunts,
-            hitReaction = hitReaction
+            hitReaction = hitReaction,
+            cutIn = cutIn
         )
     }
 }
@@ -1398,7 +1404,8 @@ class GameContentLoader(private val source: ContentSource) {
                 isGhost = c.isGhost,
                 canAttack = c.canAttack,
                 isUntargetable = c.isUntargetable,
-                spriteAlpha = c.spriteAlpha
+                spriteAlpha = c.spriteAlpha,
+                cutIn = c.cutIn
             )
         }
         val resolvedSprite = sprite?.toSpriteDefinition()
@@ -1472,7 +1479,8 @@ class GameContentLoader(private val source: ContentSource) {
         soundBites = soundBites.orEmpty().filter { it.isNotBlank() },
         scale = scale?.takeIf { it.isFinite() }?.coerceIn(0.5f, 3f) ?: if (isBoss) 2.0f else 1.0f,
         taunts = taunts.orEmpty().filter { it.isNotBlank() },
-        hitReaction = com.voicerpg.engine.model.HitReaction.parse(hitReaction)
+        hitReaction = com.voicerpg.engine.model.HitReaction.parse(hitReaction),
+        cutIn = cutIn
     )
 
     private fun EncounterDto.toDefinition(

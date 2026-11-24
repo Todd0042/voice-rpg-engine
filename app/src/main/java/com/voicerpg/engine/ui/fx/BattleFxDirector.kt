@@ -70,6 +70,10 @@ class BattleFxDirector(
     /** Damage and heal numbers in flight. */
     val numbers = mutableStateListOf<DamageNumber>()
 
+    /** The cut-in panel on screen, or null. */
+    var cutIn by mutableStateOf<ShownCutIn?>(null)
+        private set
+
     /** A running resonance streak (badge), or null. */
     var streak by mutableStateOf<ShownStreak?>(null)
         private set
@@ -136,6 +140,10 @@ class BattleFxDirector(
             }
             is BattleCue.EnemyMove -> enemyMove(cue)
             is BattleCue.TitleCard -> titleCard = ShownTitleCard(cue.text, cue.fromParty, time)
+            is BattleCue.CutIn -> {
+                cutIn = ShownCutIn(cue, time)
+                clock.slowMotion(scale = 0.3f, durationMs = (ShownCutIn.LIFETIME * 1000).toLong())
+            }
             is BattleCue.Release -> release(cue)
             is BattleCue.Impact -> impact(cue)
             is BattleCue.Reinforcements -> kick(12f, direction = 0f)
@@ -165,6 +173,7 @@ class BattleFxDirector(
         if (numbers.isNotEmpty()) numbers.removeAll { time - it.bornAt > DamageNumber.LIFETIME }
         stepCharge(step.realSeconds)
         titleCard?.let { if (time - it.bornAt > ShownTitleCard.LIFETIME) titleCard = null }
+        cutIn?.let { if (time - it.bornAt > ShownCutIn.LIFETIME) cutIn = null }
         if (screenFlash > 0f) screenFlash = (screenFlash - step.realSeconds / SCREEN_FLASH_SECONDS).coerceAtLeast(0f)
         if (zoomStart >= 0f) {
             val t = (time - zoomStart) / ZOOM_SECONDS
@@ -383,6 +392,7 @@ class BattleFxDirector(
         dim = 0f
         titleCard = null
         streak = null
+        cutIn = null
     }
 
     private fun release(cue: BattleCue.Release) {
@@ -470,6 +480,13 @@ data class CombatantLook(
     val flipped: Boolean,
     val hitReaction: com.voicerpg.engine.model.HitReaction = com.voicerpg.engine.model.HitReaction.FLINCH
 )
+
+/** A cut-in panel shown since [bornAt] (director time). */
+data class ShownCutIn(val cue: BattleCue.CutIn, val bornAt: Float) {
+    companion object {
+        const val LIFETIME = 0.65f
+    }
+}
 
 /** A resonance streak badge: [count] casts in a row, shown since [bornAt]. */
 data class ShownStreak(val count: Int, val bornAt: Float)

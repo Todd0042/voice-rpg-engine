@@ -53,6 +53,20 @@ sealed interface BattleCue {
         val windupMs: Long = 0
     ) : BattleCue
 
+    /**
+     * A portrait panel slides across ([portrait] asset, or the sprite when null) in [color] with an optional
+     * [quote], while the arena slows behind it: a hero's MYTHIC+ cast, or a boss ultimate.
+     */
+    data class CutIn(
+        val characterId: String,
+        val name: String,
+        val tier: ResonanceTier,
+        val portrait: String?,
+        val color: androidx.compose.ui.graphics.Color?,
+        val quote: String?,
+        val isEnemy: Boolean
+    ) : BattleCue
+
     /** A named move announced on screen, in the game's title-card style. */
     data class TitleCard(val text: String, val fromParty: Boolean) : BattleCue
 
