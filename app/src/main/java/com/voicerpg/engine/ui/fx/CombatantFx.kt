@@ -39,8 +39,10 @@ class CombatantFx {
     /** The sprite has shattered (or faded) away. */
     var hidden by mutableStateOf(false)
 
-    /** Leaning forward to attack (wind-up), 0..1. */
+    /** Leaning forward to attack (wind-up), 0..1; eases toward [leanTarget]. */
     var lean by mutableFloatStateOf(0f)
+        private set
+    var leanTarget = 0f
 
     private var knockAmp = 0f
     private var knockT = 0f
@@ -63,6 +65,10 @@ class CombatantFx {
     }
 
     fun step(realSeconds: Float, fxSeconds: Float) {
+        if (lean != leanTarget) {
+            lean += (leanTarget - lean) * (fxSeconds * 12f).coerceAtMost(1f)
+            if (kotlin.math.abs(lean - leanTarget) < 0.01f) lean = leanTarget
+        }
         if (flash > 0f) flash = (flash - realSeconds / FLASH_SECONDS).coerceAtLeast(0f)
         if (knockAmp != 0f) {
             knockT += fxSeconds
@@ -80,7 +86,7 @@ class CombatantFx {
 
     fun reset() {
         flash = 0f; knockAmp = 0f; knockback = 0f; squashAmp = 0f; squash = 0f
-        glow = null; glowStrength = 0f; intent = null; ultimateCharge = null; hidden = false; lean = 0f
+        glow = null; glowStrength = 0f; intent = null; ultimateCharge = null; hidden = false; lean = 0f; leanTarget = 0f
     }
 
     private companion object {

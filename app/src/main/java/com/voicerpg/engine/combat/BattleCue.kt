@@ -34,8 +34,27 @@ sealed interface BattleCue {
     /** A hero's voice was scored; revealed together with the [Impact] it powers. */
     data class ResonanceReveal(val casterId: String, val resonance: ResonanceResult, val showBanner: Boolean) : BattleCue
 
-    /** An enemy chose its move. Buffs and summons hold the stage for a moment; attacks follow at once. */
-    data class EnemyMove(val enemyId: String, val moveName: String, val kind: String, val isBossUltimate: Boolean) : BattleCue
+    /** An enemy's gauge reached 75%: it picked its next move and shows its [intent]. */
+    data class Telegraph(val enemyId: String, val moveName: String, val intent: Intent, val icon: String = intent.icon) : BattleCue
+
+    /** A boss spends this turn charging its ultimate; [turnsLeft] more charge turns before it fires. */
+    data class UltimateCharge(val enemyId: String, val moveName: String, val turnsLeft: Int, val totalTurns: Int) : BattleCue
+
+    /**
+     * An enemy uses its move: it winds up for [windupMs] (leaning in, glowing in its school's colour),
+     * then attacks. Buffs and summons hold the stage for a moment instead.
+     */
+    data class EnemyMove(
+        val enemyId: String,
+        val moveName: String,
+        val kind: String,
+        val isBossUltimate: Boolean,
+        val school: SpellSchool = SpellSchool.PHYSICAL,
+        val windupMs: Long = 0
+    ) : BattleCue
+
+    /** A named move announced on screen, in the game's title-card style. */
+    data class TitleCard(val text: String, val fromParty: Boolean) : BattleCue
 
     /** An enemy crossed a health threshold and changes tactics. */
     data class PhaseShift(val enemyId: String, val note: String) : BattleCue

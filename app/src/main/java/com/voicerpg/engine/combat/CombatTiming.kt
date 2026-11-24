@@ -28,11 +28,15 @@ data class CombatTiming(val scale: Float = 1f) {
             is BattleCue.EnemyMove -> when (cue.kind) {
                 "SUMMON" -> if (pocket) 0 else 450
                 "BUFF" -> if (pocket) 0 else 250
-                else -> 0
+                // An attack's wind-up (already scaled into the cue, like a release's flight).
+                else -> return cue.windupMs
             }
             is BattleCue.Guard -> if (pocket) 0 else 100
             is BattleCue.TurnEnd -> if (cue.fromParty) 200 else if (pocket) 300 else 250
             is BattleCue.Release,
+            is BattleCue.Telegraph,
+            is BattleCue.UltimateCharge,
+            is BattleCue.TitleCard,
             is BattleCue.ChargeLevel,
             is BattleCue.ChargeEnd,
             is BattleCue.BattleStart,
@@ -41,6 +45,10 @@ data class CombatTiming(val scale: Float = 1f) {
             is BattleCue.BattleEnd -> 0
         })
     }
+
+    /** An enemy attack's wind-up: the move's own `windupMs`, else longer for ultimates. */
+    fun windupMs(declared: Long?, isBossUltimate: Boolean): Long =
+        scaled((declared ?: if (isBossUltimate) 650L else 280L).coerceIn(0L, 3000L).toInt())
 
     /** Projectile flight from caster to target. */
     fun travelMs(fromParty: Boolean, isBossUltimate: Boolean): Long =

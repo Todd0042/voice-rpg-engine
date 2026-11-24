@@ -131,7 +131,11 @@ data class Enemy(
     /** Extra voice words for targeting (from enemies.json), besides name and subtitle. */
     val voiceAliases: List<String> = emptyList(),
     /** Recorded clips played when this enemy attacks (unless the move has its own). */
-    val soundBites: List<String> = emptyList()
+    val soundBites: List<String> = emptyList(),
+    /** The move it telegraphed when its gauge passed 75% (M4), used on its next turn. */
+    val plannedMove: String? = null,
+    /** Charge turns left before a planned boss ultimate fires; 0 when not charging. */
+    val ultimateChargeLeft: Int = 0
 ) {
     val isAlive: Boolean get() = currentHp > 0
     val isTurnReady: Boolean get() = isAlive && atbGauge >= 1.0f

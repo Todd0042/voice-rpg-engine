@@ -12,6 +12,7 @@ import com.voicerpg.engine.combat.EnemyBrain
 import com.voicerpg.engine.combat.EnemyCodex
 import com.voicerpg.engine.combat.EnemyFamily
 import com.voicerpg.engine.combat.EnemyMove
+import com.voicerpg.engine.combat.Intent
 import com.voicerpg.engine.combat.Moveset
 import com.voicerpg.engine.combat.MovesetTable
 import com.voicerpg.engine.combat.Progression
@@ -93,6 +94,8 @@ class CombatViewModel(
     val musicManager: com.voicerpg.engine.audio.MusicManager? = null,
     /** Every wait in a turn; [CombatTiming.INSTANT] in tests that don't measure time. */
     val timing: CombatTiming = CombatTiming.DEFAULT,
+    /** Enemy move choice; seed it in tests for repeatable battles. */
+    private val random: Random = Random.Default,
     private val scopeOverride: CoroutineScope? = null
 ) : ViewModel() {
 
@@ -366,6 +369,8 @@ class CombatViewModel(
             )
         }
 
+        planEnemyMoves()
+
         val freshParty = _state.value.party
         val freshEnemies = _state.value.enemies
 
@@ -440,6 +445,32 @@ class CombatViewModel(
             lastActedFaction = CombatantFaction.ENEMY
             // ENEMY TURN: PAUSE EVERYTHING until enemy executes attack
             executeSingleEnemyAttack(topEnemy)
+        }
+    }
+
+    private fun movesetOf(enemy: Enemy): Moveset = MovesetTable.movesetFor(enemy.movesetId) ?: defaultMovesetFor(enemy)
+
+    /**
+     * Telegraphs (M4): an enemy whose gauge passes [PLAN_AT_GAUGE] picks its next move now and shows it.
+     * A planned boss ultimate also starts its charge turns.
+     */
+    private fun planEnemyMoves() {
+        val toPlan = _state.value.enemies.filter { it.isAlive && it.plannedMove == null && it.atbGauge >= PLAN_AT_GAUGE }
+        if (toPlan.isEmpty()) return
+        val chargeTurns = GameContent.presentation.telegraph.bossUltimateChargeTurns
+        val plans = toPlan.associate { enemy ->
+            enemy.id to EnemyBrain.pickMove(movesetOf(enemy), enemy.hpRatio, enemy.moveCooldowns, random)
+        }
+        _state.update { prev ->
+            prev.copy(enemies = prev.enemies.map { e ->
+                val move = plans[e.id] ?: return@map e
+                e.copy(plannedMove = move.name, ultimateChargeLeft = if (Intent.isUltimate(e.isBoss, move)) chargeTurns else 0)
+            })
+        }
+        for (enemy in toPlan) {
+            val move = plans.getValue(enemy.id)
+            val intent = Intent.of(move, Intent.isUltimate(enemy.isBoss, move))
+            cue(BattleCue.Telegraph(enemy.id, move.name, intent, move.intentIcon ?: intent.icon))
         }
     }
 
@@ -580,10 +611,41 @@ class CombatViewModel(
                 combatNarrator.speak("${enemy.name} changes tactics! ${phase.note}", force = true)
                 beat(BattleCue.PhaseShift(enemy.id, phase.note))
             }
-            val move = EnemyBrain.pickMove(moveset, refreshedSelf.hpRatio, refreshedSelf.moveCooldowns)
-            val isBossUltimate = enemy.isBoss && move.powerMult >= 2.0f
-            val moveCue = BattleCue.EnemyMove(enemy.id, move.name, move.kind, isBossUltimate)
+            // The move it telegraphed at 75% (re-picked only if it can no longer be used).
+            val planned = refreshedSelf.plannedMove?.let { name ->
+                EnemyBrain.availableMoves(moveset, refreshedSelf.hpRatio, refreshedSelf.moveCooldowns).firstOrNull { it.name == name }
+            }
+            val move = planned ?: EnemyBrain.pickMove(moveset, refreshedSelf.hpRatio, refreshedSelf.moveCooldowns, random)
+            val isBossUltimate = Intent.isUltimate(enemy.isBoss, move)
+
+            // A planned boss ultimate spends its charge turns first: a red bar fills and the narrator warns.
+            if (isBossUltimate && planned != null && refreshedSelf.ultimateChargeLeft > 0) {
+                val left = refreshedSelf.ultimateChargeLeft - 1
+                _state.update { prev ->
+                    prev.copy(enemies = prev.enemies.map { if (it.id == enemy.id) it.copy(atbGauge = 0f, ultimateChargeLeft = left) else it })
+                }
+                cue(BattleCue.UltimateCharge(enemy.id, move.name, turnsLeft = left,
+                    totalTurns = GameContent.presentation.telegraph.bossUltimateChargeTurns.coerceAtLeast(1)))
+                combatNarrator.speak("${enemy.name} gathers power for ${move.name}!", force = true)
+                waitForPocketNarration()
+                finishEnemyTurn(enemy.id)
+                return@launch
+            }
+            _state.update { prev ->
+                prev.copy(enemies = prev.enemies.map { if (it.id == enemy.id) it.copy(plannedMove = null, ultimateChargeLeft = 0) else it })
+            }
+
+            val attacks = move.kind != "SUMMON" && move.kind != "BUFF"
+            val moveCue = BattleCue.EnemyMove(
+                enemyId = enemy.id,
+                moveName = move.name,
+                kind = move.kind,
+                isBossUltimate = isBossUltimate,
+                school = runCatching { SpellSchool.valueOf(move.school) }.getOrDefault(SpellSchool.PHYSICAL),
+                windupMs = if (attacks) timing.windupMs(move.windupMs, isBossUltimate) else 0L
+            )
             cue(moveCue)
+            if (move.showsTitleCard) cue(BattleCue.TitleCard(move.name, fromParty = false))
 
             // SUMMON moves spawn codex-true minions instead of attacking.
             if (move.kind == "SUMMON") {
@@ -653,7 +715,8 @@ class CombatViewModel(
             val moveSchool = runCatching { SpellSchool.valueOf(move.school) }.getOrDefault(SpellSchool.PHYSICAL)
             val enemyGraphics = move.graphics
 
-            // 6. The move flies (one projectile per targeted hero), then lands.
+            // 6. Wind-up, then the move flies (one projectile per targeted hero) and lands.
+            hold(moveCue)
             beat(
                 BattleCue.Release(
                     casterId = enemy.id,
@@ -2541,6 +2604,9 @@ class CombatViewModel(
 
         /** Particle burst of an enemy move that declares none in its graphics. */
         const val ENEMY_IMPACT_PARTICLES = 15
+
+        /** Gauge at which an enemy picks and telegraphs its next move. */
+        const val PLAN_AT_GAUGE = 0.75f
 
         /** How often a charge passes the live voice level on (the hum follows every sample). */
         const val CHARGE_LEVEL_INTERVAL_MS = 50L

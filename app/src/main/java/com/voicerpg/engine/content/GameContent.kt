@@ -264,7 +264,10 @@ data class EnemyMoveDto(
     val summonCount: Int = 0,
     val graphics: SpellGraphicsDto? = null,
     /** Optional recorded clips (asset paths, e.g. audio/quotes/x.ogg); one plays at random. */
-    val soundBites: List<String>? = null
+    val soundBites: List<String>? = null,
+    val titleCard: Boolean? = null,
+    val windupMs: Long? = null,
+    val intentIcon: String? = null
 ) {
     fun toEnemyMove(): EnemyMove = EnemyMove(
         name = name.ifBlank { "Attack" },
@@ -278,7 +281,10 @@ data class EnemyMoveDto(
         summon = summon,
         summonCount = summonCount,
         graphics = graphics?.toSpellGraphics(),
-        soundBites = soundBites.orEmpty().filter { it.isNotBlank() }
+        soundBites = soundBites.orEmpty().filter { it.isNotBlank() },
+        titleCard = titleCard,
+        windupMs = windupMs?.coerceIn(0L, 3000L),
+        intentIcon = intentIcon?.takeIf { it.isNotBlank() }
     )
 }
 

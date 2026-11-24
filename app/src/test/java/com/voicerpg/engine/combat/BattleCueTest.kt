@@ -171,7 +171,9 @@ class BattleCueTest {
         waitFor(what = "enemy turn end") { seen.cues().any { it is BattleCue.TurnEnd } }
 
         val turn = seen.cues().drop(1).takeWhile { it !is BattleCue.TurnEnd } + seen.cues().first { it is BattleCue.TurnEnd }
-        assertEquals(listOf("EnemyMove", "Release", "Impact", "TurnEnd"), turn.map { it::class.simpleName })
+        assertEquals(listOf("Telegraph", "EnemyMove", "TitleCard", "Release", "Impact", "TurnEnd"), turn.map { it::class.simpleName })
+        assertEquals("used the telegraphed move", turn.filterIsInstance<BattleCue.Telegraph>().single().moveName,
+            turn.filterIsInstance<BattleCue.EnemyMove>().single().moveName)
         val release = turn.filterIsInstance<BattleCue.Release>().single()
         assertEquals("sniper", release.casterId)
         assertTrue("enemies fire from the right", !release.fromParty)

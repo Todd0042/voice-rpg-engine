@@ -8,6 +8,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
@@ -65,6 +66,10 @@ class BattleFxDirector(private val positionOf: (String) -> Offset) {
     /** Damage and heal numbers in flight. */
     val numbers = mutableStateListOf<DamageNumber>()
 
+    /** The move name on screen, in the game's title-card style. */
+    var titleCard by mutableStateOf<ShownTitleCard?>(null)
+        private set
+
     /** 0..0.3: the arena backdrop darkens while a chant charges. */
     var dim by mutableFloatStateOf(0f)
         private set
@@ -107,12 +112,20 @@ class BattleFxDirector(private val positionOf: (String) -> Offset) {
                     kick(if (cue.resonance.tier == ResonanceTier.TRANSCENDENTAL) 30f else 18f, direction = 0f)
                 cue.resonance.bonusPercent >= BANNER_BONUS -> kick(10f, direction = 0f)
             }
-            is BattleCue.EnemyMove -> if (cue.isBossUltimate) kick(20f, direction = 0f)
+            is BattleCue.Telegraph -> if (presentation.telegraph.showIntentIcons) fxOf(cue.enemyId).intent = cue.icon
+            is BattleCue.UltimateCharge -> fxOf(cue.enemyId).let {
+                it.ultimateCharge = 1f - cue.turnsLeft.toFloat() / (cue.totalTurns + 1)
+                it.glow = ULTIMATE_GLOW
+                it.glowStrength = 0.9f
+                kick(6f, direction = 0f)
+            }
+            is BattleCue.EnemyMove -> enemyMove(cue)
+            is BattleCue.TitleCard -> titleCard = ShownTitleCard(cue.text, cue.fromParty, time)
             is BattleCue.Release -> release(cue)
             is BattleCue.Impact -> impact(cue)
             is BattleCue.Reinforcements -> kick(12f, direction = 0f)
+            is BattleCue.Death -> fxOf(cue.combatantId).let { it.intent = null; it.ultimateCharge = null; it.glow = null; it.leanTarget = 0f }
             is BattleCue.PhaseShift,
-            is BattleCue.Death,
             is BattleCue.Guard,
             is BattleCue.TurnEnd,
             is BattleCue.BattleEnd -> Unit
@@ -130,12 +143,32 @@ class BattleFxDirector(private val positionOf: (String) -> Offset) {
         for (c in combatants.values) c.step(step.realSeconds, step.fxSeconds)
         if (numbers.isNotEmpty()) numbers.removeAll { time - it.bornAt > DamageNumber.LIFETIME }
         stepCharge(step.realSeconds)
+        titleCard?.let { if (time - it.bornAt > ShownTitleCard.LIFETIME) titleCard = null }
         if (screenFlash > 0f) screenFlash = (screenFlash - step.realSeconds / SCREEN_FLASH_SECONDS).coerceAtLeast(0f)
         if (zoomStart >= 0f) {
             val t = (time - zoomStart) / ZOOM_SECONDS
             if (t >= 1f) { zoom = 1f; zoomStart = -1f } else zoom = 1f + ZOOM_PEAK * sin(PI.toFloat() * t)
         }
         frameTick = frameNanos
+    }
+
+    private fun enemyMove(cue: BattleCue.EnemyMove) {
+        if (cue.isBossUltimate) kick(20f, direction = 0f)
+        val fx = fxOf(cue.enemyId)
+        fx.intent = null
+        fx.ultimateCharge = null
+        if (cue.windupMs > 0) {
+            fx.leanTarget = 1f
+            fx.glow = cue.school.themeColor
+            fx.glowStrength = if (cue.isBossUltimate) 1f else 0.7f
+            after(cue.windupMs / 1000f) {
+                fx.leanTarget = 0f
+                fx.glow = null
+                fx.pulse(0.3f)
+            }
+        } else {
+            fx.glow = null
+        }
     }
 
     private fun stepCharge(dt: Float) {
@@ -251,6 +284,7 @@ class BattleFxDirector(private val positionOf: (String) -> Offset) {
         chargingId = null
         chargeLevel = 0f
         dim = 0f
+        titleCard = null
     }
 
     private fun release(cue: BattleCue.Release) {
@@ -305,6 +339,7 @@ class BattleFxDirector(private val positionOf: (String) -> Offset) {
         const val TYPED_CHARGE_LEVEL = 0.8f
         const val MAX_MOTES_PER_SECOND = 45f
         val CHARGE_GLOW = Color(0xFFFFD54F)
+        val ULTIMATE_GLOW = Color(0xFFFF1744)
         val GOLD = Color(0xFFFFD54F)
         val GREY = Color(0xFFB0BEC5)
         val AMBER = Color(0xFFFFAB00)
@@ -313,6 +348,13 @@ class BattleFxDirector(private val positionOf: (String) -> Offset) {
         val BLUE = Color(0xFF4FC3F7)
         /** Where a release with no living target flies (right of centre, upper arena). */
         val FALLBACK_TARGET = Offset(800f, 350f)
+    }
+}
+
+/** A move name on screen since [bornAt] (director time). */
+data class ShownTitleCard(val text: String, val fromParty: Boolean, val bornAt: Float) {
+    companion object {
+        const val LIFETIME = 1.15f
     }
 }
 

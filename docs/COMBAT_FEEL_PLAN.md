@@ -174,6 +174,14 @@ meter follows the voice while listening ("CHARGING…") and snaps to the scored 
   the boss and the narrator warns in pocket mode.
 - Tests: `plannedMove` is deterministic with a seeded RNG; ultimates always telegraph at least one turn.
 
+**Status: done (2026-11-24).** Enemies plan at 75% gauge (`Telegraph` cue, `Enemy.plannedMove`, icon from
+`combat/Intent.kt` or the move's `intentIcon`) and use that move unless it became unusable. Attacks wind up
+(`windupMs` per move; default 280 ms, 650 for ultimates): the sprite leans in and glows in the school colour.
+Named moves (`titleCard`, default true unless "Attack") show a title card in `titleCardStyle` (banner,
+headline, PA announcement, scroll). Boss ultimates (`powerMult >= 2.0`) charge for
+`telegraph.bossUltimateChargeTurns` of the boss's turns (`UltimateCharge` cue, red bar, narrator warning)
+before firing. The view model takes a seedable `random`; tests: `EnemyTelegraphTest`.
+
 ### M5: Reward bold voices (F)
 - **Stagger**: a MASTER+ chant that hits a weakness (affinity ≥ 1.5) pushes the target's gauge
   back by 35%. A MYTHIC+ hit on a charging boss **interrupts** the ultimate (`Stagger` cue, title

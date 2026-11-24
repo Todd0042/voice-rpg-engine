@@ -95,3 +95,76 @@ fun ScreenFlashLayer(director: BattleFxDirector, modifier: Modifier = Modifier) 
     val a = director.screenFlash
     if (a > 0f) Box(modifier = modifier.fillMaxSize().background(Color.White.copy(alpha = 0.85f * a)))
 }
+
+/** The current move name, in the game's title-card style; slides in from the acting side. */
+@Composable
+fun TitleCardLayer(director: BattleFxDirector, modifier: Modifier = Modifier) {
+    val card = director.titleCard ?: return
+    director.frameTick
+    val age = director.time - card.bornAt
+    val slideIn = (age / 0.16f).coerceIn(0f, 1f)
+    val fadeOut = ((ShownTitleCard.LIFETIME - age) / 0.25f).coerceIn(0f, 1f)
+    val fromSide = if (card.fromParty) -1f else 1f
+    Box(modifier = modifier.fillMaxSize().padding(top = 36.dp), contentAlignment = Alignment.TopCenter) {
+        Box(
+            modifier = Modifier.graphicsLayer {
+                translationX = fromSide * (1f - slideIn) * size.width * 0.8f
+                alpha = fadeOut
+            }
+        ) {
+            TitleCardBody(card.text, director.presentation.titleCardStyle)
+        }
+    }
+}
+
+@Composable
+private fun TitleCardBody(text: String, style: com.voicerpg.engine.content.PresentationConfig.TitleCardStyle) {
+    when (style) {
+        com.voicerpg.engine.content.PresentationConfig.TitleCardStyle.BANNER -> Text(
+            text = text.uppercase(),
+            color = Color(0xFFFFE082),
+            fontSize = 17.sp,
+            fontWeight = FontWeight.Black,
+            fontFamily = FontFamily.Monospace,
+            modifier = Modifier
+                .background(androidx.compose.ui.graphics.Brush.horizontalGradient(listOf(Color.Transparent, Color(0xE6101018), Color(0xE6101018), Color.Transparent)))
+                .padding(horizontal = 36.dp, vertical = 6.dp)
+        )
+        com.voicerpg.engine.content.PresentationConfig.TitleCardStyle.HEADLINE -> Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier
+                .background(Color(0xFFF5F1E6), RoundedCornerShape(2.dp))
+                .border(2.dp, Color(0xFF111111), RoundedCornerShape(2.dp))
+                .padding(horizontal = 14.dp, vertical = 5.dp)
+        ) {
+            Text("— BREAKING —", color = Color(0xFFB71C1C), fontSize = 9.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Serif)
+            Text(text.uppercase(), color = Color(0xFF111111), fontSize = 18.sp, fontWeight = FontWeight.Black, fontFamily = FontFamily.Serif)
+        }
+        com.voicerpg.engine.content.PresentationConfig.TitleCardStyle.PA_ANNOUNCEMENT -> Text(
+            text = "📢  ${text.uppercase()}",
+            color = Color.White,
+            fontSize = 15.sp,
+            fontWeight = FontWeight.Bold,
+            fontFamily = FontFamily.Monospace,
+            modifier = Modifier
+                .background(Color(0xFF1565C0), RoundedCornerShape(6.dp))
+                .border(2.dp, Color(0xFFFFEB3B), RoundedCornerShape(6.dp))
+                .padding(horizontal = 14.dp, vertical = 6.dp)
+        )
+        com.voicerpg.engine.content.PresentationConfig.TitleCardStyle.SCROLL -> Text(
+            text = "❦  $text  ❦",
+            color = Color(0xFF4E342E),
+            fontSize = 18.sp,
+            fontWeight = FontWeight.Bold,
+            fontStyle = FontStyle.Italic,
+            fontFamily = FontFamily.Serif,
+            modifier = Modifier
+                .background(
+                    androidx.compose.ui.graphics.Brush.verticalGradient(listOf(Color(0xFFE8D5A3), Color(0xFFF6E7C1), Color(0xFFE0C98F))),
+                    RoundedCornerShape(10.dp)
+                )
+                .border(2.dp, Color(0xFF8D6E63), RoundedCornerShape(10.dp))
+                .padding(horizontal = 20.dp, vertical = 6.dp)
+        )
+    }
+}
