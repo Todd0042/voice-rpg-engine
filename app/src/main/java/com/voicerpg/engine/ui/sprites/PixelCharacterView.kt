@@ -36,6 +36,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
@@ -70,6 +71,8 @@ fun PixelCharacterView(
     depthScale: Float = 1f,
     /** Live battle effects (flash, knockback, squash, glow, intent, charge bar), from the FX director. */
     fx: com.voicerpg.engine.ui.fx.CombatantFx? = null,
+    /** Reports where the sprite itself is drawn (for effects such as the death shatter). */
+    onSpriteLayout: ((androidx.compose.ui.layout.LayoutCoordinates) -> Unit)? = null,
     onClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
@@ -106,7 +109,9 @@ fun PixelCharacterView(
 
     val currentFrame = when {
         isDead -> SpriteFrame.DAMAGED
+        (fx?.flash ?: 0f) > 0.3f -> SpriteFrame.HURT
         stance == CharacterStance.DAMAGED -> SpriteFrame.DAMAGED
+        (fx?.lean ?: 0f) > 0.5f -> SpriteFrame.ATTACK
         stance == CharacterStance.CASTING -> SpriteFrame.ACTION_CAST
         cycleProgress > 0.5f -> SpriteFrame.IDLE_CROUCH
         else -> SpriteFrame.IDLE_UPRIGHT
@@ -138,13 +143,34 @@ fun PixelCharacterView(
                 scaleX = depthScale * (1f + 0.18f * squash)
                 scaleY = depthScale * (1f - 0.18f * squash)
                 rotationZ = facing * 6f * (fx?.lean ?: 0f)
+                // A small idle hop on the breathing cycle (still when fallen)
+                translationY = if (isDead) 0f else -(1.5f * cycleProgress).dp.toPx()
                 transformOrigin = TransformOrigin(0.5f, 1.0f)
-                alpha = if (fx?.hidden == true) 0f else 1f
+                alpha = if (fx?.hidden == true) 0f else (fx?.fade ?: 1f)
             }
             .clickable(enabled = !isDead && onClick != null) { onClick?.invoke() }
             .padding(horizontal = 4.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
+        // A taunt in a speech bubble
+        val speech = fx?.speech
+        if (speech != null && !isDead) {
+            Text(
+                text = speech,
+                color = Color(0xFF111111),
+                fontSize = 9.sp,
+                fontWeight = FontWeight.Bold,
+                fontFamily = FontFamily.Monospace,
+                maxLines = 2,
+                modifier = Modifier
+                    .padding(bottom = 2.dp)
+                    .width(110.dp)
+                    .background(Color(0xFFFFFDE7), RoundedCornerShape(8.dp))
+                    .border(1.dp, Color(0xFF424242), RoundedCornerShape(8.dp))
+                    .padding(horizontal = 5.dp, vertical = 2.dp)
+            )
+        }
+
         // Telegraphed intent (what this enemy is about to do)
         val intent = fx?.intent
         if (intent != null && !isDead) {
@@ -293,6 +319,7 @@ fun PixelCharacterView(
             modifier = Modifier
                 .padding(top = if (isDead) 16.dp else 0.dp)
                 .graphicsLayer {
+                    rotationZ = fx?.spin ?: 0f
                     if (isDead) {
                         rotationZ = if (isFlippedHorizontally) 90f else -90f
                         transformOrigin = TransformOrigin(0.5f, 0.85f)
@@ -361,10 +388,9 @@ fun PixelCharacterView(
             }
 
             Canvas(
-                modifier = Modifier.size(
-                    width = spriteWidth,
-                    height = spriteHeight
-                )
+                modifier = Modifier
+                    .size(width = spriteWidth, height = spriteHeight)
+                    .then(if (onSpriteLayout != null) Modifier.onGloballyPositioned(onSpriteLayout) else Modifier)
             ) {
                 val pPx = pixelSize.toPx()
                 val flash = fx?.flash ?: 0f

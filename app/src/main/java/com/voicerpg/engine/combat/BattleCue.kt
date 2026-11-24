@@ -106,6 +106,9 @@ sealed interface BattleCue {
     /** Consecutive strong casts: [count] ≥ 2 while it runs, 0 when it ends. Looks and sound only. */
     data class Streak(val count: Int) : BattleCue
 
+    /** An enemy shouts a line (enemies.json `taunts`) as it telegraphs. */
+    data class Taunt(val enemyId: String, val line: String) : BattleCue
+
     /** A combatant fell (announced right after the [Impact] that felled it). */
     data class Death(val combatantId: String, val isEnemy: Boolean) : BattleCue
 

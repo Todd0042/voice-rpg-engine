@@ -213,6 +213,16 @@ Balance harness: not extended; the per-round cap bounds stagger to −0.35 gauge
   space (a boss takes the back row).
 - Optional sprite frames `attack` / `hurt` / `death` used when present.
 
+**Status: done (2026-11-24).** `Death` of an enemy shatters its death frame (every opaque pixel, in its own
+colour, blown away from the party side under gravity; `dissolve` drifts up; `fade` fades the sprite); heroes
+fall as before. Sprite views report their bounds so shards start in place. Live particles are capped at 900
+(oldest dropped). Hit reactions (`flinch`/`stagger`/`comic_spin`), squash on hits and casts, lean wind-ups,
+an idle hop; drop shadows already existed. `enemies.json`: `scale` (bosses 2.0 by default, 0.5-3),
+`taunts` (35% chance on telegraph, speech bubble; spoken in pocket mode), `hitReaction`. Sprite JSON:
+optional `attack`, `hurt`, `death` frames (fallbacks: action_cast, damaged, damaged). Bosses take the back
+row in hordes. Particles still draw as rects (the cap keeps it cheap; switch to `drawPoints` if a device
+drops frames).
+
 ### M7: Portrait cut-ins (G)
 - At MYTHIC+ (`cutIn.minTier`): a diagonal slash panel slides across with the character's portrait
   (or selfie portrait), theme color, speed lines and the optional `quote`, for about 600 ms, with the

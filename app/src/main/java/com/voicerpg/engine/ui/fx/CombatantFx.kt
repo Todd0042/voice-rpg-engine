@@ -39,6 +39,17 @@ class CombatantFx {
     /** The sprite has shattered (or faded) away. */
     var hidden by mutableStateOf(false)
 
+    /** 1 = solid; runs down to 0 during a fade-out death. */
+    var fade by mutableFloatStateOf(1f)
+        private set
+
+    /** Degrees: a comic spin after a hit. */
+    var spin by mutableFloatStateOf(0f)
+        private set
+
+    /** A taunt in a speech bubble above the sprite, or null. */
+    var speech by mutableStateOf<String?>(null)
+
     /** Leaning forward to attack (wind-up), 0..1; eases toward [leanTarget]. */
     var lean by mutableFloatStateOf(0f)
         private set
@@ -49,13 +60,26 @@ class CombatantFx {
     private var squashAmp = 0f
     private var squashT = 0f
 
-    fun hit(direction: Float, amplitudeDp: Float) {
+    private var fading = false
+    private var spinning = false
+    private var spinT = 0f
+
+    fun hit(direction: Float, amplitudeDp: Float, reaction: com.voicerpg.engine.model.HitReaction = com.voicerpg.engine.model.HitReaction.FLINCH) {
         flash = 1f
-        knockAmp = direction * amplitudeDp
+        val amp = if (reaction == com.voicerpg.engine.model.HitReaction.STAGGER) amplitudeDp * 1.6f else amplitudeDp
+        knockAmp = direction * amp
         knockT = 0f
         knockback = knockAmp
-        squashAmp = 0.35f
+        squashAmp = if (reaction == com.voicerpg.engine.model.HitReaction.STAGGER) 0.5f else 0.35f
         squashT = 0f
+        if (reaction == com.voicerpg.engine.model.HitReaction.COMIC_SPIN) {
+            spinning = true
+            spinT = 0f
+        }
+    }
+
+    fun startFade() {
+        fading = true
     }
 
     /** A small stretch then settle (casting, attacking). */
@@ -65,6 +89,16 @@ class CombatantFx {
     }
 
     fun step(realSeconds: Float, fxSeconds: Float) {
+        if (fading && fade > 0f) {
+            fade = (fade - fxSeconds / FADE_SECONDS).coerceAtLeast(0f)
+            if (fade == 0f) hidden = true
+        }
+        if (spinning) {
+            spinT += fxSeconds
+            val t = (spinT / SPIN_SECONDS).coerceAtMost(1f)
+            spin = 360f * (1f - (1f - t) * (1f - t)) // ease out
+            if (t >= 1f) { spinning = false; spin = 0f }
+        }
         if (lean != leanTarget) {
             lean += (leanTarget - lean) * (fxSeconds * 12f).coerceAtMost(1f)
             if (kotlin.math.abs(lean - leanTarget) < 0.01f) lean = leanTarget
@@ -87,10 +121,13 @@ class CombatantFx {
     fun reset() {
         flash = 0f; knockAmp = 0f; knockback = 0f; squashAmp = 0f; squash = 0f
         glow = null; glowStrength = 0f; intent = null; ultimateCharge = null; hidden = false; lean = 0f; leanTarget = 0f
+        fade = 1f; fading = false; spin = 0f; spinning = false; speech = null
     }
 
     private companion object {
         const val FLASH_SECONDS = 0.14f
+        const val FADE_SECONDS = 0.6f
+        const val SPIN_SECONDS = 0.45f
         const val KNOCK_DECAY = 0.11f
         const val KNOCK_RATE = 16f
         const val SQUASH_DECAY = 0.09f

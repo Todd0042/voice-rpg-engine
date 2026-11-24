@@ -137,12 +137,26 @@ data class Enemy(
     /** Charge turns left before a planned boss ultimate fires; 0 when not charging. */
     val ultimateChargeLeft: Int = 0,
     /** The round it was last staggered in (one stagger per enemy per round); 0 = never. */
-    val staggeredRound: Int = 0
+    val staggeredRound: Int = 0,
+    /** Sprite size multiplier (enemies.json `scale`; bosses default 2.0). */
+    val scale: Float = 1f,
+    /** Lines it may shout when it telegraphs a move (enemies.json `taunts`). */
+    val taunts: List<String> = emptyList(),
+    val hitReaction: HitReaction = HitReaction.FLINCH
 ) {
     val isAlive: Boolean get() = currentHp > 0
     val isTurnReady: Boolean get() = isAlive && atbGauge >= 1.0f
     val hpRatio: Float get() = if (isAlive) (currentHp.toFloat() / maxHp).coerceIn(0f, 1f) else 0f
     val atbRatio: Float get() = if (isAlive) atbGauge.coerceIn(0f, 1f) else 0f
+}
+
+/** How an enemy's sprite reacts to a blow (enemies.json `hitReaction`). */
+enum class HitReaction {
+    FLINCH, STAGGER, COMIC_SPIN;
+
+    companion object {
+        fun parse(raw: String?): HitReaction = entries.firstOrNull { it.name.equals(raw?.trim(), ignoreCase = true) } ?: FLINCH
+    }
 }
 
 enum class TargetSelection {

@@ -31,7 +31,11 @@ import kotlin.math.sin
  *
  * [positionOf] resolves a combatant id to its live sprite position in arena pixels.
  */
-class BattleFxDirector(private val positionOf: (String) -> Offset) {
+class BattleFxDirector(
+    private val positionOf: (String) -> Offset,
+    /** What a combatant looks like (sprite grid, facing, hit reaction); null when unknown. */
+    private val lookOf: (String) -> CombatantLook? = { null }
+) {
 
     val clock = FxClock()
     val projectiles = SpellVfxEngine()
@@ -88,10 +92,17 @@ class BattleFxDirector(private val positionOf: (String) -> Offset) {
     private var moteDebt = 0f
 
     private val combatants = HashMap<String, CombatantFx>()
+    private val spriteBounds = HashMap<String, androidx.compose.ui.geometry.Rect>()
+
+    /** Where a combatant's sprite is drawn, in arena pixels (reported by its view). */
+    fun registerSpriteBounds(id: String, bounds: androidx.compose.ui.geometry.Rect) {
+        spriteBounds[id] = bounds
+    }
     private val pending = mutableListOf<Pair<Float, () -> Unit>>()
     private var zoomStart = -1f
     private val flashTimes = ArrayDeque<Float>()
     private var nextNumberId = 0L
+    private val shardRandom = kotlin.random.Random(7)
 
     /** Live effects of one combatant (created on first use). */
     fun fxOf(id: String): CombatantFx = combatants.getOrPut(id) { CombatantFx() }
@@ -130,7 +141,11 @@ class BattleFxDirector(private val positionOf: (String) -> Offset) {
             is BattleCue.Reinforcements -> kick(12f, direction = 0f)
             is BattleCue.Stagger -> stagger(cue)
             is BattleCue.Streak -> streak = if (cue.count >= 2) ShownStreak(cue.count, time) else null
-            is BattleCue.Death -> fxOf(cue.combatantId).let { it.intent = null; it.ultimateCharge = null; it.glow = null; it.leanTarget = 0f }
+            is BattleCue.Death -> death(cue)
+            is BattleCue.Taunt -> fxOf(cue.enemyId).let { fx ->
+                fx.speech = cue.line
+                after(TAUNT_SECONDS) { if (fx.speech == cue.line) fx.speech = null }
+            }
             is BattleCue.PhaseShift,
             is BattleCue.Guard,
             is BattleCue.TurnEnd,
@@ -156,6 +171,63 @@ class BattleFxDirector(private val positionOf: (String) -> Offset) {
             if (t >= 1f) { zoom = 1f; zoomStart = -1f } else zoom = 1f + ZOOM_PEAK * sin(PI.toFloat() * t)
         }
         frameTick = frameNanos
+    }
+
+    private fun death(cue: BattleCue.Death) {
+        val fx = fxOf(cue.combatantId)
+        fx.intent = null
+        fx.ultimateCharge = null
+        fx.glow = null
+        fx.leanTarget = 0f
+        fx.speech = null
+        val look = lookOf(cue.combatantId)
+        if (!cue.isEnemy || look == null || !look.isEnemy) return // heroes fall as before (they can be revived)
+        when (presentation.deathEffect) {
+            PresentationConfig.DeathEffect.FADE -> fx.startFade()
+            PresentationConfig.DeathEffect.SHATTER -> { shatter(cue.combatantId, look, rising = false); fx.hidden = true }
+            PresentationConfig.DeathEffect.DISSOLVE -> { shatter(cue.combatantId, look, rising = true); fx.hidden = true }
+        }
+    }
+
+    /**
+     * Every opaque pixel of the sprite's death frame becomes a particle in its own colour, blown away from
+     * the hit (enemies are struck from the party side) under gravity; [rising]: they drift up instead.
+     */
+    private fun shatter(id: String, look: CombatantLook, rising: Boolean) {
+        val rows = look.matrix.size
+        val cols = look.matrix.maxOfOrNull { it.length } ?: return
+        if (rows == 0 || cols == 0) return
+        val centre = positionOf(id)
+        val bounds = spriteBounds[id] ?: androidx.compose.ui.geometry.Rect(centre.x - cols * 2f, centre.y - rows * 2f, centre.x + cols * 2f, centre.y + rows * 2f)
+        val pxW = bounds.width / cols
+        val pxH = bounds.height / rows
+        val away = if (look.isEnemy) 1f else -1f
+        val shards = ArrayList<com.voicerpg.engine.model.Particle>()
+        for (r in 0 until rows) {
+            val line = look.matrix[r]
+            for (c in line.indices) {
+                val ch = line[c]
+                if (ch == '.') continue
+                val color = look.palette[ch] ?: continue
+                if (color.alpha == 0f) continue
+                val col = if (look.flipped) cols - 1 - c else c
+                val x = bounds.left + (col + 0.5f) * pxW
+                val y = bounds.top + (r + 0.5f) * pxH
+                val spread = (x - bounds.center.x) / bounds.width
+                shards += com.voicerpg.engine.model.Particle(
+                    x = x, y = y,
+                    vx = if (rising) spread * 1.5f + away * 0.3f else away * (2f + shardRandom.nextFloat() * 4f) + spread * 3f,
+                    vy = if (rising) -(0.6f + shardRandom.nextFloat() * 1.4f) else -(1.5f + shardRandom.nextFloat() * 3.5f),
+                    size = maxOf(pxW, pxH), initialSize = maxOf(pxW, pxH),
+                    decay = if (rising) 0.012f else 0.016f,
+                    color = color,
+                    gravity = if (rising) 0f else 0.28f,
+                    drag = 0.985f
+                )
+            }
+        }
+        if (shards.size > MAX_SHARDS_PER_DEATH) shards.shuffle(shardRandom)
+        particles.add(shards.take(MAX_SHARDS_PER_DEATH))
     }
 
     private fun stagger(cue: BattleCue.Stagger) {
@@ -234,7 +306,8 @@ class BattleFxDirector(private val positionOf: (String) -> Offset) {
         cue.hits.forEachIndexed { i, hit ->
             val land = {
                 if (!cue.isTick && hit.kind == BattleCue.HitKind.DAMAGE && hit.amount > 0) {
-                    fxOf(hit.targetId).hit(push, if (reduceMotion) amplitude * 0.5f else amplitude)
+                    val reaction = lookOf(hit.targetId)?.hitReaction ?: com.voicerpg.engine.model.HitReaction.FLINCH
+                    fxOf(hit.targetId).hit(push, if (reduceMotion) amplitude * 0.5f else amplitude, reaction)
                 }
                 spawnNumber(hit, cue.tier, push)
             }
@@ -301,6 +374,7 @@ class BattleFxDirector(private val positionOf: (String) -> Offset) {
         numbers.clear()
         pending.clear()
         combatants.values.forEach { it.reset() }
+        spriteBounds.clear()
         zoom = 1f
         zoomStart = -1f
         screenFlash = 0f
@@ -366,6 +440,8 @@ class BattleFxDirector(private val positionOf: (String) -> Offset) {
         val CHARGE_GLOW = Color(0xFFFFD54F)
         val ULTIMATE_GLOW = Color(0xFFFF1744)
         val STAGGER_COLOR = Color(0xFFFF6E40)
+        const val TAUNT_SECONDS = 2.2f
+        const val MAX_SHARDS_PER_DEATH = 600
         val GOLD = Color(0xFFFFD54F)
         val GREY = Color(0xFFB0BEC5)
         val AMBER = Color(0xFFFFAB00)
@@ -383,6 +459,17 @@ data class ShownTitleCard(val text: String, val fromParty: Boolean, val bornAt: 
         const val LIFETIME = 1.15f
     }
 }
+
+/** What the director needs to know about a combatant's sprite. */
+data class CombatantLook(
+    val isEnemy: Boolean,
+    /** The frame that shatters (its death frame), as the sprite grid rows. */
+    val matrix: List<String>,
+    val palette: Map<Char, Color>,
+    /** Drawn mirrored (enemies face the party). */
+    val flipped: Boolean,
+    val hitReaction: com.voicerpg.engine.model.HitReaction = com.voicerpg.engine.model.HitReaction.FLINCH
+)
 
 /** A resonance streak badge: [count] casts in a row, shown since [bornAt]. */
 data class ShownStreak(val count: Int, val bornAt: Float)

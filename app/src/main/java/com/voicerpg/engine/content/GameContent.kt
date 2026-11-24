@@ -153,7 +153,11 @@ data class SpriteFramesDto(
     val idle_crouch: List<String>? = null,
     @SerializedName(value = "action_cast", alternate = ["actionCast"])
     val action_cast: List<String>? = null,
-    val damaged: List<String>? = null
+    val damaged: List<String>? = null,
+    /** Optional frames (fall back to action_cast / damaged / damaged). */
+    val attack: List<String>? = null,
+    val hurt: List<String>? = null,
+    val death: List<String>? = null
 )
 
 data class SpriteDefinitionDto(
@@ -332,7 +336,12 @@ data class EnemyDto(
     /** Extra words that target this enemy by voice ("warrior" for an orc), besides its name and subtitle. */
     val voiceAliases: List<String>? = null,
     /** Optional recorded clips (asset paths, e.g. audio/quotes/x.ogg); one plays at random. */
-    val soundBites: List<String>? = null
+    val soundBites: List<String>? = null,
+    /** Sprite size multiplier; bosses default to 2.0. */
+    val scale: Float? = null,
+    val taunts: List<String>? = null,
+    /** flinch | stagger | comic_spin */
+    val hitReaction: String? = null
 )
 
 data class EnemyFileDto(val enemies: List<EnemyDto>? = null)
@@ -810,13 +819,19 @@ data class SpriteDefinition(
     val idleUpright: List<String>,
     val idleCrouch: List<String>,
     val actionCast: List<String>,
-    val damaged: List<String>
+    val damaged: List<String>,
+    val attack: List<String>? = null,
+    val hurt: List<String>? = null,
+    val death: List<String>? = null
 ) {
     fun getFrame(frame: SpriteFrame): List<String> = when (frame) {
         SpriteFrame.IDLE_UPRIGHT -> idleUpright
         SpriteFrame.IDLE_CROUCH -> idleCrouch
         SpriteFrame.ACTION_CAST -> actionCast
         SpriteFrame.DAMAGED -> damaged
+        SpriteFrame.ATTACK -> attack ?: actionCast
+        SpriteFrame.HURT -> hurt ?: damaged
+        SpriteFrame.DEATH -> death ?: damaged
     }
 }
 
@@ -895,7 +910,10 @@ data class EnemyTemplate(
     val spriteId: String,
     val spriteTint: Color,
     val voiceAliases: List<String> = emptyList(),
-    val soundBites: List<String> = emptyList()
+    val soundBites: List<String> = emptyList(),
+    val scale: Float = if (isBoss) 2.0f else 1.0f,
+    val taunts: List<String> = emptyList(),
+    val hitReaction: com.voicerpg.engine.model.HitReaction = com.voicerpg.engine.model.HitReaction.FLINCH
 ) {
     fun toEnemy(
         instanceId: String? = null,
@@ -928,7 +946,10 @@ data class EnemyTemplate(
             movesetId = movesetId,
             atbGauge = atbGauge,
             voiceAliases = voiceAliases,
-            soundBites = soundBites
+            soundBites = soundBites,
+            scale = scale,
+            taunts = taunts,
+            hitReaction = hitReaction
         )
     }
 }
@@ -1423,7 +1444,10 @@ class GameContentLoader(private val source: ContentSource) {
                 idleUpright = idleUp,
                 idleCrouch = idleCr,
                 actionCast = actCast,
-                damaged = dmg
+                damaged = dmg,
+                attack = f?.attack?.takeIf { it.isNotEmpty() },
+                hurt = f?.hurt?.takeIf { it.isNotEmpty() },
+                death = f?.death?.takeIf { it.isNotEmpty() }
             )
         }
         return null
@@ -1445,7 +1469,10 @@ class GameContentLoader(private val source: ContentSource) {
         spriteId = spriteId,
         spriteTint = parseHexColor(spriteTint, Color(0xFFE57373)),
         voiceAliases = voiceAliases?.filter { it.isNotBlank() } ?: emptyList(),
-        soundBites = soundBites.orEmpty().filter { it.isNotBlank() }
+        soundBites = soundBites.orEmpty().filter { it.isNotBlank() },
+        scale = scale?.takeIf { it.isFinite() }?.coerceIn(0.5f, 3f) ?: if (isBoss) 2.0f else 1.0f,
+        taunts = taunts.orEmpty().filter { it.isNotBlank() },
+        hitReaction = com.voicerpg.engine.model.HitReaction.parse(hitReaction)
     )
 
     private fun EncounterDto.toDefinition(

@@ -540,6 +540,11 @@ class CombatViewModel(
             val move = plans.getValue(enemy.id)
             val intent = Intent.of(move, Intent.isUltimate(enemy.isBoss, move))
             cue(BattleCue.Telegraph(enemy.id, move.name, intent, move.intentIcon ?: intent.icon))
+            if (enemy.taunts.isNotEmpty() && random.nextFloat() < TAUNT_CHANCE) {
+                val line = enemy.taunts[random.nextInt(enemy.taunts.size)]
+                cue(BattleCue.Taunt(enemy.id, line))
+                if (combatNarrator.isEyesFreeMode.value) combatNarrator.speak("${enemy.name}: $line", force = false)
+            }
         }
     }
 
@@ -2685,6 +2690,9 @@ class CombatViewModel(
         /** How far a stagger pushes an enemy's gauge back. */
         const val STAGGER_GAUGE = 0.35f
         const val WEAKNESS_AFFINITY = 1.5f
+
+        /** Chance an enemy with taunts shouts one when it telegraphs. */
+        const val TAUNT_CHANCE = 0.35f
 
         /** Gauge at which an enemy picks and telegraphs its next move. */
         const val PLAN_AT_GAUGE = 0.75f

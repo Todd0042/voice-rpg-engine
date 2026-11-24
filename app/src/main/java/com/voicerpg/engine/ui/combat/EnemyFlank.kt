@@ -29,6 +29,8 @@ fun EnemyFlank(
     onPositionEnemy: ((String, Offset) -> Unit)? = null,
     arenaCoordinates: LayoutCoordinates? = null,
     fxOf: ((String) -> CombatantFx)? = null,
+    /** Where each enemy's sprite is drawn, in arena pixels (the death shatter starts there). */
+    onSpriteBounds: ((String, androidx.compose.ui.geometry.Rect) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val isLargeHorde = enemies.size > 3
@@ -52,15 +54,17 @@ fun EnemyFlank(
                     onPositionEnemy = onPositionEnemy,
                     arenaCoordinates = arenaCoordinates,
                     fx = fxOf?.invoke(enemy.id),
+                        onSpriteBounds = onSpriteBounds,
                     modifier = Modifier.offset(x = staggerX)
                 )
             }
         }
     } else {
         // 2-Column Staggered JRPG Formation (4 to 6 enemies)
-        // Front row (closer to heroes) and Back row (rearguard)
-        val frontRow = enemies.filterIndexed { index, _ -> index % 2 == 0 }
-        val backRow = enemies.filterIndexed { index, _ -> index % 2 != 0 }
+        // Front row (closer to heroes) and Back row (rearguard); bosses take the back row
+        val (bosses, others) = enemies.partition { it.isBoss }
+        val frontRow = others.filterIndexed { index, _ -> index % 2 == 0 }
+        val backRow = bosses + others.filterIndexed { index, _ -> index % 2 != 0 }
 
         Row(
             modifier = modifier.padding(end = 6.dp),
@@ -81,7 +85,8 @@ fun EnemyFlank(
                         onSelectEnemy = onSelectEnemy,
                         onPositionEnemy = onPositionEnemy,
                         arenaCoordinates = arenaCoordinates,
-                        fx = fxOf?.invoke(enemy.id)
+                        fx = fxOf?.invoke(enemy.id),
+                        onSpriteBounds = onSpriteBounds
                     )
                 }
             }
@@ -100,7 +105,8 @@ fun EnemyFlank(
                         onSelectEnemy = onSelectEnemy,
                         onPositionEnemy = onPositionEnemy,
                         arenaCoordinates = arenaCoordinates,
-                        fx = fxOf?.invoke(enemy.id)
+                        fx = fxOf?.invoke(enemy.id),
+                        onSpriteBounds = onSpriteBounds
                     )
                 }
             }
@@ -117,6 +123,7 @@ private fun EnemyCard(
     onPositionEnemy: ((String, Offset) -> Unit)? = null,
     arenaCoordinates: LayoutCoordinates? = null,
     fx: CombatantFx? = null,
+    onSpriteBounds: ((String, androidx.compose.ui.geometry.Rect) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val stance = when {
@@ -153,9 +160,13 @@ private fun EnemyCard(
         isTargeted = enemy.isAlive && enemy.isTargeted,
         stance = stance,
         isFlippedHorizontally = true,
-        pixelSize = if (isCompact) 1.65.dp else 2.2.dp,
+        pixelSize = (if (isCompact) 1.65.dp else 2.2.dp) * enemy.scale,
         depthScale = depthScale,
         fx = fx,
+        onSpriteLayout = if (onSpriteBounds == null) null else { coords ->
+            val arena = arenaCoordinates
+            if (arena != null && arena.isAttached && coords.isAttached) onSpriteBounds(enemy.id, arena.localBoundingBoxOf(coords))
+        },
         onClick = if (enemy.isAlive) { { onSelectEnemy(enemy) } } else null,
         modifier = modifier.onGloballyPositioned { cardCoords = it }
     )

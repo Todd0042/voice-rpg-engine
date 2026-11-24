@@ -84,7 +84,10 @@ fun RetroBattleScreen(
 
     // Battle effects: the view model announces cues, the director plays them (ui/fx).
     val director = remember(viewModel) {
-        BattleFxDirector(positionOf = { id -> viewModel.combatantSlot(id).let { (x, y) -> Offset(x, y) } })
+        BattleFxDirector(
+            positionOf = { id -> viewModel.combatantSlot(id).let { (x, y) -> Offset(x, y) } },
+            lookOf = { id -> combatantLook(viewModel.state.value, id) }
+        )
     }
     director.presentation = GameContent.presentation
     director.reduceMotion = reduceMotion
@@ -275,6 +278,7 @@ fun RetroBattleScreen(
                             },
                             arenaCoordinates = arenaCoordinates,
                             fxOf = director::fxOf,
+                            onSpriteBounds = director::registerSpriteBounds,
                             modifier = Modifier.weight(1f)
                         )
                     }
@@ -459,4 +463,18 @@ private fun BattleStatusLine(messages: List<FloatingCombatText>) {
             )
         }
     }
+}
+
+/** What the effects director needs about a combatant's sprite: its death frame, facing and hit reaction. */
+private fun combatantLook(state: com.voicerpg.engine.viewmodel.CombatState, id: String): com.voicerpg.engine.ui.fx.CombatantLook? {
+    val enemy = state.enemies.firstOrNull { it.id == id }
+    val spriteId = enemy?.spriteId?.ifBlank { enemy.id } ?: state.party.firstOrNull { it.id == id }?.id ?: return null
+    val (matrix, palette) = com.voicerpg.engine.ui.sprites.PixelSpriteData.getPixelMatrix(spriteId, com.voicerpg.engine.ui.sprites.SpriteFrame.DEATH)
+    return com.voicerpg.engine.ui.fx.CombatantLook(
+        isEnemy = enemy != null,
+        matrix = matrix,
+        palette = palette,
+        flipped = enemy != null,
+        hitReaction = enemy?.hitReaction ?: com.voicerpg.engine.model.HitReaction.FLINCH
+    )
 }
