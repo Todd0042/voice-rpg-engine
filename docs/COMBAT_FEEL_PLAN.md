@@ -280,6 +280,10 @@ Order (Todd, 2026-11-24): **echoes-of-logos** (pilot) â†’ **superstore-saga** â†
 Pilot status: echoes-of-logos runs M1 (engine 44e9572) with school-distinct spell `graphics` and
 `presentation.json` intensity 1.1; installed on Todd's phone 2026-11-24 for testing. Its title cards, cut-ins,
 Malakor telegraph and intensity tracks follow M4, M7 and M8.
+Update 2026-11-24 (M1-M9 done): Echoes runs engine a9c105e with `titleCardStyle: scroll`, cut-in quotes for the
+four heroes, boss cut-ins (portrait + quote) for Malakor, Vaelor, Ouros, Nocturne and Galahault, and the nine
+boss ultimates from Echoes commit 2920e23 restored (they were lost in the convergence), plus Malakor's Cords of
+Severance below 34% HP as a 2.6x area blast. Intensity tracks wait on Todd's music decision. Installed for testing.
 The engine milestones land everywhere through sync; the per-game work below is **JSON and assets only**.
 
 ### Phase 0: done by the convergence plan
