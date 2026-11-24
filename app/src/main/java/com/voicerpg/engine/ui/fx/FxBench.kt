@@ -48,7 +48,7 @@ object FxBench {
             matchedThematicRoots = emptyList(), syllableCount = 0
         )
         val reveal = BattleCue.ResonanceReveal(casterId, resonance, showBanner = bonus >= 50)
-        val travel = timing.travelMs(fromParty = true, isBossUltimate = false)
+        val travel = timing.travelMs(fromParty = true, isBossUltimate = false, tier = tier)
         val charge = BattleCue.ChargeStart(casterId, typed = true)
         return listOf(
             Step(0, charge),

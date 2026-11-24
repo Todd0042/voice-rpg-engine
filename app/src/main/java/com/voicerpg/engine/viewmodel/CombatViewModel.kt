@@ -570,10 +570,7 @@ class CombatViewModel(
                         }
                     }
                 } else if (speechManager.isAutoListen.value) {
-                    activeScope.launch {
-                        delay(100)
-                        startVoiceListening()
-                    }
+                    relistenAfter(100)
                 }
             }
         } else if (topEnemy != null) {
@@ -1059,10 +1056,7 @@ class CombatViewModel(
                     proceedToStory()
                 }
             } else if (speechManager.isAutoListen.value) {
-                activeScope.launch {
-                    delay(150)
-                    startVoiceListening()
-                }
+                relistenAfter(150)
             }
         }
     }
@@ -1106,10 +1100,7 @@ class CombatViewModel(
                     proceedToStory()
                 }
             } else if (speechManager.isAutoListen.value) {
-                activeScope.launch {
-                    delay(150)
-                    startVoiceListening()
-                }
+                relistenAfter(150)
             }
         }
     }
@@ -1236,10 +1227,7 @@ class CombatViewModel(
                         }
                     }
                 } else if (speechManager.isAutoListen.value) {
-                    activeScope.launch {
-                        delay(100)
-                        startVoiceListening()
-                    }
+                    relistenAfter(100)
                 }
             }
         } else {
@@ -1374,15 +1362,20 @@ class CombatViewModel(
             if (combatNarrator.isEyesFreeMode.value) {
                 val heroName = _state.value.activePartyMember?.name ?: "Hero"
                 combatNarrator.speak("$heroName is ready. Speak your command.", force = true) {
-                    activeScope.launch {
-                        delay(100)
-                        startVoiceListening()
-                    }
+                    relistenAfter(100)
                 }
             } else {
                 startVoiceListening()
             }
         } else {
+            startVoiceListening()
+        }
+    }
+
+    /** Re-arm the microphone after [ms] (lets TTS release the audio route first). */
+    private fun relistenAfter(ms: Long) {
+        activeScope.launch {
+            delay(ms)
             startVoiceListening()
         }
     }
@@ -1405,10 +1398,7 @@ class CombatViewModel(
         val text = if (enabled) "Eyes-free pocket mode enabled. Screen locked." else "Eyes-free pocket mode disabled."
         combatNarrator.speak(text, force = true) {
             if (_state.value.phase == CombatPhase.PLAYER_INPUT && speechManager.isAutoListen.value) {
-                activeScope.launch {
-                    delay(100)
-                    startVoiceListening()
-                }
+                relistenAfter(100)
             }
         }
         return enabled
@@ -1510,10 +1500,7 @@ class CombatViewModel(
         _state.value = _state.value.copy(isOptionsOpen = true)
         combatNarrator.speak("Options open. Say Pocket Mode, Auto Listen, Speaker Names, Help, or Close Options.", force = _state.value.isEyesFreeMode) {
             if (speechManager.isAutoListen.value) {
-                activeScope.launch {
-                    delay(100)
-                    startVoiceListening()
-                }
+                relistenAfter(100)
             }
         }
     }
@@ -1522,10 +1509,7 @@ class CombatViewModel(
         _state.value = _state.value.copy(isOptionsOpen = false)
         combatNarrator.speak("Resuming battle.", force = _state.value.isEyesFreeMode) {
             if (_state.value.phase == CombatPhase.PLAYER_INPUT && speechManager.isAutoListen.value) {
-                activeScope.launch {
-                    delay(100)
-                    startVoiceListening()
-                }
+                relistenAfter(100)
             }
         }
     }
@@ -1535,30 +1519,21 @@ class CombatViewModel(
             MetaCommand.STATUS_REPORT -> {
                 combatNarrator.narrateStatus(_state.value.party, _state.value.enemies) {
                     if (_state.value.phase == CombatPhase.PLAYER_INPUT && speechManager.isAutoListen.value) {
-                        activeScope.launch {
-                            delay(100)
-                            startVoiceListening()
-                        }
+                        relistenAfter(100)
                     }
                 }
             }
             MetaCommand.CHECK_ENEMIES -> {
                 combatNarrator.narrateEnemies(_state.value.enemies) {
                     if (_state.value.phase == CombatPhase.PLAYER_INPUT && speechManager.isAutoListen.value) {
-                        activeScope.launch {
-                            delay(100)
-                            startVoiceListening()
-                        }
+                        relistenAfter(100)
                     }
                 }
             }
             MetaCommand.CHECK_PARTY -> {
                 combatNarrator.narrateParty(_state.value.party) {
                     if (_state.value.phase == CombatPhase.PLAYER_INPUT && speechManager.isAutoListen.value) {
-                        activeScope.launch {
-                            delay(100)
-                            startVoiceListening()
-                        }
+                        relistenAfter(100)
                     }
                 }
             }
@@ -1582,10 +1557,7 @@ class CombatViewModel(
                 val text = "Eyes-free pocket mode enabled. Screen locked."
                 combatNarrator.speak(text, force = true) {
                     if (_state.value.phase == CombatPhase.PLAYER_INPUT && speechManager.isAutoListen.value) {
-                        activeScope.launch {
-                            delay(100)
-                            startVoiceListening()
-                        }
+                        relistenAfter(100)
                     }
                 }
             }
@@ -1597,10 +1569,7 @@ class CombatViewModel(
                 combatNarrator.unlockPocketGuard()
                 combatNarrator.speak("Screen unlocked.", force = true) {
                     if (_state.value.phase == CombatPhase.PLAYER_INPUT && speechManager.isAutoListen.value) {
-                        activeScope.launch {
-                            delay(100)
-                            startVoiceListening()
-                        }
+                        relistenAfter(100)
                     }
                 }
             }
@@ -1612,10 +1581,7 @@ class CombatViewModel(
                 combatNarrator.lockPocketGuard()
                 combatNarrator.speak("Screen locked. Pocket mode active.", force = true) {
                     if (_state.value.phase == CombatPhase.PLAYER_INPUT && speechManager.isAutoListen.value) {
-                        activeScope.launch {
-                            delay(100)
-                            startVoiceListening()
-                        }
+                        relistenAfter(100)
                     }
                 }
             }
@@ -1625,10 +1591,7 @@ class CombatViewModel(
                 val status = if (enabled) "Auto listen enabled." else "Auto listen disabled."
                 combatNarrator.speak(status, force = true) {
                     if (enabled && _state.value.phase == CombatPhase.PLAYER_INPUT) {
-                        activeScope.launch {
-                            delay(100)
-                            startVoiceListening()
-                        }
+                        relistenAfter(100)
                     }
                 }
                 val fct = FloatingCombatText(
@@ -1648,10 +1611,7 @@ class CombatViewModel(
                 val status = if (enabled) "Story narration enabled." else "Story narration muted."
                 combatNarrator.speak(status, force = true) {
                     if (_state.value.phase == CombatPhase.PLAYER_INPUT && speechManager.isAutoListen.value) {
-                        activeScope.launch {
-                            delay(100)
-                            startVoiceListening()
-                        }
+                        relistenAfter(100)
                     }
                 }
                 val fct = FloatingCombatText(
@@ -1671,10 +1631,7 @@ class CombatViewModel(
                 val status = if (enabled) "Choice reading enabled." else "Choice reading disabled."
                 combatNarrator.speak(status, force = true) {
                     if (_state.value.phase == CombatPhase.PLAYER_INPUT && speechManager.isAutoListen.value) {
-                        activeScope.launch {
-                            delay(100)
-                            startVoiceListening()
-                        }
+                        relistenAfter(100)
                     }
                 }
                 val fct = FloatingCombatText(
@@ -1694,10 +1651,7 @@ class CombatViewModel(
                 val status = if (enabled) "Speaker names will be announced." else "Speaker names hidden. Voices remain distinct."
                 combatNarrator.speak(status, force = true) {
                     if (_state.value.phase == CombatPhase.PLAYER_INPUT && speechManager.isAutoListen.value) {
-                        activeScope.launch {
-                            delay(100)
-                            startVoiceListening()
-                        }
+                        relistenAfter(100)
                     }
                 }
                 val fct = FloatingCombatText(
@@ -1717,10 +1671,7 @@ class CombatViewModel(
                 val status = if (enabled) "Background music enabled." else "Background music muted."
                 combatNarrator.speak(status, force = true) {
                     if (_state.value.phase == CombatPhase.PLAYER_INPUT && speechManager.isAutoListen.value) {
-                        activeScope.launch {
-                            delay(100)
-                            startVoiceListening()
-                        }
+                        relistenAfter(100)
                     }
                 }
                 val fct = FloatingCombatText(
@@ -1744,10 +1695,7 @@ class CombatViewModel(
             MetaCommand.HELP -> {
                 combatNarrator.narrateHelp {
                     if (_state.value.phase == CombatPhase.PLAYER_INPUT && speechManager.isAutoListen.value) {
-                        activeScope.launch {
-                            delay(100)
-                            startVoiceListening()
-                        }
+                        relistenAfter(100)
                     }
                 }
             }
@@ -1761,10 +1709,7 @@ class CombatViewModel(
                 combatNarrator.setSpeechRate(next)
                 combatNarrator.speak("Narration speed increased to %.2fx.".format(next), force = true) {
                     if (_state.value.phase == CombatPhase.PLAYER_INPUT && speechManager.isAutoListen.value) {
-                        activeScope.launch {
-                            delay(100)
-                            startVoiceListening()
-                        }
+                        relistenAfter(100)
                     }
                 }
             }
@@ -1778,10 +1723,7 @@ class CombatViewModel(
                 combatNarrator.setSpeechRate(next)
                 combatNarrator.speak("Narration speed decreased to %.2fx.".format(next), force = true) {
                     if (_state.value.phase == CombatPhase.PLAYER_INPUT && speechManager.isAutoListen.value) {
-                        activeScope.launch {
-                            delay(100)
-                            startVoiceListening()
-                        }
+                        relistenAfter(100)
                     }
                 }
             }
@@ -1789,10 +1731,7 @@ class CombatViewModel(
                 combatNarrator.setSpeechRate(1.05f)
                 combatNarrator.speak("Narration speed reset to normal 1.05x.", force = true) {
                     if (_state.value.phase == CombatPhase.PLAYER_INPUT && speechManager.isAutoListen.value) {
-                        activeScope.launch {
-                            delay(100)
-                            startVoiceListening()
-                        }
+                        relistenAfter(100)
                     }
                 }
             }
@@ -1886,10 +1825,7 @@ class CombatViewModel(
                     selectPartyMember(switchTarget)
                     combatNarrator.speak("Switched to ${switchTarget.name}. Ready to act.", force = true) {
                         if (speechManager.isAutoListen.value) {
-                            activeScope.launch {
-                                delay(100)
-                                startVoiceListening()
-                            }
+                            relistenAfter(100)
                         }
                     }
                 } else {
@@ -1908,10 +1844,7 @@ class CombatViewModel(
                     }
                     combatNarrator.speak("${switchTarget.name} is not ready yet ($pct% charged). It is ${activeHero.name}'s turn.", force = true) {
                         if (speechManager.isAutoListen.value) {
-                            activeScope.launch {
-                                delay(100)
-                                startVoiceListening()
-                            }
+                            relistenAfter(100)
                         }
                     }
                 }
@@ -2033,10 +1966,7 @@ class CombatViewModel(
             }
             val relisten: () -> Unit = {
                 if (speechManager.isAutoListen.value && _state.value.phase == CombatPhase.PLAYER_INPUT) {
-                    activeScope.launch {
-                        delay(150)
-                        startVoiceListening()
-                    }
+                    relistenAfter(150)
                 }
             }
             // The active hero may answer in character (outOfTurnLine in their character file).
@@ -2080,10 +2010,7 @@ class CombatViewModel(
                     force = true
                 ) {
                     if (speechManager.isAutoListen.value) {
-                        activeScope.launch {
-                            delay(150)
-                            startVoiceListening()
-                        }
+                        relistenAfter(150)
                     }
                 }
                 return@launch
@@ -2148,7 +2075,7 @@ class CombatViewModel(
                     bonusPercent = resonance.bonusPercent,
                     particleCount = resonance.particleCount,
                     graphics = parsed.spell.graphics,
-                    travelMs = timing.travelMs(fromParty = true, isBossUltimate = false)
+                    travelMs = timing.travelMs(fromParty = true, isBossUltimate = false, tier = resonance.tier)
                 )
             )
 

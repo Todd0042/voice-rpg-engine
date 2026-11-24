@@ -257,6 +257,13 @@ latches it on). The view model watches party health as a flow, so every HP chang
   Transcendental turn about 3.5 s with all the trimmings.
 - Remove the leftover ad-hoc `delay()` calls that `CombatTiming` replaced.
 
+**Status: done (2026-11-24), table side; the on-device pass is Todd's.** Hero flight time 380-540 ms and the
+impact hold 650-1700 ms by tier (pocket: 300): Basic release → next input ≈ 1.23 s, Transcendental ≈ 3.09 s
+plus render overhead (`CombatPacingTest`). Every turn beat goes through `CombatTiming`; the view model's
+`delay()` calls fell from 81 (before M1) to 33. Those left are the ATB tick, microphone re-arms (now one
+`relistenAfter` helper), status-message lifetimes, story-mode watchdogs and the pocket narration wait, none
+of them turn beats. Tune the table on device if a tier feels long or short.
+
 ### Verification for every milestone
 - `./gradlew testDebugUnitTest` and `compileDebugKotlin` in the engine.
 - An **FX test bench**: extend the developer tools (`EnvironmentSwitcherBar` / `DebugWarpDialog`) with

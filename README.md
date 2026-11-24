@@ -15,7 +15,7 @@
 [![Kotlin](https://img.shields.io/badge/Kotlin-2.0.21-7F52FF.svg?logo=kotlin&logoColor=white)](https://kotlinlang.org)
 [![Jetpack Compose](https://img.shields.io/badge/UI-Jetpack%20Compose%202024.10.01-4285F4.svg?logo=jetpackcompose&logoColor=white)](https://developer.android.com/jetpack/compose)
 [![Android CI](https://github.com/Todd0042/voice-rpg-engine/actions/workflows/android_ci.yml/badge.svg)](https://github.com/Todd0042/voice-rpg-engine/actions)
-[![Unit Tests](https://img.shields.io/badge/Unit%20Tests-279%20Passing-39ff14.svg)](app/src/test/java/com/voicerpg/engine/)
+[![Unit Tests](https://img.shields.io/badge/Unit%20Tests-311%20Passing-39ff14.svg)](app/src/test/java/com/voicerpg/engine/)
 [![Support on Ko-fi](https://img.shields.io/badge/Ko--fi-Support%20Creator-F16061?style=flat&logo=ko-fi&logoColor=white)](https://ko-fi.com/todd0042)
 
 > **A high-performance, modular native Android game engine designed for building audio-first, voice-commanded retro JRPGs. Every aspect of gameplay—incantations, tactical ATB party combat, visual novel exploration, dialogue choices, and system toggles—can be operated hands-free via natural voice or via retro touch controls.**
@@ -90,7 +90,7 @@ While traditional mobile RPGs rely heavily on small on-screen buttons, menus, an
 
 Designed for commuters, walkers, and visually impaired players, **Pocket Mode** turns the display into an ultra-low-power OLED black touch-guard while routing all narration and audio through headphones. Spoken meta-commands (*"Status"*, *"Enemies"*, *"Fellowship"*, *"Help"*) allow players to inspect party health, mana, and enemy threats completely eyes-free.
 
-**Reduce Motion** (Options → Pocket & Accessibility) keeps the battle arena still: no screen shake when spells land or bosses strike. It is saved with the game like the audio options.
+**Reduce Motion** and **Reduce Flashing** (Options → Pocket & Accessibility) keep battles comfortable: no shake or zoom and only a brief freeze, and no full-screen flash (flashes are always limited to three a second). Both are saved with the game like the audio options. In pocket mode, cut-in quotes and boss warnings are spoken.
 
 ---
 
@@ -142,28 +142,49 @@ All character and enemy abilities inherit from standardized categories defined i
 
 ### Battle cues & effects (`BattleCue.kt`, `CombatTiming.kt`, `ui/fx/`)
 
-Combat logic and what the player sees are separate layers. [`CombatViewModel`](app/src/main/java/com/voicerpg/engine/viewmodel/CombatViewModel.kt) decides outcomes and announces them as an ordered stream of [`BattleCue`](app/src/main/java/com/voicerpg/engine/combat/BattleCue.kt)s; the battle screen's [`BattleFxDirector`](app/src/main/java/com/voicerpg/engine/ui/fx/BattleFxDirector.kt) plays them and never changes game state.
+Combat logic and what the player sees are separate layers. [`CombatViewModel`](app/src/main/java/com/voicerpg/engine/viewmodel/CombatViewModel.kt) decides outcomes and announces them as an ordered stream of [`BattleCue`](app/src/main/java/com/voicerpg/engine/combat/BattleCue.kt)s; the battle screen's [`BattleFxDirector`](app/src/main/java/com/voicerpg/engine/ui/fx/BattleFxDirector.kt) plays them and never changes game state. The full design is in [`docs/COMBAT_FEEL_PLAN.md`](docs/COMBAT_FEEL_PLAN.md).
 
-| Cue | When | What the player sees |
+| What happens | Cues | What the player sees and hears |
 | :--- | :--- | :--- |
-| `ResonanceReveal` | A hero's voice was scored | Resonance banner; a shake on MYTHIC and above |
-| `EnemyMove` / `PhaseShift` | An enemy chose a move / changes tactics | Boss ultimates shake the arena |
-| `Release` | A spell or move leaves its caster | One projectile per target (a breath turn glows on the caster) |
-| `Impact` | The release resolved: every hit at once | Particle bursts; a shake in the direction of the blow |
-| `Death`, `Guard`, `Reinforcements`, `TurnEnd`, `BattleStart`, `BattleEnd` | As named | Reinforcements shake; a new battle clears the arena |
+| **Voice charge-up** | `ChargeStart` / `ChargeLevel` / `ChargeEnd` | While you speak, the arena dims, a gold aura on the caster grows with your voice and a hum follows it; the resonance meter fills live. Typed chants get a short simulated charge. |
+| **Cut-in** | `CutIn` | At MYTHIC and above, a diagonal panel slides across with the caster's portrait (or selfie portrait) and quote, the arena in slow motion behind it. Bosses can have one for their ultimate. |
+| **The blow lands** | `Release`, `ResonanceReveal`, `Impact` | The projectile flies; the resonance banner and fanfare arrive *with* the hit. A freeze of 60-180 ms by tier, a white flash and knockback on each target, labelled numbers (WEAK!, RESIST, MYTHIC!), a shake toward the side that was hit. Transcendental adds slow motion, a zoom punch and a screen flash. Per-school impact sounds. |
+| **Bold voices** | `Stagger`, `Streak` | A MASTER+ chant on a weakness pushes the enemy's turn back; a MYTHIC+ hit breaks a charging boss ultimate ("BROKEN!"). A streak of strong casts grows a badge and the fanfare climbs; it never changes damage. |
+| **Enemy turns** | `Telegraph`, `EnemyMove`, `TitleCard`, `UltimateCharge`, `Taunt` | Enemies show what they'll do at 75% gauge, wind up, and name their moves on a title card. Boss ultimates charge for a turn under a red bar. Enemies taunt in speech bubbles. |
+| **Deaths** | `Death` | Enemies shatter into their own pixels (or fade, or dissolve). |
+| **Music** | `MusicIntensity` | An optional intensity track fades in when the party is low or a boss changes phase. |
 
-- **One timing table.** Every wait in a turn comes from [`CombatTiming`](app/src/main/java/com/voicerpg/engine/combat/CombatTiming.kt) (pocket mode keeps its own audio-paced values). `CombatTiming.INSTANT` lets tests run whole battles with no real time passing.
-- **Frame-rate independent.** [`FxClock`](app/src/main/java/com/voicerpg/engine/ui/fx/FxClock.kt) advances projectiles and particles on frame *time*, so effects run at the same speed at 60 Hz and 120 Hz. It also supports hit-stop and slow motion for the whole arena.
-- **Only the arena shakes**: the status bar and voice console stay still and readable.
-- **Per-game tuning** in the optional `assets/game/combat/presentation.json` (a game without it gets the defaults):
+- **One timing table.** Every wait in a turn comes from [`CombatTiming`](app/src/main/java/com/voicerpg/engine/combat/CombatTiming.kt): a Basic turn runs about 1.2 s from release to the next input, a Transcendental one about 3.1 s. Pocket mode keeps its own audio-paced values. `CombatTiming.INSTANT` lets tests run whole battles with no real time passing.
+- **Frame-rate independent.** [`FxClock`](app/src/main/java/com/voicerpg/engine/ui/fx/FxClock.kt) runs effects on frame *time* (the same at 60 and 120 Hz), with hit-stop and slow motion for the whole arena.
+- **Only the arena shakes and zooms**: the status bar and voice console stay still and readable. Messages (charging, mana, guards) sit on one status line above the console.
+- **Repeatable.** Enemy plans and damage rolls use the view model's injectable `random`.
+- **FX test bench**: with developer tools on, a row of buttons plays a cast at every tier, an area spell, an enemy hit and a boss ultimate on the current encounter, without touching the battle.
+
+**Per-game tuning** in the optional `assets/game/combat/presentation.json` (every field optional; a game without the file gets these defaults):
 
 ```json
-{ "intensity": 1.0 }
+{
+  "intensity": 1.0,
+  "titleCardStyle": "banner",
+  "damageNumberStyle": "pop",
+  "labels": { "weak": "WEAK!", "resist": "RESIST", "crit": "{tier}!" },
+  "cutIn": { "minTier": "MYTHIC" },
+  "streak": { "label": "RESONANCE x{n}", "minTier": "ADEPT" },
+  "telegraph": { "showIntentIcons": true, "bossUltimateChargeTurns": 1 },
+  "deathEffect": "shatter",
+  "music": { "intensityTrack": null, "lowHpThreshold": 0.3 }
+}
 ```
 
-`intensity` scales the shake (0 = none, up to 2.0). More fields arrive with the effects that use them; see [`docs/COMBAT_FEEL_PLAN.md`](docs/COMBAT_FEEL_PLAN.md).
+| Field | Values |
+| :--- | :--- |
+| `intensity` | 0-2: scales shake, freeze and knockback |
+| `titleCardStyle` | `banner`, `headline` (newspaper), `pa_announcement` (intercom), `scroll` (parchment) |
+| `damageNumberStyle` | `pop`, `receipt` (paper slip), `comic` (yellow stamp) |
+| `deathEffect` | `shatter`, `fade`, `dissolve` |
+| `telegraph.bossUltimateChargeTurns` | 0-3 boss turns of charging before an ultimate fires |
 
-- **FX test bench**: with developer tools on, the battle screen shows a row of buttons that play a cast at every resonance tier, an area spell, an enemy hit and a boss ultimate on the current encounter, without touching the battle.
+Content files can add, all optional: `enemies.json` `scale` (bosses 2.0 by default), `taunts`, `hitReaction` (`flinch`, `stagger`, `comic_spin`), `cutIn`; `enemy_spells.json` moves `titleCard`, `windupMs`, `intentIcon`; characters' `combat.cutIn` (`portrait`, `color`, `quote`); `encounters.json` `intensityTrack`; sprite `frames` `attack`, `hurt`, `death`.
 
 ---
 
@@ -234,7 +255,7 @@ The included sync utility [`scripts/sync_engine_to_games.sh`](scripts/sync_engin
 
 ## 9. Automated Unit Verification Suite
 
-The engine features an automated suite of **279 unit tests** across 40 test files, covering intent parsing, multilingual resonance incantations, ATB timeline priority, save state integrity, and the JVM **Balance Harness** ([`BalanceHarnessTest.kt`](app/src/test/java/com/voicerpg/engine/combat/BalanceHarnessTest.kt)):
+The engine features an automated suite of **311 unit tests** across 47 test files, covering intent parsing, multilingual resonance incantations, ATB timeline priority, save state integrity, and the JVM **Balance Harness** ([`BalanceHarnessTest.kt`](app/src/test/java/com/voicerpg/engine/combat/BalanceHarnessTest.kt)):
 ```bash
 # Run full unit test suite (including headless Balance Harness):
 ./gradlew testDebugUnitTest

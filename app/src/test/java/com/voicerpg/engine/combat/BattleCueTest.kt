@@ -254,7 +254,8 @@ class BattleCueTest {
         val end = at("TurnEnd")
         val tolerance = 150L
         val travel = (release.cue as BattleCue.Release).travelMs
-        assertEquals("projectiles fly for the table's travel time", timing.travelMs(fromParty = true, isBossUltimate = false), travel)
+        assertEquals("projectiles fly for the table's travel time",
+            timing.travelMs(fromParty = true, isBossUltimate = false, tier = (release.cue as BattleCue.Release).tier), travel)
         assertTrue("the voice is revealed as the spell lands, not before it flies", reveal.atMs - release.atMs >= travel - tolerance)
         assertTrue("reveal and impact are one moment", impact.atMs - reveal.atMs < tolerance)
         assertTrue("the result is held before the turn ends", end.atMs - impact.atMs >= timing.holdMs(impact.cue, pocket = false) - tolerance)
