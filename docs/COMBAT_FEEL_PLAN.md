@@ -212,7 +212,10 @@ the games that are ready (see §3). Letters map to the suggestions list (A–J).
 
 ## 3. Game rollout
 
-Order: **superstore-saga** (pilot) → **wallys-world** → **echoes-of-logos** → **commander-america-rpg**.
+Order (Todd, 2026-11-24): **echoes-of-logos** (pilot) → **superstore-saga** → **wallys-world** → **commander-america-rpg**.
+Pilot status: echoes-of-logos runs M1 (engine 44e9572) with school-distinct spell `graphics` and
+`presentation.json` intensity 1.1; installed on Todd's phone 2026-11-24 for testing. Its title cards, cut-ins,
+Malakor telegraph and intensity tracks follow M4, M7 and M8.
 The engine milestones land everywhere through sync; the per-game work below is **JSON and assets only**.
 
 ### Phase 0: done by the convergence plan
@@ -254,7 +257,7 @@ Ouros, Nocturne; 14 portraits)
 
 ## 4. Decisions needed before starting
 
-1. **Pilot**: Superstore Saga first?
+1. **Pilot**: decided 2026-11-24: Echoes of Logos.
 2. **Assets**: synthesized sounds only (no new files), or will you supply intensity music
    tracks per game?
 
