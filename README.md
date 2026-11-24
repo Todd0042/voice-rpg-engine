@@ -211,6 +211,7 @@ The engine features an automated suite of **238 unit tests** across 31 test file
 
 - **100% Original Framework:** Zero copyrighted game assets or proprietary game logic bundled in the core engine.
 - **PolyForm Noncommercial 1.0.0:** Free for personal, educational, and hobbyist game development. For commercial inquiries, contact **[todd.0042.git@gmail.com](mailto:todd.0042.git@gmail.com)**.
+- **Media License**: the images, artwork and audio made for this project (paths listed in [LICENSE-MEDIA](LICENSE-MEDIA)) are © Todd0042 under **[CC BY-NC 4.0](LICENSE-MEDIA)**: free to share and adapt with credit for non-commercial purposes; commercial use requires permission.
 
 ---
 
