@@ -173,12 +173,48 @@ class CombatViewModel(
         cue(BattleCue.ChargeEnd(id))
     }
 
+    // ---- Music intensity (M8): the intensity layer follows party health and boss phases -------------
+    private var intensityJob: Job? = null
+    private var intensityOn = false
+    private var bossPhaseShifted = false
+
+    private fun partyHpRatio(party: List<PartyMember>): Float {
+        val mortal = party.filter { !it.isGhost }
+        val max = mortal.sumOf { it.maxHp }
+        return if (max <= 0) 1f else mortal.sumOf { it.currentHp.coerceAtLeast(0) }.toFloat() / max
+    }
+
+    private fun startIntensityWatcher(intensityTrack: String?) {
+        intensityJob?.cancel()
+        intensityOn = false
+        bossPhaseShifted = false
+        musicManager?.setIntensityTrack(intensityTrack)
+        intensityJob = activeScope.launch {
+            _state.map { partyHpRatio(it.party) }.distinctUntilChanged().collect { evaluateIntensity(it) }
+        }
+    }
+
+    private fun evaluateIntensity(ratio: Float = partyHpRatio(_state.value.party)) = synchronized(this) {
+        val next = com.voicerpg.engine.combat.MusicIntensityRule.next(
+            current = intensityOn, partyHpRatio = ratio,
+            threshold = GameContent.presentation.music.lowHpThreshold, bossPhaseShifted = bossPhaseShifted
+        )
+        if (next != intensityOn) {
+            intensityOn = next
+            cue(BattleCue.MusicIntensity(next))
+            musicManager?.setIntensity(next)
+        }
+    }
+
     /** Announces a [BattleCue.Death] for everyone alive in [before] who has fallen since. */
     private fun announceFallen(before: Set<String>) {
         val enemyIds = _state.value.enemies.map { it.id }.toSet()
         for (id in before - aliveIds()) {
             val isEnemy = id in enemyIds
             cue(BattleCue.Death(id, isEnemy = isEnemy))
+            if (isEnemy && GameContent.presentation.deathEffect != com.voicerpg.engine.content.PresentationConfig.DeathEffect.FADE) {
+                sfxManager.playShatter()
+            }
             if (!isEnemy) endStreak() // a fallen hero ends the streak
         }
     }
@@ -713,6 +749,10 @@ class CombatViewModel(
                     _state.value = _state.value.copy(floatingTexts = _state.value.floatingTexts.filterNot { f -> f.id == phaseFct.id })
                 }
                 combatNarrator.speak("${enemy.name} changes tactics! ${phase.note}", force = true)
+                if (enemy.isBoss) {
+                    bossPhaseShifted = true
+                    evaluateIntensity()
+                }
                 beat(BattleCue.PhaseShift(enemy.id, phase.note))
             }
             // The move it telegraphed at 75% (re-picked only if it can no longer be used).
@@ -834,7 +874,7 @@ class CombatViewModel(
                     travelMs = timing.travelMs(fromParty = false, isBossUltimate = isBossUltimate)
                 )
             )
-            sfxManager.playHitImpact()
+            sfxManager.playImpact(moveSchool)
             sfxManager.playSoundBite(move.soundBites.ifEmpty { refreshedSelf.soundBites })
             val moveShake = enemyGraphics?.screenShake ?: 0f
 
@@ -2335,7 +2375,14 @@ class CombatViewModel(
         val isAoe = spell.hitsAll || target == TargetSelection.ALL_ENEMIES
         val targetList = resolveDamageTargets(spell, target, targetEnemyId)
 
-        sfxManager.playHitImpact()
+        sfxManager.playImpact(spell.school, resonance.tier)
+        // A muffled whomp under the freeze of a strong blow (lengths follow the director's hit-stop table).
+        when (resonance.tier) {
+            ResonanceTier.MASTER -> sfxManager.playWhomp(110)
+            ResonanceTier.MYTHIC -> sfxManager.playWhomp(150)
+            ResonanceTier.TRANSCENDENTAL -> sfxManager.playWhomp(180)
+            else -> Unit
+        }
 
         // Per-enemy resolution: affinity lands on the base, voice multiplier untouched.
         val school = schoolOf(spell.school)
@@ -2494,6 +2541,9 @@ class CombatViewModel(
         atbJob = null
         chargeJob?.cancel()
         chargeJob = null
+        intensityJob?.cancel()
+        intensityJob = null
+        musicManager?.setIntensityTrack(null)
         endCharge()
         combatNarrator.setCombatActive(false)
         _state.update { it.copy(phase = CombatPhase.INACTIVE) }
@@ -2655,6 +2705,8 @@ class CombatViewModel(
         cue(BattleCue.BattleStart(currentEncounterId))
         startAtbLoop()
         startChargeWatcher()
+        startIntensityWatcher(lastEncounterDefinition?.takeIf { it.id == currentEncounterId }?.intensityTrack
+            ?: GameContent.presentation.music.intensityTrack)
     }
 
     fun restartBattle() {
@@ -2695,6 +2747,7 @@ class CombatViewModel(
         cue(BattleCue.BattleStart(currentEncounterId))
         startAtbLoop()
         startChargeWatcher()
+        startIntensityWatcher(GameContent.presentation.music.intensityTrack)
     }
 
     fun cleanup() {
@@ -2704,6 +2757,7 @@ class CombatViewModel(
         conclusionWatchdogJob = null
         atbJob?.cancel()
         chargeJob?.cancel()
+        intensityJob?.cancel()
         endCharge()
         speechManager.destroy()
         combatNarrator.destroy()

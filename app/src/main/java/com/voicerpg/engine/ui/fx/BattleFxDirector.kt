@@ -154,6 +154,7 @@ class BattleFxDirector(
                 fx.speech = cue.line
                 after(TAUNT_SECONDS) { if (fx.speech == cue.line) fx.speech = null }
             }
+            is BattleCue.MusicIntensity,
             is BattleCue.PhaseShift,
             is BattleCue.Guard,
             is BattleCue.TurnEnd,

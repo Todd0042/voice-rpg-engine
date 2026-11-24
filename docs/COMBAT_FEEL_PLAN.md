@@ -243,6 +243,15 @@ Bosses with `cutIn` in enemies.json get one for their ultimate. Pocket mode spea
 - Music intensity: optional `music.intensityTrack` crossfades in (a second `MediaPlayer`) below the
   low-HP threshold and on boss phase changes. Also allowed per encounter in `encounters.json`.
 
+**Status: done (2026-11-24).** `SfxManager.playImpact(school, tier)` synthesizes a set per school
+(`audio/ImpactSound.kt`: fire crackle, ice shatter, thunder, holy chime, shadow thrum, wind whoosh for nature,
+physical thud) with ±8% pitch, louder for stronger tiers; MASTER+ hero blows add a low-passed whomp as long
+as the hit-stop; shatter and stagger stingers. Music: `music.intensityTrack` (or an encounter's
+`intensityTrack`) is prepared silent beside the battle music and crossfaded in over 1.5 s by
+`MusicIntensityRule` (below `lowHpThreshold` party health, out again 10 points above it; a boss phase change
+latches it on). The view model watches party health as a flow, so every HP change counts; it emits
+`MusicIntensity` cues. Without a track nothing changes (Todd's decision on music files is still open).
+
 ### M9: Pacing pass (J)
 - Tune `CombatTiming` on device: a Basic turn from release to next input in ≤ 1.6 s, a
   Transcendental turn about 3.5 s with all the trimmings.

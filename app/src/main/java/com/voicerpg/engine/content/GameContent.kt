@@ -389,7 +389,9 @@ data class EncounterDto(
     val party: List<String>? = null,
     val enemies: List<EncounterEnemyDto>? = null,
     val bossPhases: List<BossPhaseDto>? = null,
-    val midBattleJoin: MidBattleJoinDto? = null
+    val midBattleJoin: MidBattleJoinDto? = null,
+    /** A second music track for when this fight turns desperate (crossfaded in). */
+    val intensityTrack: String? = null
 )
 
 data class EncounterFileDto(val encounters: List<EncounterDto>? = null)
@@ -1529,7 +1531,8 @@ class GameContentLoader(private val source: ContentSource) {
                     announcementText = it.announcementText,
                     afterEnemyActions = it.afterEnemyActions
                 )
-            }
+            },
+            intensityTrack = intensityTrack?.takeIf { it.isNotBlank() }
         )
     }
 

@@ -135,5 +135,8 @@ sealed interface BattleCue {
     /** The acting combatant's turn is over; the next one may start after its hold. */
     data class TurnEnd(val actorId: String, val fromParty: Boolean) : BattleCue
 
+    /** The battle music's intensity layer comes in ([on]) or goes out. */
+    data class MusicIntensity(val on: Boolean) : BattleCue
+
     data class BattleEnd(val victory: Boolean) : BattleCue
 }

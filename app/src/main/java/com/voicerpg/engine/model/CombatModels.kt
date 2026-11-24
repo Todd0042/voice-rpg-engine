@@ -251,7 +251,9 @@ data class EncounterDefinition(
     val enemies: List<Enemy>,
     val initialParty: List<PartyMember>? = null,
     val bossPhases: List<BossPhaseRule> = emptyList(),
-    val midBattleJoin: MidBattleJoin? = null
+    val midBattleJoin: MidBattleJoin? = null,
+    /** Overrides `presentation.json` music.intensityTrack for this fight. */
+    val intensityTrack: String? = null
 )
 
 data class FloatingCombatText(

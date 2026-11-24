@@ -39,6 +39,7 @@ data class CombatTiming(val scale: Float = 1f) {
             is BattleCue.Telegraph,
             is BattleCue.Stagger,
             is BattleCue.Taunt,
+            is BattleCue.MusicIntensity,
             is BattleCue.Streak,
             is BattleCue.UltimateCharge,
             is BattleCue.TitleCard,
