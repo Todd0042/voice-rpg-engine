@@ -111,6 +111,25 @@ the games that are ready (see §3). Letters map to the suggestions list (A–J).
 - Tests: cue order for a cast, enemy turn and victory; defaults load when the file is missing;
   projectile travel time is the same at 60 and 120 fps.
 
+**Status: done (2026-11-24).** Built as planned, with these differences:
+- **Cue set.** Beside the plan's cues, logic also emits `EnemyMove`, `PhaseShift`, `Guard`, `Reinforcements`,
+  `TurnEnd`, `BattleStart` and `BattleEnd`, so every wait in a turn is a cue's hold. `Impact` carries all
+  hits of one release (an area spell lands together; M2 staggers its numbers from that list).
+  `ChargeStart`/`ChargeLevel`, `Telegraph`, `TitleCard`, `Stagger`, `Streak`, `CutIn` and `Taunt` arrive
+  with the milestones that emit them.
+- **`awaitBeat`.** The view model waits on the timing table itself (`beat(cue)` = emit + `CombatTiming`
+  hold), never on the screen, so a battle runs the same with no screen collecting (pocket mode, tests).
+  The view model no longer owns the projectile and particle engines; the director does.
+- **Timing.** Behaviour-preserving: the table holds today's durations (the 1000-1200 ms pre-hit banner
+  stays until M3). Projectiles now fly for exactly the release's travel time (420 ms hero, 350/550 ms
+  enemy), so impact bursts land with the damage.
+- **`presentation.json`** holds only `intensity` (shake strength, 0-2) for now; each field arrives with
+  the effect that uses it, so no game can configure an effect that doesn't exist yet.
+- **Options.** Reduce motion is in (no shake; saved with the slot). **Reduce flashing moves to M2**, with
+  the white flashes it turns off: nothing in M1 flashes.
+- Not touched: the tutorial battle (`TutorialBattleViewModel`/`TutorialBattleScreen`) keeps its own
+  small shake; it gets the cue layer when it is next reworked.
+
 ### M2: Impact and numbers (B, D)
 - Hit-stop 60–180 ms by tier; white silhouette flash (sprite drawn with a solid color filter);
   knockback 8–14 px with a spring back; Transcendental adds slow motion, a full flash and a

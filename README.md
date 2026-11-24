@@ -15,7 +15,7 @@
 [![Kotlin](https://img.shields.io/badge/Kotlin-2.0.21-7F52FF.svg?logo=kotlin&logoColor=white)](https://kotlinlang.org)
 [![Jetpack Compose](https://img.shields.io/badge/UI-Jetpack%20Compose%202024.10.01-4285F4.svg?logo=jetpackcompose&logoColor=white)](https://developer.android.com/jetpack/compose)
 [![Android CI](https://github.com/Todd0042/voice-rpg-engine/actions/workflows/android_ci.yml/badge.svg)](https://github.com/Todd0042/voice-rpg-engine/actions)
-[![Unit Tests](https://img.shields.io/badge/Unit%20Tests-238%20Passing-39ff14.svg)](app/src/test/java/com/voicerpg/engine/)
+[![Unit Tests](https://img.shields.io/badge/Unit%20Tests-279%20Passing-39ff14.svg)](app/src/test/java/com/voicerpg/engine/)
 [![Support on Ko-fi](https://img.shields.io/badge/Ko--fi-Support%20Creator-F16061?style=flat&logo=ko-fi&logoColor=white)](https://ko-fi.com/todd0042)
 
 > **A high-performance, modular native Android game engine designed for building audio-first, voice-commanded retro JRPGs. Every aspect of gameplay—incantations, tactical ATB party combat, visual novel exploration, dialogue choices, and system toggles—can be operated hands-free via natural voice or via retro touch controls.**
@@ -43,7 +43,7 @@
 * **Part 2 — Consolidated Technical Documentation & Architecture Reference**
   * [1. Hands-Free Voice Recognition & Continuous State Loop (`SpeechManager.kt`, `IntentParser.kt`)](#1-hands-free-voice-recognition--continuous-state-loop)
   * [2. Resonance Engine & Acoustic-Poetic Scoring Math (`ResonanceEngine.kt`, `SpellThesaurus.kt`)](#2-resonance-engine--acoustic-poetic-scoring-math)
-  * [3. 5-Category Tactical Spell Combat & ATB Timeline (`CombatModels.kt`, `MovesetTable.kt`)](#3-5-category-tactical-spell-combat--atb-timeline)
+  * [3. 5-Category Tactical Spell Combat, ATB Timeline & Battle Effects (`CombatModels.kt`, `MovesetTable.kt`, `BattleCue.kt`, `ui/fx/`)](#3-5-category-tactical-spell-combat-atb-timeline--battle-effects)
   * [4. Opt-In Multi-Track Campaign Architecture (`SaveModels.kt`, `GameContent.kt`)](#4-opt-in-multi-track-campaign-architecture)
   * [5. On-Device Translation Banner & Fallback Dictionaries (`BuiltInDictionaries.kt`)](#5-on-device-translation-banner--fallback-dictionaries)
   * [6. MLKit & TFLite Selfie Character Creation (`SelfiePortraitProcessor.kt`)](#6-mlkit--tflite-selfie-character-creation)
@@ -90,6 +90,8 @@ While traditional mobile RPGs rely heavily on small on-screen buttons, menus, an
 
 Designed for commuters, walkers, and visually impaired players, **Pocket Mode** turns the display into an ultra-low-power OLED black touch-guard while routing all narration and audio through headphones. Spoken meta-commands (*"Status"*, *"Enemies"*, *"Fellowship"*, *"Help"*) allow players to inspect party health, mana, and enemy threats completely eyes-free.
 
+**Reduce Motion** (Options → Pocket & Accessibility) keeps the battle arena still: no screen shake when spells land or bosses strike. It is saved with the game like the audio options.
+
 ---
 
 ## 🚀 Quick Download & Installation
@@ -129,7 +131,7 @@ $$\text{Resonance Score} = S_{\text{acoustic}} + S_{\text{poetic}} + S_{\text{le
 
 ---
 
-## 3. 5-Category Tactical Spell Combat & ATB Timeline
+## 3. 5-Category Tactical Spell Combat, ATB Timeline & Battle Effects
 
 All character and enemy abilities inherit from standardized categories defined in [`CombatModels.kt`](app/src/main/java/com/voicerpg/engine/model/CombatModels.kt):
 - `ATTACK`: Direct single-target damage spells.
@@ -137,6 +139,31 @@ All character and enemy abilities inherit from standardized categories defined i
 - `HEAL`: Restorative recovery spells (party-wide with 0.65 split).
 - `DEFENSE`: Damage mitigation, shields, and party buffs.
 - `MANA`: Recovery and attunement spells.
+
+### Battle cues & effects (`BattleCue.kt`, `CombatTiming.kt`, `ui/fx/`)
+
+Combat logic and what the player sees are separate layers. [`CombatViewModel`](app/src/main/java/com/voicerpg/engine/viewmodel/CombatViewModel.kt) decides outcomes and announces them as an ordered stream of [`BattleCue`](app/src/main/java/com/voicerpg/engine/combat/BattleCue.kt)s; the battle screen's [`BattleFxDirector`](app/src/main/java/com/voicerpg/engine/ui/fx/BattleFxDirector.kt) plays them and never changes game state.
+
+| Cue | When | What the player sees |
+| :--- | :--- | :--- |
+| `ResonanceReveal` | A hero's voice was scored | Resonance banner; a shake on MYTHIC and above |
+| `EnemyMove` / `PhaseShift` | An enemy chose a move / changes tactics | Boss ultimates shake the arena |
+| `Release` | A spell or move leaves its caster | One projectile per target (a breath turn glows on the caster) |
+| `Impact` | The release resolved: every hit at once | Particle bursts; a shake in the direction of the blow |
+| `Death`, `Guard`, `Reinforcements`, `TurnEnd`, `BattleStart`, `BattleEnd` | As named | Reinforcements shake; a new battle clears the arena |
+
+- **One timing table.** Every wait in a turn comes from [`CombatTiming`](app/src/main/java/com/voicerpg/engine/combat/CombatTiming.kt) (pocket mode keeps its own audio-paced values). `CombatTiming.INSTANT` lets tests run whole battles with no real time passing.
+- **Frame-rate independent.** [`FxClock`](app/src/main/java/com/voicerpg/engine/ui/fx/FxClock.kt) advances projectiles and particles on frame *time*, so effects run at the same speed at 60 Hz and 120 Hz. It also supports hit-stop and slow motion for the whole arena.
+- **Only the arena shakes**: the status bar and voice console stay still and readable.
+- **Per-game tuning** in the optional `assets/game/combat/presentation.json` (a game without it gets the defaults):
+
+```json
+{ "intensity": 1.0 }
+```
+
+`intensity` scales the shake (0 = none, up to 2.0). More fields arrive with the effects that use them; see [`docs/COMBAT_FEEL_PLAN.md`](docs/COMBAT_FEEL_PLAN.md).
+
+- **FX test bench**: with developer tools on, the battle screen shows a row of buttons that play a cast at every resonance tier, an area spell, an enemy hit and a boss ultimate on the current encounter, without touching the battle.
 
 ---
 
@@ -207,7 +234,7 @@ The included sync utility [`scripts/sync_engine_to_games.sh`](scripts/sync_engin
 
 ## 9. Automated Unit Verification Suite
 
-The engine features an automated suite of **238 unit tests** across 31 test files, covering intent parsing, multilingual resonance incantations, ATB timeline priority, save state integrity, and the JVM **Balance Harness** ([`BalanceHarnessTest.kt`](app/src/test/java/com/voicerpg/engine/combat/BalanceHarnessTest.kt)):
+The engine features an automated suite of **279 unit tests** across 40 test files, covering intent parsing, multilingual resonance incantations, ATB timeline priority, save state integrity, and the JVM **Balance Harness** ([`BalanceHarnessTest.kt`](app/src/test/java/com/voicerpg/engine/combat/BalanceHarnessTest.kt)):
 ```bash
 # Run full unit test suite (including headless Balance Harness):
 ./gradlew testDebugUnitTest
