@@ -150,13 +150,14 @@ Combat logic and what the player sees are separate layers. [`CombatViewModel`](a
 | **Cut-in** | `CutIn` | At MYTHIC and above, a diagonal panel slides across with the caster's portrait (or selfie portrait) and quote, the arena in slow motion behind it. Bosses can have one for their ultimate. |
 | **The blow lands** | `Release`, `ResonanceReveal`, `Impact` | The projectile flies; the resonance banner and fanfare arrive *with* the hit. A freeze of 60-180 ms by tier, a white flash and knockback on each target, labelled numbers (WEAK!, RESIST, MYTHIC!), a shake toward the side that was hit. Transcendental adds slow motion, a zoom punch and a screen flash. Per-school impact sounds. |
 | **Bold voices** | `Stagger`, `Streak` | A MASTER+ chant on a weakness pushes the enemy's turn back; a MYTHIC+ hit breaks a charging boss ultimate ("BROKEN!"). A streak of strong casts grows a badge and the fanfare climbs; it never changes damage. |
-| **Enemy turns** | `Telegraph`, `EnemyMove`, `TitleCard`, `UltimateCharge`, `Taunt` | Enemies show what they'll do at 75% gauge, wind up, and name their moves on a title card. Boss ultimates charge for a turn under a red bar. Enemies taunt in speech bubbles. |
+| **Enemy turns** | `Telegraph`, `EnemyMove`, `TitleCard`, `UltimateCharge`, `Taunt` | Enemies show what they'll do at 75% gauge, wind up, and name their moves on a title card. Boss ultimates charge for a turn, shown on the boss bar. Enemies taunt in speech bubbles. |
 | **Deaths** | `Death` | Enemies shatter into their own pixels (or fade, or dissolve). |
 | **Music** | `MusicIntensity` | An optional intensity track fades in when the party is low or a boss changes phase. |
 
 - **One timing table.** Every wait in a turn comes from [`CombatTiming`](app/src/main/java/com/voicerpg/engine/combat/CombatTiming.kt): a Basic turn runs about 1.2 s from release to the next input, a Transcendental one about 3.1 s. Pocket mode keeps its own audio-paced values. `CombatTiming.INSTANT` lets tests run whole battles with no real time passing.
 - **Frame-rate independent.** [`FxClock`](app/src/main/java/com/voicerpg/engine/ui/fx/FxClock.kt) runs effects on frame *time* (the same at 60 and 120 Hz), with hit-stop and slow motion for the whole arena.
 - **One floor for everyone.** [`BattleStage`](app/src/main/java/com/voicerpg/engine/ui/combat/BattleStage.kt) defines the floor band (from the backdrop's horizon at 43% of the arena to the bottom edge); each combatant is placed by its feet inside it, back of the formation near the horizon, front at the bottom. However tall the console below (developer tools and preset chants make the arena much shorter), nobody stands in the sky. The backdrop picture moves with the stage: each environment in `environments.json` gives its picture's painted horizon (`artHorizon`, and `artHorizonPortrait` for the `_p` variant; default 0.55), and the picture is cover-cropped so that line is drawn exactly on the stage horizon at any arena size.
+- **Gauges off the field.** [`BattleHud`](app/src/main/java/com/voicerpg/engine/ui/combat/BattleHud.kt) keeps the arena clear: the party's HP, MP and turn gauges are chips in the console's top row (tap one to pick that hero; the acting hero is outlined in gold), up to two bosses get a health bar across the top of the arena with their ultimate charge, and a regular enemy shows a thin health sliver only while targeted or for 2.5 s after a hit or heal. The tutorial battle shows the same chips.
 - **Only the arena shakes and zooms**: the status bar and voice console stay still and readable. Messages (charging, mana, guards) sit on one status line above the console.
 - **Repeatable.** Enemy plans and damage rolls use the view model's injectable `random`.
 - **FX test bench**: with developer tools on, a row of buttons plays a cast at every tier, an area spell, an enemy hit and a boss ultimate on the current encounter, without touching the battle.
@@ -256,7 +257,7 @@ The included sync utility [`scripts/sync_engine_to_games.sh`](scripts/sync_engin
 
 ## 9. Automated Unit Verification Suite
 
-The engine features an automated suite of **314 unit tests** across 48 test files, covering intent parsing, multilingual resonance incantations, ATB timeline priority, save state integrity, and the JVM **Balance Harness** ([`BalanceHarnessTest.kt`](app/src/test/java/com/voicerpg/engine/combat/BalanceHarnessTest.kt)):
+The engine features an automated suite of **317 unit tests** across 49 test files, covering intent parsing, multilingual resonance incantations, ATB timeline priority, save state integrity, and the JVM **Balance Harness** ([`BalanceHarnessTest.kt`](app/src/test/java/com/voicerpg/engine/combat/BalanceHarnessTest.kt)):
 ```bash
 # Run full unit test suite (including headless Balance Harness):
 ./gradlew testDebugUnitTest
