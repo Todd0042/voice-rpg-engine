@@ -197,6 +197,9 @@ Combatants are drawn from **Aseprite sheets** (a PNG plus Aseprite's JSON export
 - **The sprite contract blocks release**: every party fighter, enemy and boss needs a 64 px sheet (bosses 64/96/128, each its own) with a `feet` slice, its role's animations and the `release`/`impact` events ([`SpriteContract`](app/src/main/java/com/voicerpg/engine/content/SpriteSheets.kt)). `GameSpriteContractTest` enforces it when the game sets `"spriteContract": 1` in `manifest.json`, and always in the release variant: the sync installs `.engine-sync/release_gate.gradle.kts` in each game, which makes `assembleRelease`/`bundleRelease` run `testReleaseUnitTest` first. `scripts/sprite_coverage.sh <game>` prints what a game still lacks.
 - **Sprite lineup** (gallery → **SPRITES**, [`SpriteLineup.kt`](app/src/main/java/com/voicerpg/engine/ui/gallery/SpriteLineup.kt)): every battle sprite the game uses, once each, side by side on one floor line at one pixel scale, all playing the chosen animation in step, with height guides every 16 px, a plain or backdrop background, filters for party, bosses and enemies, and a ✓/✗ for the contract. Tap a sprite for its animations, cell, feet, users and contract problems.
 - **Variants**: `game/sprites/sprites.json` recolours a sheet into a new enemy (`{"sprites": {"ember_wolf": {"base": "wolf", "palette": {"#3A3A3A": "#8A2B1A"}, "scale": 1.25}}}`).
+- **Placeholders**: `{"orc": {"placeholder": "template_brute"}}` lets a game map its enemies to a sprite whose art is still being made; the battle draws the placeholder, the contract still counts it as missing, and the real `orc.json` takes over the moment it lands. A sprite's own sheet always wins over a variant base or a placeholder.
+- **Boss size**: a sheet is drawn at its own size (bosses are drawn at 96 or 128 px), so a boss's default 2x enlargement applies only to legacy text grids.
+- **`scripts/sprite_lint.py <game> [--fix]`** checks delivered sheets for what AI-made art gets wrong: labels baked into frames, a `feet` slice off the soles (floating or sinking sprites), wrong cell sizes, stray preview images in the APK (moved to `art/sprite-previews/`), and flags pure-magenta pixels for a look.
 
 ---
 
@@ -267,7 +270,7 @@ The included sync utility [`scripts/sync_engine_to_games.sh`](scripts/sync_engin
 
 ## 9. Automated Unit Verification Suite
 
-The engine features an automated suite of **325 unit tests** across 53 test files, covering intent parsing, multilingual resonance incantations, ATB timeline priority, save state integrity, and the JVM **Balance Harness** ([`BalanceHarnessTest.kt`](app/src/test/java/com/voicerpg/engine/combat/BalanceHarnessTest.kt)):
+The engine features an automated suite of **327 unit tests** across 53 test files, covering intent parsing, multilingual resonance incantations, ATB timeline priority, save state integrity, and the JVM **Balance Harness** ([`BalanceHarnessTest.kt`](app/src/test/java/com/voicerpg/engine/combat/BalanceHarnessTest.kt)):
 ```bash
 # Run full unit test suite (including headless Balance Harness):
 ./gradlew testDebugUnitTest

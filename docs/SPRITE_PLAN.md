@@ -131,6 +131,10 @@ failure (section 3.4), never a crash: it falls back down the chain to `idle`.
 
 Echoes' 79 enemies could become about 12 drawn families × variants instead of 3 shared silhouettes.
 
+A sprite whose art is on the way can name a **placeholder** (`{"orc": {"placeholder": "template_brute"}}`): the
+battle draws the placeholder, the contract reports `no sprite sheet yet`, and the real sheet replaces it on arrival.
+Resolution order: the sprite's own sheet, then a variant's base, then a placeholder.
+
 ### 3.4 Enforcement
 
 - `manifest.json` gains `"spriteContract": 1`. With it, the engine's content-pack test

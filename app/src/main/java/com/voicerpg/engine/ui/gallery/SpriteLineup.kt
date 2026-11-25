@@ -91,7 +91,7 @@ object SpriteLineup {
         val party = pack.characters.values
             .filter { it.combat != null && it.role != CharacterRole.NARRATOR }
             .sortedBy { it.id }
-            .map { c -> Entry(c.id, c.speaker.name, Group.PARTY, listOf(c.id), pack.resolveSheet(c.id) != null, problemsOf(c.id)) }
+            .map { c -> Entry(c.id, c.speaker.name, Group.PARTY, listOf(c.id), drawn(pack, c.id), problemsOf(c.id)) }
 
         val enemies = pack.enemyTemplates.values
             .groupBy { it.spriteId.ifBlank { it.id } }
@@ -103,13 +103,16 @@ object SpriteLineup {
                     label = (boss ?: sorted.first()).name,
                     group = if (boss != null) Group.BOSS else Group.ENEMY,
                     usedBy = sorted.map { it.id },
-                    hasSheet = pack.resolveSheet(key) != null,
+                    hasSheet = drawn(pack, key),
                     problems = problemsOf(key)
                 )
             }
         return party + enemies.filter { it.group == Group.BOSS }.sortedBy { it.label } +
             enemies.filter { it.group == Group.ENEMY }.sortedBy { it.label }
     }
+
+    /** A real sheet (or a variant of one), not a placeholder standing in for art on the way. */
+    private fun drawn(pack: GameContentPack, key: String) = pack.resolveSheet(key)?.isPlaceholder == false
 
     fun filter(entries: List<Entry>, group: Group?): List<Entry> = if (group == null) entries else entries.filter { it.group == group }
 
@@ -267,6 +270,7 @@ fun SpriteLineupTab(modifier: Modifier = Modifier) {
                         Text(
                             text = when {
                                 e.problems.isEmpty() -> "✓ " + clip.name
+                                !e.hasSheet && e.problems.any { it.startsWith("no sprite sheet yet") } -> "… art on the way"
                                 !e.hasSheet -> "✗ text grid"
                                 else -> "✗ ${e.problems.size} · ${clip.name}"
                             },
