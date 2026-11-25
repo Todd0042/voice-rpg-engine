@@ -229,6 +229,13 @@ for game in "${TARGETS[@]}"; do
     chmod +x "$dir/.engine-sync/guard.sh"
     cp "$ENGINE_ROOT/scripts/githooks/pre-commit" "$dir/.githooks/pre-commit"
     chmod +x "$dir/.githooks/pre-commit"
+    # The release gate: a release build runs the strict release-variant tests (sprite contract, docs/SPRITE_PLAN.md).
+    cp "$ENGINE_ROOT/scripts/game-files/release_gate.gradle.kts" "$dir/.engine-sync/release_gate.gradle.kts"
+    gate_line='apply(from = rootProject.file(".engine-sync/release_gate.gradle.kts")) // engine release gate'
+    if [ -f "$dir/app/build.gradle.kts" ] && ! grep -qF '.engine-sync/release_gate.gradle.kts' "$dir/app/build.gradle.kts"; then
+        printf '\n%s\n' "$gate_line" >> "$dir/app/build.gradle.kts"
+        echo "    [+] app/build.gradle.kts now applies the engine release gate"
+    fi
     # The agent rule: in .agy/rules/ (Antigravity) and as a marked block in AGENTS.md / GEMINI.md.
     mkdir -p "$dir/.agy/rules"
     cp "$ENGINE_ROOT/scripts/game-files/00_voicerpg_engine.md" "$dir/.agy/rules/00_voicerpg_engine.md"
@@ -268,7 +275,7 @@ PY
             failures=1
         fi
     fi
-    echo "    Commit in ${game}:  git add -A ${ENGINE_OWNED_PATHS[*]} .engine-sync .githooks .github/workflows/engine_guard.yml AGENTS.md GEMINI.md && git commit -m \"Sync engine ${VERSION:0:12}\""
+    echo "    Commit in ${game}:  git add -A ${ENGINE_OWNED_PATHS[*]} .engine-sync .githooks .github/workflows/engine_guard.yml app/build.gradle.kts AGENTS.md GEMINI.md && git commit -m \"Sync engine ${VERSION:0:12}\""
 done
 
 echo ""

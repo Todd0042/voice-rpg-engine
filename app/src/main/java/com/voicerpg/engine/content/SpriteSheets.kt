@@ -135,3 +135,81 @@ internal fun parseArgb(hex: String): Int? {
         else -> null
     }
 }
+
+/** A sheet as a combatant uses it: the sprite key it was found under, the sheet, and any variant settings. */
+data class ResolvedSheet(val key: String, val sheet: SpriteSheet, val setting: SpriteSetting?)
+
+/**
+ * The sprite contract (docs/SPRITE_PLAN.md §3): what every game must ship before it can be released.
+ * Enforced when the game opts in (`manifest.json` `"spriteContract": 1`) and always for a release build.
+ */
+object SpriteContract {
+
+    enum class Role(val required: List<String>, val cells: Set<Int>) {
+        PARTY(listOf("idle", "ready", "charge", "cast", "attack", "hurt", "ko", "victory"), setOf(64)),
+        ENEMY(listOf("idle", "attack", "hurt"), setOf(64)),
+        BOSS(listOf("idle", "windup", "attack", "cast", "hurt", "charge_ultimate", "ultimate"), setOf(64, 96, 128))
+    }
+
+    /** The event frame each of these animations must mark, when the role requires the animation. */
+    val EVENTS = mapOf("cast" to "release", "attack" to "impact", "ultimate" to "release")
+
+    data class Violation(val combatant: String, val sprite: String, val problem: String) {
+        override fun toString() = "$combatant ($sprite): $problem"
+    }
+
+    data class Report(val violations: List<Violation>, val checked: Int) {
+        val passes: Boolean get() = violations.isEmpty()
+
+        fun format(): String = buildString {
+            appendLine("Sprite contract: $checked combatants checked, ${violations.size} problem(s)")
+            violations.groupBy { it.combatant }.forEach { (who, list) ->
+                appendLine("  $who (${list.first().sprite})")
+                list.forEach { appendLine("    - ${it.problem}") }
+            }
+        }
+    }
+
+    fun isEnforced(manifest: GameManifest, releaseBuild: Boolean): Boolean = releaseBuild || manifest.spriteContract >= 1
+
+    fun check(pack: GameContentPack): Report {
+        val violations = mutableListOf<Violation>()
+        val fighters = pack.characters.values.filter { it.combat != null && it.role != CharacterRole.NARRATOR }
+        fighters.sortedBy { it.id }.forEach { c -> violations += checkSprite(pack, c.id, c.id, Role.PARTY) }
+
+        val enemies = pack.enemyTemplates.values.sortedBy { it.id }
+        val keyOf = enemies.associate { it.id to it.spriteId.ifBlank { it.id } }
+        enemies.forEach { e ->
+            val key = keyOf.getValue(e.id)
+            val role = if (e.isBoss) Role.BOSS else Role.ENEMY
+            violations += checkSprite(pack, e.id, key, role)
+            if (e.isBoss) {
+                val sharers = enemies.filter { it.id != e.id && keyOf[it.id] == key }.map { it.id }
+                if (sharers.isNotEmpty()) violations += Violation(e.id, key, "shares its sprite with ${sharers.joinToString()} (every boss needs its own)")
+            }
+        }
+        return Report(violations, fighters.size + enemies.size)
+    }
+
+    private fun checkSprite(pack: GameContentPack, who: String, key: String, role: Role): List<Violation> {
+        val resolved = pack.resolveSheet(key)
+        val variantBase = pack.spriteSettings[key]?.base
+        if (resolved == null) {
+            val problem = if (variantBase != null) "variant of $variantBase, which has no sprite sheet" else "no sprite sheet"
+            return listOf(Violation(who, key, problem))
+        }
+        val sheet = resolved.sheet
+        val out = mutableListOf<Violation>()
+        role.required.filter { it !in sheet.tags }.forEach { out += Violation(who, key, "missing animation $it") }
+        val cellOk = sheet.cellW == sheet.cellH && sheet.cellW in role.cells
+        if (!cellOk) {
+            val must = if (role.cells.size == 1) "${role.cells.single()}x${role.cells.single()}" else role.cells.sorted().joinToString(", ", postfix = " px square")
+            out += Violation(who, key, "frames are ${sheet.cellW}x${sheet.cellH}, must be $must")
+        }
+        if ("feet" !in sheet.slices) out += Violation(who, key, "no feet slice")
+        EVENTS.forEach { (tag, event) ->
+            if (tag in role.required && sheet.tags[tag]?.events?.containsKey(event) == false) out += Violation(who, key, "$tag has no $event event")
+        }
+        return out
+    }
+}

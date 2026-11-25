@@ -12,6 +12,8 @@ import com.voicerpg.engine.model.BattleEnvironment
 import com.voicerpg.engine.model.Enemy
 import com.voicerpg.engine.model.PartyMember
 import com.voicerpg.engine.model.ResonanceTier
+import com.voicerpg.engine.testing.AsepriteFixture
+import com.voicerpg.engine.testing.AsepriteFixture.Tag
 import com.voicerpg.engine.testing.TemplateFixture
 import com.voicerpg.engine.ui.fx.BattleFxDirector
 import com.voicerpg.engine.ui.fx.CombatantLook
@@ -75,27 +77,7 @@ class SpriteAnimationTest {
 
     // ---- Aseprite exports, as Aseprite writes them (hash format, trimmed frames, tag user data, slices) ----
 
-    private data class Tag(val name: String, val from: Int, val to: Int, val dir: String = "forward", val data: String? = null)
-
-    private fun aseprite(name: String, cell: Int, tags: List<Tag>, feet: Pair<Int, Int>, durations: (Int) -> Int = { 100 }): String {
-        val count = tags.maxOf { it.to } + 1
-        val frames = (0 until count).joinToString(",\n") { i ->
-            // Trimmed: each frame's opaque box sits inside the cell, offset by spriteSourceSize.
-            val x = (i % 8) * cell; val y = (i / 8) * cell
-            """"$name $i.aseprite": { "frame": {"x":$x,"y":$y,"w":${cell - 16},"h":${cell - 8}}, "rotated": false, "trimmed": true,
-               "spriteSourceSize": {"x":8,"y":6,"w":${cell - 16},"h":${cell - 8}}, "sourceSize": {"w":$cell,"h":$cell}, "duration": ${durations(i)} }"""
-        }
-        val tagJson = tags.joinToString(",") { t ->
-            """{ "name": "${t.name}", "from": ${t.from}, "to": ${t.to}, "direction": "${t.dir}", "color": "#000000ff"${t.data?.let { ", \"data\": \"$it\"" } ?: ""} }"""
-        }
-        return """{ "frames": { $frames },
-          "meta": { "app": "https://www.aseprite.org/", "version": "1.3.7", "image": "$name.png", "format": "RGBA8888",
-            "size": {"w": ${8 * cell}, "h": ${((count + 7) / 8) * cell}}, "scale": "1",
-            "frameTags": [ $tagJson ],
-            "layers": [ { "name": "Layer 1", "opacity": 255, "blendMode": "normal" } ],
-            "slices": [ { "name": "feet", "color": "#0000ffff", "keys": [ { "frame": 0, "bounds": {"x": ${feet.first - 2}, "y": ${feet.second - 2}, "w": 4, "h": 2 } } ] },
-                        { "name": "cast", "color": "#ff0000ff", "keys": [ { "frame": 0, "bounds": {"x": 44, "y": 24, "w": 2, "h": 2 } } ] } ] } }"""
-    }
+    private fun aseprite(name: String, cell: Int, tags: List<Tag>, feet: Pair<Int, Int>) = AsepriteFixture.export(name, cell, tags, feet)
 
     private fun heroSheet() = aseprite("hero", 64, listOf(
         Tag("idle", 0, 3),

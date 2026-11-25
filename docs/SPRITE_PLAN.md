@@ -5,7 +5,7 @@ their foes instead of the camera, every combatant has real animations (idle, rea
 hurt, fall, victory) synced to the battle's own timing, and the engine sets a **sprite contract** that every
 game must meet.
 
-Status: decided 2026-11-25 (section 7); S1 in progress.
+Status: decided 2026-11-25 (section 7). S1-S3 built (engine fa1d235 and after); S4 (lineup) and S5 (graphical-studio) next.
 
 ---
 
@@ -139,8 +139,9 @@ Echoes' 79 enemies could become about 12 drawn families × variants instead of 3
   or `ultimate`, or a frame isn't the declared cell size.
 - Without it, the same check runs as a **coverage report** (per game: which characters lack which tags), so
   each game can see its gap before opting in.
-- Rule for release: a game turns the contract on before its next store release. That's Phase 2 sign-off
-  in section 6.
+- **Release is blocked** (Todd, 2026-11-25): the sync installs `.engine-sync/release_gate.gradle.kts` in each game
+  and applies it from `app/build.gradle.kts`; a release build (`assembleRelease`, `bundleRelease`) runs
+  `testReleaseUnitTest` first, where `GameSpriteContractTest` is strict. Debug builds are unaffected.
 
 ---
 

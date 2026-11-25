@@ -168,10 +168,9 @@ class GridSprite(override val id: String, val definition: SpriteDefinition) : Sp
 object SpriteLibrary {
 
     fun source(key: String): SpriteSource {
-        sheetSource(key)?.let { return it }
-        // A character or enemy template naming a different sprite id.
-        GameContent.characterById(key)?.spriteId?.takeIf { it.isNotBlank() && it != key }?.let { id -> sheetSource(id)?.let { return it } }
-        GameContent.enemyTemplateById(key)?.spriteId?.takeIf { it.isNotBlank() && it != key }?.let { id -> sheetSource(id)?.let { return it } }
+        GameContent.pack.resolveSheet(key)?.let { r ->
+            return SheetSprite(key, r.sheet, r.setting?.recolor ?: emptyMap(), r.setting?.scale ?: 1f)
+        }
         return GridSprite(key, PixelSpriteData.definitionFor(key))
     }
 
@@ -182,16 +181,6 @@ object SpriteLibrary {
     /** Whether [key] has a real sheet (or a variant of one), not just a legacy grid. */
     fun hasSheet(key: String): Boolean = source(key) is SheetSprite
 
-    private fun sheetSource(key: String): SheetSprite? {
-        val setting = GameContent.spriteSettings[key]
-        val base = setting?.base
-        if (base != null) {
-            val sheet = GameContent.spriteSheets[base] ?: return null
-            return SheetSprite(key, sheet, setting.recolor, setting.scale)
-        }
-        val sheet = GameContent.spriteSheets[key] ?: return null
-        return SheetSprite(key, sheet, setting?.recolor ?: emptyMap(), setting?.scale ?: 1f)
-    }
 }
 
 /** The resting animation a combatant returns to between one-shots, from its combat state. */

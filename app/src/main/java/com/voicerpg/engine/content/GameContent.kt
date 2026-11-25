@@ -46,6 +46,8 @@ import java.io.File
 // =============================================================================
 
 data class ManifestDto(
+    /** 1 = the game opts in to the sprite contract (docs/SPRITE_PLAN.md); a release build checks it regardless. */
+    val spriteContract: Int = 0,
     val gameTitle: String = "VoiceRPG Engine",
     val gameSubtitle: String = "",
     val worldName: String = "the realm",
@@ -673,6 +675,7 @@ data class CommandCatalogDto(
 // =============================================================================
 
 data class GameManifest(
+    val spriteContract: Int = 0,
     val gameTitle: String,
     val gameSubtitle: String,
     val worldName: String = "the realm",
@@ -1002,6 +1005,23 @@ class GameContentPack(
     val spriteSheets: Map<String, SpriteSheet> = emptyMap(),
     val spriteSettings: Map<String, SpriteSetting> = emptyMap()
 ) {
+    /**
+     * The sheet a sprite key draws: a variant of a sheet, the sheet itself, or the sheet named by the
+     * character or enemy template with that id. Null when only a legacy text grid (or nothing) exists.
+     */
+    fun resolveSheet(key: String): ResolvedSheet? {
+        direct(key)?.let { return it }
+        characters[key]?.spriteId?.takeIf { it.isNotBlank() && it != key }?.let { id -> direct(id)?.let { return it } }
+        enemyTemplates[key]?.spriteId?.takeIf { it.isNotBlank() && it != key }?.let { id -> direct(id)?.let { return it } }
+        return null
+    }
+
+    private fun direct(key: String): ResolvedSheet? {
+        val setting = spriteSettings[key]
+        val sheet = spriteSheets[setting?.base ?: key] ?: return null
+        return ResolvedSheet(key, sheet, setting)
+    }
+
     val heroCharacter: GameCharacter? = characters.values.firstOrNull { it.role == CharacterRole.HERO }
 
     /** All speakers that can hold a TTS voice binding (narrator first). */
@@ -1301,6 +1321,7 @@ class GameContentLoader(private val source: ContentSource) {
 
         val pack = GameContentPack(
             manifest = GameManifest(
+                spriteContract = manifestDto.spriteContract,
                 gameTitle = manifestDto.gameTitle,
                 gameSubtitle = manifestDto.gameSubtitle,
                 worldName = manifestDto.worldName,
