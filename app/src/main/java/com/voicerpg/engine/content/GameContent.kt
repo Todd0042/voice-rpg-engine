@@ -997,7 +997,10 @@ class GameContentPack(
     val metrics: Map<String, MetricDefinition> = emptyMap(),
     val incidents: Map<String, IncidentDefinition> = emptyMap(),
     val minigames: Map<String, MiniGameConfig> = emptyMap(),
-    val commandCatalogs: Map<String, com.voicerpg.engine.model.CommandCatalog> = emptyMap()
+    val commandCatalogs: Map<String, com.voicerpg.engine.model.CommandCatalog> = emptyMap(),
+    /** Aseprite battle sheets by sprite id (`sprites/sheets/`), and per-sprite settings and variants. */
+    val spriteSheets: Map<String, SpriteSheet> = emptyMap(),
+    val spriteSettings: Map<String, SpriteSetting> = emptyMap()
 ) {
     val heroCharacter: GameCharacter? = characters.values.firstOrNull { it.role == CharacterRole.HERO }
 
@@ -1167,6 +1170,12 @@ class FileContentSource(private val rootDir: File) : ContentSource {
 /** Parses the JSON content tree into a resolved [GameContentPack]. */
 class GameContentLoader(private val source: ContentSource) {
 
+    private companion object {
+        const val SPRITE_SHEET_DIR = "sprites/sheets"
+        /** The content folder inside the APK's assets (sheet PNG paths are given from the assets root). */
+        const val CONTENT_ASSET_ROOT = "game"
+    }
+
     private val gson = Gson()
 
     fun load(): GameContentPack {
@@ -1220,6 +1229,16 @@ class GameContentLoader(private val source: ContentSource) {
                 dto.toSpriteDefinition()?.let { id to it }
             }
             .toMap()
+
+        val spriteSheets = source.listFiles(SPRITE_SHEET_DIR)
+            .mapNotNull { file ->
+                val id = file.removeSuffix(".json")
+                source.readText("$SPRITE_SHEET_DIR/$file")?.let { AsepriteParser.parse(id, it, "$CONTENT_ASSET_ROOT/$SPRITE_SHEET_DIR") }
+            }
+            .associateBy { it.id }
+        val spriteSettings = (read("sprites/sprites.json", SpriteSettingsFileDto::class.java)?.sprites ?: emptyMap())
+            .map { (id, dto) -> dto.toSetting(id) }
+            .associateBy { it.id }
 
         val enemyMovesets = (read("enemies/enemy_spells.json", EnemySpellsFileDto::class.java)?.movesets ?: emptyMap())
             .mapValues { it.value.toMoveset() }
@@ -1340,7 +1359,9 @@ class GameContentLoader(private val source: ContentSource) {
             metrics = metrics,
             incidents = incidents,
             minigames = minigames,
-            commandCatalogs = commandCatalogs
+            commandCatalogs = commandCatalogs,
+            spriteSheets = spriteSheets,
+            spriteSettings = spriteSettings
         )
         return if (pack.scenes.isEmpty() || pack.nodes.isEmpty()) EmergencyFallback.build() else pack
     }
@@ -1757,6 +1778,8 @@ object GameContent {
     val encounters: Map<String, EncounterDefinition> get() = pack.encounters
     val enemyTemplates: Map<String, EnemyTemplate> get() = pack.enemyTemplates
     val enemySprites: Map<String, SpriteDefinition> get() = pack.enemySprites
+    val spriteSheets: Map<String, SpriteSheet> get() = pack.spriteSheets
+    val spriteSettings: Map<String, SpriteSetting> get() = pack.spriteSettings
     val enemyMovesets: Map<String, Moveset> get() = pack.enemyMovesets
     val narrator: DialogueSpeaker get() = pack.narrator
     val heroCharacter: GameCharacter? get() = pack.heroCharacter

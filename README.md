@@ -188,6 +188,14 @@ Combat logic and what the player sees are separate layers. [`CombatViewModel`](a
 
 Content files can add, all optional: `enemies.json` `scale` (bosses 2.0 by default), `taunts`, `hitReaction` (`flinch`, `stagger`, `comic_spin`), `cutIn`; `enemy_spells.json` moves `titleCard`, `windupMs`, `intentIcon`; characters' `combat.cutIn` (`portrait`, `color`, `quote`); `encounters.json` `intensityTrack`; sprite `frames` `attack`, `hurt`, `death`.
 
+### Battle sprites & animation (`ui/sprites/`, `content/SpriteSheets.kt`)
+
+Combatants are drawn from **Aseprite sheets** (a PNG plus Aseprite's JSON export in `game/sprites/sheets/<spriteId>.json`): 64 px side-view pixel art facing right (the engine mirrors the enemy side), drawn with nearest-neighbour filtering at a whole-number scale, its `feet` slice standing on the floor line. Games without sheets yet keep their text-grid sprites, which play through the same animation path. The plan and the contract each game must meet: [`docs/SPRITE_PLAN.md`](docs/SPRITE_PLAN.md).
+
+- **Animations are tags** (`idle`, `ready`, `charge`, `cast`, `attack`, `hurt`, `ko`, `victory`; enemies `windup`, `death`, `taunt`; bosses `charge_ultimate`, `ultimate`, and `p2_…` after a phase shift). A missing tag falls back down a chain ending at `idle` ([`SpriteSources.kt`](app/src/main/java/com/voicerpg/engine/ui/sprites/SpriteSources.kt)).
+- **Driven by the battle**: [`SpriteAnimator`](app/src/main/java/com/voicerpg/engine/ui/sprites/SpriteAnimator.kt) runs on the effects clock (hit-stop freezes the frame), and the director starts each animation from its cue. A cast or attack is raised and held on the frame before its event (`release=3` / `impact=3` in the tag's user data, counted from 1) until the spell actually leaves; an enemy's wind-up is stretched to its move's `windupMs`; the charge loop speeds up with the voice.
+- **Variants**: `game/sprites/sprites.json` recolours a sheet into a new enemy (`{"sprites": {"ember_wolf": {"base": "wolf", "palette": {"#3A3A3A": "#8A2B1A"}, "scale": 1.25}}}`).
+
 ---
 
 ## 4. Opt-In Multi-Track Campaign Architecture
@@ -257,7 +265,7 @@ The included sync utility [`scripts/sync_engine_to_games.sh`](scripts/sync_engin
 
 ## 9. Automated Unit Verification Suite
 
-The engine features an automated suite of **317 unit tests** across 49 test files, covering intent parsing, multilingual resonance incantations, ATB timeline priority, save state integrity, and the JVM **Balance Harness** ([`BalanceHarnessTest.kt`](app/src/test/java/com/voicerpg/engine/combat/BalanceHarnessTest.kt)):
+The engine features an automated suite of **320 unit tests** across 50 test files, covering intent parsing, multilingual resonance incantations, ATB timeline priority, save state integrity, and the JVM **Balance Harness** ([`BalanceHarnessTest.kt`](app/src/test/java/com/voicerpg/engine/combat/BalanceHarnessTest.kt)):
 ```bash
 # Run full unit test suite (including headless Balance Harness):
 ./gradlew testDebugUnitTest
