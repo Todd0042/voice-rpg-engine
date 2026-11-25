@@ -5,7 +5,7 @@ their foes instead of the camera, every combatant has real animations (idle, rea
 hurt, fall, victory) synced to the battle's own timing, and the engine sets a **sprite contract** that every
 game must meet.
 
-Status: decided 2026-11-25 (section 7). S1-S3 built (engine fa1d235 and after); S4 (lineup) and S5 (graphical-studio) next.
+Status: decided 2026-11-25 (section 7). S1-S4 built (engine fa1d235 and after); S5 (graphical-studio) next.
 
 ---
 
