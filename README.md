@@ -15,7 +15,7 @@
 [![Kotlin](https://img.shields.io/badge/Kotlin-2.0.21-7F52FF.svg?logo=kotlin&logoColor=white)](https://kotlinlang.org)
 [![Jetpack Compose](https://img.shields.io/badge/UI-Jetpack%20Compose%202024.10.01-4285F4.svg?logo=jetpackcompose&logoColor=white)](https://developer.android.com/jetpack/compose)
 [![Android CI](https://github.com/Todd0042/voice-rpg-engine/actions/workflows/android_ci.yml/badge.svg)](https://github.com/Todd0042/voice-rpg-engine/actions)
-[![Unit Tests](https://img.shields.io/badge/Unit%20Tests-311%20Passing-39ff14.svg)](app/src/test/java/com/voicerpg/engine/)
+[![Unit Tests](https://img.shields.io/badge/Unit%20Tests-314%20Passing-39ff14.svg)](app/src/test/java/com/voicerpg/engine/)
 [![Support on Ko-fi](https://img.shields.io/badge/Ko--fi-Support%20Creator-F16061?style=flat&logo=ko-fi&logoColor=white)](https://ko-fi.com/todd0042)
 
 > **A high-performance, modular native Android game engine designed for building audio-first, voice-commanded retro JRPGs. Every aspect of gameplay—incantations, tactical ATB party combat, visual novel exploration, dialogue choices, and system toggles—can be operated hands-free via natural voice or via retro touch controls.**
@@ -156,6 +156,7 @@ Combat logic and what the player sees are separate layers. [`CombatViewModel`](a
 
 - **One timing table.** Every wait in a turn comes from [`CombatTiming`](app/src/main/java/com/voicerpg/engine/combat/CombatTiming.kt): a Basic turn runs about 1.2 s from release to the next input, a Transcendental one about 3.1 s. Pocket mode keeps its own audio-paced values. `CombatTiming.INSTANT` lets tests run whole battles with no real time passing.
 - **Frame-rate independent.** [`FxClock`](app/src/main/java/com/voicerpg/engine/ui/fx/FxClock.kt) runs effects on frame *time* (the same at 60 and 120 Hz), with hit-stop and slow motion for the whole arena.
+- **One floor for everyone.** [`BattleStage`](app/src/main/java/com/voicerpg/engine/ui/combat/BattleStage.kt) defines the floor band (from the backdrop's horizon at 43% of the arena to the bottom edge); each combatant is placed by its feet inside it, back of the formation near the horizon, front at the bottom. However tall the console below (developer tools and preset chants make the arena much shorter), nobody stands in the sky.
 - **Only the arena shakes and zooms**: the status bar and voice console stay still and readable. Messages (charging, mana, guards) sit on one status line above the console.
 - **Repeatable.** Enemy plans and damage rolls use the view model's injectable `random`.
 - **FX test bench**: with developer tools on, a row of buttons plays a cast at every tier, an area spell, an enemy hit and a boss ultimate on the current encounter, without touching the battle.
@@ -255,7 +256,7 @@ The included sync utility [`scripts/sync_engine_to_games.sh`](scripts/sync_engin
 
 ## 9. Automated Unit Verification Suite
 
-The engine features an automated suite of **311 unit tests** across 47 test files, covering intent parsing, multilingual resonance incantations, ATB timeline priority, save state integrity, and the JVM **Balance Harness** ([`BalanceHarnessTest.kt`](app/src/test/java/com/voicerpg/engine/combat/BalanceHarnessTest.kt)):
+The engine features an automated suite of **314 unit tests** across 48 test files, covering intent parsing, multilingual resonance incantations, ATB timeline priority, save state integrity, and the JVM **Balance Harness** ([`BalanceHarnessTest.kt`](app/src/test/java/com/voicerpg/engine/combat/BalanceHarnessTest.kt)):
 ```bash
 # Run full unit test suite (including headless Balance Harness):
 ./gradlew testDebugUnitTest
