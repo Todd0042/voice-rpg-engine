@@ -11,6 +11,7 @@ Checks every `game/sprites/sheets/<id>.json` + PNG for what AI-made sheets typic
 
   scripts/sprite_lint.py ../echoes-of-logos            # report
   scripts/sprite_lint.py ../echoes-of-logos --fix      # repair in place; strays move to art/sprite-previews/
+  scripts/sprite_lint.py ../echoes-of-logos --fix --strip-above-body wisp,archon   # labels the safe rules miss
 
 Exit code 0 when nothing is left to fix.
 """
@@ -65,7 +66,7 @@ def frame_rects(data: dict) -> list[dict]:
     return list(frames.values()) if isinstance(frames, dict) else frames
 
 
-def lint_sheet(json_path: str, fix: bool) -> list[str]:
+def lint_sheet(json_path: str, fix: bool, strip_above: bool = False):
     problems = []
     data = json.load(open(json_path))
     meta = data.get("meta", {})
@@ -79,14 +80,30 @@ def lint_sheet(json_path: str, fix: bool) -> list[str]:
     if cell[0] != cell[1] or cell[0] not in (64, 96, 128):
         problems.append(f"cells are {cell[0]}x{cell[1]} (64, or 96/128 for a boss)")
 
-    labelled, keyed = set(), 0
+    labelled, maybe, keyed = set(), set(), 0
     for i, r in enumerate(rects):
         f = r["frame"]
         c = img[f["y"]:f["y"] + f["h"], f["x"]:f["x"] + f["w"]]
         keyed += int((magenta(c[..., :3]) & (c[..., 3] > 0)).sum())
-        for pts in components(c[..., 3] > 0)[1:]:
+        comps = components(c[..., 3] > 0)
+        k = f["h"] / 64                      # sizes scale with the cell (96 and 128 px bosses)
+        body = comps[0] if comps else []
+        body_top = min(p[0] for p in body) if body else 0
+        small = []
+        for pts in comps[1:]:
             ys = [p[0] for p in pts]
-            if len(pts) <= LABEL_MAX_PIXELS and max(ys) - min(ys) <= LABEL_HEIGHT and max(ys) <= LABEL_ROWS:
+            if len(pts) <= LABEL_MAX_PIXELS * k * k and max(ys) - min(ys) <= LABEL_HEIGHT * k:
+                small.append((min(ys), max(ys), pts))
+        for top, bottom, pts in small:
+            # A label is a line of text: near the top of the cell, or a row of 3+ letter-sized marks side by
+            # side above the body (scattered debris and spell sparks don't line up like that).
+            line = [s for s in small if s[0] <= bottom and s[1] >= top]
+            above = bottom < body_top
+            if above and not strip_above and bottom > LABEL_ROWS:
+                if len(line) >= 3:
+                    maybe.add(i)             # looks like a line of text, or aligned debris: a look decides
+                continue
+            if bottom <= LABEL_ROWS or above:
                 labelled.add(i)
                 if fix:
                     for y, x in pts:
@@ -94,6 +111,9 @@ def lint_sheet(json_path: str, fix: bool) -> list[str]:
     if labelled:
         problems.append(f"text-like marks above the sprite in {len(labelled)} frame(s): {sorted(labelled)[:12]}")
     notes = [f"note: {keyed} pure magenta pixel(s); fine if it's a glow, a keying leftover if not"] if keyed else []
+    if maybe:
+        notes.append(f"note: a row of small marks above the body in frame(s) {sorted(maybe)[:12]}: labels? "
+                     f"If so, rerun with --strip-above-body {os.path.basename(json_path)[:-5]}")
 
     # Feet: the slice's bottom edge must be the sole line of the idle frames.
     tags = {t["name"]: t for t in meta.get("frameTags", [])}
@@ -134,6 +154,9 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("game", help="the game's folder (or its sprites/sheets folder)")
     ap.add_argument("--fix", action="store_true")
+    ap.add_argument("--strip-above-body", default="", metavar="SHEETS",
+                    help="comma-separated sheet ids whose every small mark above the body is a label (check by eye first: "
+                         "spell sparks and debris above the body would go too)")
     args = ap.parse_args()
     sheets = args.game if os.path.basename(os.path.normpath(args.game)) == "sheets" else os.path.join(args.game, SHEETS)
     if not os.path.isdir(sheets):
@@ -157,7 +180,8 @@ def main() -> int:
             remaining += len(strays)
 
     for j in jsons:
-        problems, notes = lint_sheet(os.path.join(sheets, j), args.fix)
+        aggressive = j[:-5] in {x.strip() for x in args.strip_above_body.split(",") if x.strip()}
+        problems, notes = lint_sheet(os.path.join(sheets, j), args.fix, aggressive)
         name = j[:-5]
         if not problems:
             print(f"[ok]    {name}")
@@ -170,7 +194,7 @@ def main() -> int:
         for n in notes:
             print(f"        {n}")
         if args.fix:
-            after, _ = lint_sheet(os.path.join(sheets, j), fix=False)
+            after, _ = lint_sheet(os.path.join(sheets, j), fix=False, strip_above=aggressive)
             for p in after:
                 print(f"        ! still: {p}")
             remaining += len(after)
