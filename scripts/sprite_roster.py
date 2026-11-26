@@ -94,6 +94,10 @@ class Roster:
         if dupes: problems.append(f"listed twice: {dupes}")
         if bosses_out: problems.append(f"bosses (isBoss) listed as regular enemies: {bosses_out}")
         if party_missing: problems.append(f"party fighters without a brief: {party_missing}")
+        not_bosses = sorted(b["id"] for b in self.section("bosses") if b["id"] in self.enemies and not self.enemies[b["id"]].get("isBoss"))
+        if not_bosses: problems.append(f"listed as bosses but not \"isBoss\" in enemies.json: {not_bosses}")
+        bad_cells = sorted(b["id"] for b in self.section("bosses") if b.get("cell", 96) not in (64, 96, 128))
+        if bad_cells: problems.append(f"boss cells must be 64, 96 or 128: {bad_cells}")
         return problems
 
     # ---- apply ----------------------------------------------------------------------------------------------
@@ -164,6 +168,13 @@ class Roster:
     def mark(self, key):
         return " ✅ delivered" if self.delivered(key) else ""
 
+    def spec(self, key, role, cell, extra=""):
+        """The exact delivery spec, so a sheet can't come back as the wrong role or size."""
+        tags = {"party": "idle, ready, charge, cast (release=4), attack (impact=4), hurt, ko, victory",
+                "enemy": "idle, attack (impact=4), hurt (+ windup, cast (release=4), death)",
+                "boss": "idle, windup, attack (impact=4), cast (release=4), hurt, charge_ultimate, ultimate (release=5) (+ death)"}[role]
+        return f"> **Deliver:** `{SHEETS}/{key}.png` + `{key}.json` · **{role}** · **{cell}x{cell}** cells · tags: {tags}{extra}"
+
     def brief(self) -> str:
         r = self.r
         title = r.get("title", os.path.basename(self.dir))
@@ -202,6 +213,8 @@ class Roster:
             for p in party:
                 c = self.characters.get(p["id"], {})
                 L += [f"### `{p['id']}`: {p['name']}{self.mark(p['id'])}", ""]
+                if not p.get("variant_of"):
+                    L += [self.spec(p["id"], "party", 64, " · also the boss tags" if p.get("boss_versions") else ""), ""]
                 if c.get("portraitAsset"):
                     L += [f"Portrait: `{c['portraitAsset']}`.", ""]
                 L += [p["look"], ""]
@@ -217,7 +230,7 @@ class Roster:
         if fams:
             L += [f"## Enemy families ({len(fams)}, 64 px)", ""]
             for f in fams:
-                L += [f"### `{f['key']}`: {f['name']}{self.mark(f['key'])}", "", f["look"], ""]
+                L += [f"### `{f['key']}`: {f['name']}{self.mark(f['key'])}", "", self.spec(f["key"], "enemy", f.get("cell", 64)), "", f["look"], ""]
                 if f.get("moves"):
                     L += [f"*Moves*: {f['moves']}", ""]
                 plain = [m for m in f["members"] if not m.get("variant")]
@@ -233,7 +246,10 @@ class Roster:
         if bosses:
             L += [f"## Bosses ({len(own_bosses)} to draw, each its own sprite)", ""]
             for b in bosses:
-                L += [f"### `{b['id']}`: {b['name']} ({b.get('cell', 96)} px){self.mark(b['id'])}", "", b["look"], ""]
+                L += [f"### `{b['id']}`: {b['name']} ({b.get('cell', 96)} px){self.mark(b['id'])}", ""]
+                if not b.get("variant_of"):
+                    L += [self.spec(b["id"], "boss", b.get("cell", 96)), ""]
+                L += [b["look"], ""]
                 if b.get("moves"):
                     L += [f"*Moves*: {b['moves']}", ""]
                 e = self.enemies.get(b["id"], {})

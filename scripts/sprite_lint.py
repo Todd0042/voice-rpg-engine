@@ -32,6 +32,7 @@ STRAYS = "art/sprite-previews"
 LABEL_ROWS = 17      # labels sit in the top rows of a cell
 LABEL_HEIGHT = 5     # one line of tiny text
 LABEL_MAX_PIXELS = 90
+LABEL_MIN_PIXELS = 8   # a line of text has at least this many pixels; fewer is a stray speck
 
 
 def components(mask: np.ndarray) -> list[list[tuple[int, int]]]:
@@ -103,7 +104,8 @@ def lint_sheet(json_path: str, fix: bool, strip_above: bool = False):
                 if len(line) >= 3:
                     maybe.add(i)             # looks like a line of text, or aligned debris: a look decides
                 continue
-            if bottom <= LABEL_ROWS or above:
+            # Text has substance: a line of letters adds up to a few pixels at least; stray specks don't.
+            if above and sum(len(m[2]) for m in line) >= LABEL_MIN_PIXELS * k:
                 labelled.add(i)
                 if fix:
                     for y, x in pts:
