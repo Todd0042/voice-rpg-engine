@@ -95,6 +95,15 @@ class Roster:
         if bosses_out: problems.append(f"bosses (isBoss) listed as regular enemies: {bosses_out}")
         if party_missing: problems.append(f"party fighters without a brief: {party_missing}")
         not_bosses = sorted(b["id"] for b in self.section("bosses") if b["id"] in self.enemies and not self.enemies[b["id"]].get("isBoss"))
+        # An enemy an encounter gives boss phases to is a boss: without the flag it never fires its ultimate,
+        # gets no boss bar, and its sheet is checked (and briefed) as a regular enemy's.
+        enc_path = os.path.join(self.dir, GAME, "encounters/encounters.json")
+        phased = set()
+        for x in (load(enc_path).get("encounters", []) if os.path.exists(enc_path) else []):
+            inst = {m.get("id"): m.get("templateId") or m.get("id") for m in x.get("enemies", []) if isinstance(m, dict)}
+            phased |= {inst.get(ph.get("enemyId"), ph.get("enemyId")) for ph in x.get("bossPhases", [])}
+        unflagged = sorted(t for t in phased if t in self.enemies and not self.enemies[t].get("isBoss"))
+        if unflagged: problems.append(f"given boss phases in an encounter but not \"isBoss\" in enemies.json: {unflagged}")
         if not_bosses: problems.append(f"listed as bosses but not \"isBoss\" in enemies.json: {not_bosses}")
         bad_cells = sorted(b["id"] for b in self.section("bosses") if b.get("cell", 96) not in (64, 96, 128))
         if bad_cells: problems.append(f"boss cells must be 64, 96 or 128: {bad_cells}")
