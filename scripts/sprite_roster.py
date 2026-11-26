@@ -174,8 +174,30 @@ class Roster:
         el = "/".join(x.lower() for x in (e.get("family"), e.get("selfElement")) if x)
         return f"{e['name']} ({e.get('subtitle', '')}{', ' + el if el else ''})"
 
-    def mark(self, key):
-        return " ✅ delivered" if self.delivered(key) else ""
+    REQUIRED = {"party": ["idle", "ready", "charge", "cast", "attack", "hurt", "ko", "victory"],
+                "enemy": ["idle", "attack", "hurt"],
+                "boss": ["idle", "windup", "attack", "cast", "hurt", "charge_ultimate", "ultimate"]}
+
+    def mark(self, key, role=None, cell=None):
+        """✅ when the delivered sheet meets its spec; ⚠️ REDO with the reason when it doesn't (wrong size, missing tags)."""
+        if not self.delivered(key):
+            return ""
+        if role is None:
+            return " ✅ delivered"
+        try:
+            j = load(os.path.join(self.dir, SHEETS, f"{key}.json"))
+            frames = j["frames"].values() if isinstance(j["frames"], dict) else j["frames"]
+            w = next(iter(frames))["frame"]["w"]
+            tags = {t["name"] for t in j["meta"].get("frameTags", [])}
+        except (KeyError, StopIteration, TypeError, ValueError):
+            return " ⚠️ REDO: the delivered sheet's JSON can't be read"
+        wrong = []
+        if cell and w != cell:
+            wrong.append(f"delivered at {w}x{w}, must be {cell}x{cell}")
+        missing = [t for t in self.REQUIRED[role] if t not in tags]
+        if missing:
+            wrong.append("missing " + ", ".join(missing))
+        return f" ⚠️ REDO: {'; '.join(wrong)}" if wrong else " ✅ delivered"
 
     def spec(self, key, role, cell, extra=""):
         """The exact delivery spec, so a sheet can't come back as the wrong role or size."""
@@ -221,7 +243,7 @@ class Roster:
             L += [f"## Party fighters ({len(party)}, 64 px)", ""]
             for p in party:
                 c = self.characters.get(p["id"], {})
-                L += [f"### `{p['id']}`: {p['name']}{self.mark(p['id'])}", ""]
+                L += [f"### `{p['id']}`: {p['name']}{self.mark(p['id'], None if p.get('variant_of') else 'party', 64)}", ""]
                 if not p.get("variant_of"):
                     L += [self.spec(p["id"], "party", 64, " · also the boss tags" if p.get("boss_versions") else ""), ""]
                 if c.get("portraitAsset"):
@@ -239,7 +261,7 @@ class Roster:
         if fams:
             L += [f"## Enemy families ({len(fams)}, 64 px)", ""]
             for f in fams:
-                L += [f"### `{f['key']}`: {f['name']}{self.mark(f['key'])}", "", self.spec(f["key"], "enemy", f.get("cell", 64)), "", f["look"], ""]
+                L += [f"### `{f['key']}`: {f['name']}{self.mark(f['key'], 'enemy', f.get('cell', 64))}", "", self.spec(f["key"], "enemy", f.get("cell", 64)), "", f["look"], ""]
                 if f.get("moves"):
                     L += [f"*Moves*: {f['moves']}", ""]
                 plain = [m for m in f["members"] if not m.get("variant")]
@@ -255,7 +277,7 @@ class Roster:
         if bosses:
             L += [f"## Bosses ({len(own_bosses)} to draw, each its own sprite)", ""]
             for b in bosses:
-                L += [f"### `{b['id']}`: {b['name']} ({b.get('cell', 96)} px){self.mark(b['id'])}", ""]
+                L += [f"### `{b['id']}`: {b['name']} ({b.get('cell', 96)} px){self.mark(b['id'], None if b.get('variant_of') else 'boss', b.get('cell', 96))}", ""]
                 if not b.get("variant_of"):
                     L += [self.spec(b["id"], "boss", b.get("cell", 96)), ""]
                 L += [b["look"], ""]
