@@ -258,6 +258,11 @@ feet placement and the animation state machine.
    on and off).
 
 ### Phase 2: the other games
+Rosters and briefs are written (2026-11-26) in each game's `art/` (`scripts/sprite_roster.py <game>`):
+superstore-saga 8 sheets, wallys-world 47, commander-america-rpg 53. Before `--apply` in a game still on text
+grids, the placeholder lookup has to accept a legacy grid id (today a placeholder must name a sheet): those
+rosters name each family's current grid sprite as its placeholder, so the game looks as before until each sheet
+lands. Superstore and Wally's World also drop their unused leftover enemies at that point.
 Each game: coverage report → art (reusing the paper-doll base for humans) → contract on → sign-off. Commander
 starts furthest behind (82 enemies with no sprite at all); Wally's World is furthest ahead (32 enemy sprites
 to convert or redraw).

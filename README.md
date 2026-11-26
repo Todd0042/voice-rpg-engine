@@ -199,6 +199,7 @@ Combatants are drawn from **Aseprite sheets** (a PNG plus Aseprite's JSON export
 - **Variants**: `game/sprites/sprites.json` recolours a sheet into a new enemy (`{"sprites": {"ember_wolf": {"base": "wolf", "palette": {"#3A3A3A": "#8A2B1A"}, "scale": 1.25}}}`).
 - **Placeholders**: `{"orc": {"placeholder": "template_brute"}}` lets a game map its enemies to a sprite whose art is still being made; the battle draws the placeholder, the contract still counts it as missing, and the real `orc.json` takes over the moment it lands. A sprite's own sheet always wins over a variant base or a placeholder.
 - **Boss size**: a sheet is drawn at its own size (bosses are drawn at 96 or 128 px), so a boss's default 2x enlargement applies only to legacy text grids.
+- **`scripts/sprite_roster.py <game> [--apply]`**: a game's `art/sprite_roster.json` maps every party fighter, enemy and boss to a sprite (families with recolours, bosses with their own sprites, party members whose boss versions reuse their sheet, leftovers to remove) and holds the artist's descriptions. The script checks that it covers everyone, writes `art/SPRITE_BRIEFS.md`, and with `--apply` sets `enemies.json` `spriteId` and `sprites/sprites.json`.
 - **`scripts/sprite_lint.py <game> [--fix]`** checks delivered sheets for what AI-made art gets wrong: labels baked into frames, a `feet` slice off the soles (floating or sinking sprites), wrong cell sizes, stray preview images in the APK (moved to `art/sprite-previews/`), and flags pure-magenta pixels for a look.
 
 ---
