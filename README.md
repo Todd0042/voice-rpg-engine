@@ -90,6 +90,15 @@ While traditional mobile RPGs rely heavily on small on-screen buttons, menus, an
 
 Designed for commuters, walkers, and visually impaired players, **Pocket Mode** turns the display into an ultra-low-power OLED black touch-guard while routing all narration and audio through headphones. Spoken meta-commands (*"Status"*, *"Enemies"*, *"Fellowship"*, *"Help"*) allow players to inspect party health, mana, and enemy threats completely eyes-free.
 
+**Combat speech has two settings** (Options, or say *"Spell callouts"* / *"Battle reports"*):
+
+| Setting | What it says | Default |
+| :--- | :--- | :--- |
+| 🔮 **Spell callouts** | Each cast and its resonance in the caster's own voice (*"Fireball! Master!"*), then its one-word result (*"Weak! Broken! 3 in a row!"*); cut-in quotes | On |
+| 📜 **Battle reports** | Everything else, a few words each: *"Orc, 120. Orc down."*, *"Orc: Cleave!"*, *"Cedric, 40. Poisoned."*, *"Aethel. Target: Orc."* | Off |
+
+Combat waits for every line it speaks, so nothing is cut off, and a setting that's off costs no time. Pocket Mode always keeps the essential reports even with battle reports off (whose turn it is, a hero falling, a foe going down, a boss charging its ultimate). Answers to the player (*"Not enough mana. Say attune."*) and the battle's result are always spoken. Every line is a template in [`CombatLines.kt`](app/src/main/java/com/voicerpg/engine/audio/CombatLines.kt) that a game can reword in `combat/presentation.json` (`"speechLines": {"hit": "{target} takes {amount}!"}`); enemies can give a spoken `shortName` and spells a `calloutName` when their names are too long to say, and a contract test keeps every line within its word limit with each game's real names.
+
 **Reduce Motion** and **Reduce Flashing** (Options → Pocket & Accessibility) keep battles comfortable: no shake or zoom and only a brief freeze, and no full-screen flash (flashes are always limited to three a second). Both are saved with the game like the audio options. In pocket mode, cut-in quotes and boss warnings are spoken.
 
 ---
@@ -271,7 +280,7 @@ The included sync utility [`scripts/sync_engine_to_games.sh`](scripts/sync_engin
 
 ## 9. Automated Unit Verification Suite
 
-The engine features an automated suite of **333 unit tests** across 56 test files, covering intent parsing, multilingual resonance incantations, ATB timeline priority, save state integrity, and the JVM **Balance Harness** ([`BalanceHarnessTest.kt`](app/src/test/java/com/voicerpg/engine/combat/BalanceHarnessTest.kt)):
+The engine features an automated suite of **339 unit tests** across 58 test files, covering intent parsing, multilingual resonance incantations, ATB timeline priority, save state integrity, and the JVM **Balance Harness** ([`BalanceHarnessTest.kt`](app/src/test/java/com/voicerpg/engine/combat/BalanceHarnessTest.kt)):
 ```bash
 # Run full unit test suite (including headless Balance Harness):
 ./gradlew testDebugUnitTest
