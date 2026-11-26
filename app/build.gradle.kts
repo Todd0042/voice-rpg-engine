@@ -106,3 +106,9 @@ dependencies {
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")
 }
+
+// Unit tests read the content straight from src/main/assets (and the template fixture), so they are test inputs:
+// a content-only change re-runs the tests instead of reporting an old result.
+tasks.withType<Test>().configureEach {
+    inputs.dir("src/main/assets").withPropertyName("gameContent").withPathSensitivity(PathSensitivity.RELATIVE)
+}
