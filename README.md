@@ -150,6 +150,8 @@ All character and enemy abilities inherit from standardized categories defined i
 - `DEFENSE`: Damage mitigation, shields, and party buffs.
 - `MANA`: Recovery and attunement spells.
 
+**Planned, not built yet:** levels and XP removed, mana optional per game, spells learned at story moments, learned enemy weaknesses, route-locked warps, and a battle simulator that holds every game's fights to a rising difficulty curve. Decisions and build order: [`docs/COMBAT_PROGRESSION_PLAN.md`](docs/COMBAT_PROGRESSION_PLAN.md).
+
 ### Battle cues & effects (`BattleCue.kt`, `CombatTiming.kt`, `ui/fx/`)
 
 Combat logic and what the player sees are separate layers. [`CombatViewModel`](app/src/main/java/com/voicerpg/engine/viewmodel/CombatViewModel.kt) decides outcomes and announces them as an ordered stream of [`BattleCue`](app/src/main/java/com/voicerpg/engine/combat/BattleCue.kt)s; the battle screen's [`BattleFxDirector`](app/src/main/java/com/voicerpg/engine/ui/fx/BattleFxDirector.kt) plays them and never changes game state. The full design is in [`docs/COMBAT_FEEL_PLAN.md`](docs/COMBAT_FEEL_PLAN.md).
