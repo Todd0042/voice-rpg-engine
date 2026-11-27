@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>VoiceRPG Art Studio</title>
+  <style>
+    body { margin:0; font-family: system-ui, sans-serif; background:#0b0e14; color:#e2e8f0; }
+    header { background:#111622; border-bottom:1px solid #1f2738; padding:14px 20px; display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:12px; }
+    .brand { font-weight:700; font-size:17px; background:linear-gradient(90deg,#38bdf8,#a78bfa); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+    .controls { display:flex; flex-wrap:wrap; align-items:center; gap:8px; }
+    select, button { background:#182032; color:#e2e8f0; border:1px solid #2b364f; border-radius:8px; padding:7px 12px; font-size:13px; cursor:pointer; }
+    button.primary { background:#0ea5e926; border-color:#38bdf866; color:#bae6fd; font-weight:600; }
+    button.pause { background:#f59e0b24; border-color:#f59e0b66; color:#fde68a; font-weight:600; }
+    button.resume { background:#10b98124; border-color:#10b98166; color:#a7f3d0; font-weight:600; }
+    .stats { max-width:1360px; margin:16px auto 0; padding:0 16px; display:flex; flex-wrap:wrap; gap:10px; font-size:12px; }
+    .pill { background:#131926; border:1px solid #222b3e; border-radius:999px; padding:5px 12px; }
+    main { max-width:1360px; margin:14px auto 40px; padding:0 16px; display:grid; grid-template-columns:1fr 1fr; gap:16px; align-items:start; }
+    @media (max-width: 900px) { main { grid-template-columns:1fr; } }
+    .pane { background:#0f141f; border:1px solid #1f2738; border-radius:14px; padding:12px; display:flex; flex-direction:column; gap:8px; }
+    .pane-hdr { display:flex; align-items:center; justify-content:space-between; padding:4px 4px 8px; border-bottom:1px solid #1f2738; font-size:13px; font-weight:700; color:#cbd5e1; }
+    .card { background:#111622; border:1px solid #1f2738; border-radius:10px; padding:10px 12px; display:flex; align-items:center; justify-content:space-between; gap:10px; }
+    .card.in_progress { border-color:#38bdf888; background:#121b2d; }
+    .card.completed { opacity:0.75; }
+    a.card.clickable { text-decoration:none; color:inherit; cursor:pointer; transition:opacity 0.15s, border-color 0.15s; }
+    a.card.clickable:hover { opacity:1; border-color:#10b98188; }
+    .badge { font-size:10px; font-weight:700; text-transform:uppercase; padding:2px 8px; border-radius:999px; border:1px solid #334155; }
+    .badge.in_progress { background:#0284c733; color:#7dd3fc; border-color:#38bdf855; }
+    .badge.pending { background:#33415544; color:#cbd5e1; }
+    .badge.completed { background:#05966933; color:#6ee7b7; border-color:#10b98155; }
+    .badge.failed { background:#e11d4833; color:#fda4af; border-color:#f43f5e55; }
+    .machine { font-size:11px; color:#94a3b8; background:#1a2234; padding:2px 7px; border-radius:6px; }
+    .thumb { width:48px; height:48px; object-fit:contain; background:#0b0e14; border-radius:6px; border:1px solid #242d40; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand">VoiceRPG Art Studio — Dual-Machine Asset Queue</div>
+    <div class="controls">
+      <select id="gameSel"></select>
+      <select id="paletteSel" title="Sprite Sheet Color Mode">
+        <option value="0" selected>Full Color (32-bit RGBA)</option>
+        <option value="24">24-Color Retro Palette</option>
+      </select>
+      <button class="primary" onclick="generatePlan()">Generate Plan</button>
+      <button id="toggleBtn" class="resume" onclick="toggleQueue()">Resume Queue</button>
+      <button onclick="refresh()">Refresh</button>
+    </div>
+  </header>
+  <div class="stats" id="stats"></div>
+  <main>
+    <section class="pane">
+      <div class="pane-hdr">
+        <span>Laptop Queue (Klein Key Poses, Sheet Pack &amp; Backdrops)</span>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span id="laptopCount"></span>
+          <button id="laptopBtn" class="resume" style="padding:4px 9px;font-size:11px" onclick="toggleMachine('laptop')">Resume Laptop</button>
+        </div>
+      </div>
+      <div id="laptopList" style="display:flex;flex-direction:column;gap:8px"></div>
+    </section>
+    <section class="pane">
+      <div class="pane-hdr">
+        <span>Desktop Queue (Wan 2.2-14B FLF Animations)</span>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span id="desktopCount"></span>
+          <button id="desktopBtn" class="resume" style="padding:4px 9px;font-size:11px" onclick="toggleMachine('desktop')">Resume Desktop</button>
+        </div>
+      </div>
+      <div id="desktopList" style="display:flex;flex-direction:column;gap:8px"></div>
+    </section>
+  </main>
+  <script>
+    let curState = null;
+    async function loadGames() {
+      const r = await fetch('/api/games').then(x => x.json());
+      const sel = document.getElementById('gameSel');
+      sel.innerHTML = r.games.map(g => `<option value="${g}" ${g===r.current?'selected':''}>${g}</option>`).join('');
+      sel.onchange = async () => {
+        await fetch('/api/game/select', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({game: sel.value}) });
+        refresh();
+      };
+    }
+    function renderCards(items, emptyMsg) {
+      if (!items.length) return `<div class="card">${emptyMsg}</div>`;
+      return items.map(it => {
+        const previewUrl = it.outputPath ? `/api/preview?path=${encodeURIComponent(it.outputPath)}` : '';
+        const clickable = it.status === 'completed' && previewUrl;
+        const tag = clickable ? `a class="card ${it.status} clickable" href="${previewUrl}" target="_blank" rel="noopener"` : `div class="card ${it.status}"`;
+        const closeTag = clickable ? 'a' : 'div';
+        const thumb = previewUrl && it.outputPath.endsWith('.png')
+          ? `<img class="thumb" src="${previewUrl}" />`
+          : (previewUrl && it.outputPath.endsWith('.mp4') ? `<span class="machine">MP4 ↗</span>` : '');
+        return `
+        <${tag}>
+          <div style="min-width:0;flex:1">
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+              <span class="badge ${it.status}">${it.status.replace('_',' ')}</span>
+              <span class="machine">${it.kind}</span>
+              <span style="font-size:11px;color:#64748b">${it.wave}</span>
+            </div>
+            <div style="margin-top:4px;font-weight:600;font-size:13px">${it.name}</div>
+            <div style="font-size:11px;color:#94a3b8;margin-top:2px">${it.promptDesc || ''}</div>
+            ${it.error ? `<div style="font-size:11px;color:#fda4af;margin-top:4px">${it.error}</div>` : ''}
+          </div>
+          ${thumb}
+        </${closeTag}>
+      `;
+      }).join('');
+    }
+    async function refresh() {
+      const s = await fetch('/api/state').then(x => x.json());
+      curState = s;
+      if (typeof s.paletteColors === 'number') {
+        document.getElementById('paletteSel').value = String(s.paletteColors);
+      }
+      const btn = document.getElementById('toggleBtn');
+      if (s.paused) {
+        btn.className = 'resume';
+        btn.textContent = 'Resume Both';
+      } else {
+        btn.className = 'pause';
+        btn.textContent = 'Pause Both';
+      }
+      const lBtn = document.getElementById('laptopBtn');
+      lBtn.className = s.laptopPaused ? 'resume' : 'pause';
+      lBtn.textContent = s.laptopPaused ? 'Resume Laptop' : 'Pause Laptop';
+      const dBtn = document.getElementById('desktopBtn');
+      dBtn.className = s.desktopPaused ? 'resume' : 'pause';
+      dBtn.textContent = s.desktopPaused ? 'Resume Desktop' : 'Pause Desktop';
+      const c = s.counts || {};
+      document.getElementById('stats').innerHTML = `
+        <span class="pill">In Progress: <b>${c.in_progress||0}</b></span>
+        <span class="pill">Planned: <b>${c.pending||0}</b></span>
+        <span class="pill">Completed: <b>${c.completed||0}</b></span>
+        <span class="pill">Total: <b>${c.total||0}</b></span>
+        <span class="pill">Laptop: <b>${s.laptopActive || 'idle'}</b></span>
+        <span class="pill">Desktop: <b>${s.desktopActive || 'idle'}</b></span>
+      `;
+      const all = s.items || [];
+      const laptopItems = all.filter(x => x.machine === 'laptop');
+      const desktopItems = all.filter(x => x.machine === 'desktop');
+      document.getElementById('laptopCount').textContent = `${laptopItems.filter(x => x.status==='completed').length}/${laptopItems.length} done`;
+      document.getElementById('desktopCount').textContent = `${desktopItems.filter(x => x.status==='completed').length}/${desktopItems.length} done`;
+      document.getElementById('laptopList').innerHTML = renderCards(laptopItems, `No Laptop tasks for <b>${s.game}</b>. Click <b>Generate Plan</b>.`);
+      document.getElementById('desktopList').innerHTML = renderCards(desktopItems, `No Desktop tasks for <b>${s.game}</b>. Click <b>Generate Plan</b>.`);
+    }
+    async function generatePlan() {
+      const g = document.getElementById('gameSel').value;
+      const paletteColors = Number(document.getElementById('paletteSel').value || 0);
+      await fetch('/api/plan/generate', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({game: g, paletteColors}) });
+      refresh();
+    }
+    async function toggleQueue() {
+      if (!curState) return;
+      await fetch(curState.paused ? '/api/queue/resume' : '/api/queue/pause', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({machine:'all'}) });
+      refresh();
+    }
+    async function toggleMachine(m) {
+      if (!curState) return;
+      const isPaused = m === 'laptop' ? curState.laptopPaused : curState.desktopPaused;
+      await fetch(isPaused ? '/api/queue/resume' : '/api/queue/pause', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({machine: m}) });
+      refresh();
+    }
+    loadGames().then(refresh);
+    setInterval(refresh, 3000);
+  </script>
+</body>
+</html>

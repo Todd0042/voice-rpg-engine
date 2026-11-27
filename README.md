@@ -47,10 +47,11 @@
   * [4. Opt-In Multi-Track Campaign Architecture (`SaveModels.kt`, `GameContent.kt`)](#4-opt-in-multi-track-campaign-architecture)
   * [5. On-Device Translation Banner & Fallback Dictionaries (`BuiltInDictionaries.kt`)](#5-on-device-translation-banner--fallback-dictionaries)
   * [6. MLKit & TFLite Selfie Character Creation (`SelfiePortraitProcessor.kt`)](#6-mlkit--tflite-selfie-character-creation)
-  * [7. Scaffolding Templates for New Game Development (`com.voicerpg.engine.template`)](#7-scaffolding-templates-for-new-game-development)
+  * [7. Scaffolding Templates & Game Creation Flow (`com.voicerpg.engine.template`, `docs/GAME_CREATION_GUIDE.md`)](#7-scaffolding-templates--game-creation-flow)
   * [8. Multi-Repo Distribution Pipeline (`scripts/sync_engine_to_games.sh`)](#8-multi-repo-distribution-pipeline)
-  * [9. Automated Unit Verification Suite (`tests/`)](#9-automated-unit-verification-suite)
-  * [10. Clean-Room Provenance & Non-Commercial Licensing](#10-clean-room-provenance--non-commercial-licensing)
+  * [9. Optional Art Studio Addon (`addons/art_studio/`, `scripts/generate_battle_sprites.py`)](#9-optional-art-studio-addon)
+  * [10. Automated Unit Verification Suite (`tests/`)](#10-automated-unit-verification-suite)
+  * [11. Clean-Room Provenance & Non-Commercial Licensing](#11-clean-room-provenance--non-commercial-licensing)
 
 ---
 
@@ -255,7 +256,9 @@ Integrated on-device selfie segmentation and pixel-art synthesis:
 
 ---
 
-## 7. Scaffolding Templates for New Game Development
+## 7. Scaffolding Templates & Game Creation Flow
+
+See [`docs/GAME_CREATION_GUIDE.md`](docs/GAME_CREATION_GUIDE.md) for the complete step-by-step workflow for creating a new game (including why **character profiles, enemies, and environments must be authored before generating graphical assets**).
 
 The `com.voicerpg.engine.template` package provides clean starter blueprints for rapid game creation:
 - [`TemplateHero.kt`](app/src/main/java/com/voicerpg/engine/template/TemplateHero.kt): Hero stats, starting kits, and affinities.
@@ -278,7 +281,22 @@ The included sync utility [`scripts/sync_engine_to_games.sh`](scripts/sync_engin
 
 ---
 
-## 9. Automated Unit Verification Suite
+## 9. Optional Art Studio Addon
+
+The supplemental [`addons/art_studio/`](addons/art_studio/README.md) web dashboard and [`scripts/generate_battle_sprites.py`](scripts/generate_battle_sprites.py) pipeline automate 16-bit animated sprite sheet (`FLUX.2 Klein` + `Wan 2.2-14B` `WanFirstLastFrameToVideo`) and `SDXL` combat backdrop generation once your character and enemy JSON profiles are in place:
+
+```bash
+# 1. Install dependencies & verify ComfyUI models
+./addons/art_studio/install.sh
+./addons/art_studio/install.sh --check
+
+# 2. Launch the Art Studio queue UI on http://127.0.0.1:8792
+./addons/art_studio/run.sh --game ~/GitHub/your-game
+```
+
+---
+
+## 10. Automated Unit Verification Suite
 
 The engine features an automated suite of **339 unit tests** across 58 test files, covering intent parsing, multilingual resonance incantations, ATB timeline priority, save state integrity, and the JVM **Balance Harness** ([`BalanceHarnessTest.kt`](app/src/test/java/com/voicerpg/engine/combat/BalanceHarnessTest.kt)):
 ```bash
@@ -291,7 +309,7 @@ The engine features an automated suite of **339 unit tests** across 58 test file
 
 ---
 
-## 10. Clean-Room Provenance & Non-Commercial Licensing
+## 11. Clean-Room Provenance & Non-Commercial Licensing
 
 - **100% Original Framework:** Zero copyrighted game assets or proprietary game logic bundled in the core engine.
 - **PolyForm Noncommercial 1.0.0:** Free for personal, educational, and hobbyist game development. For commercial inquiries, contact **[todd.0042.git@gmail.com](mailto:todd.0042.git@gmail.com)**.
