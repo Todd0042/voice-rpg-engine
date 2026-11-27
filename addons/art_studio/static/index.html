@@ -111,6 +111,10 @@
     async function refresh() {
       const s = await fetch('/api/state').then(x => x.json());
       curState = s;
+      if (s.game) {
+        const gs = document.getElementById('gameSel');
+        if (gs && gs.value !== s.game) gs.value = s.game;
+      }
       if (typeof s.paletteColors === 'number') {
         document.getElementById('paletteSel').value = String(s.paletteColors);
       }
