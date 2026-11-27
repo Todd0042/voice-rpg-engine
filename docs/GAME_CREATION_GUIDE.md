@@ -57,6 +57,8 @@ battle; a fighter joining late arrives knowing what the story has already passed
 | `classes/<id>.json` | `starterSpellIds` | The hero's starting kit for that class. |
 | `classes/<id>.json`, `characters/<id>.json` | `spellGrants` | `[ { "flag": "ch5_done", "spellIds": ["frost_spike"] } ]`: learned when the flag is set ("Lyra learns Frost Spike" is said and shown). |
 | `characters/<id>.json` | `joinWhenFlag` | The story flag at which the character joins the party. |
+| `characters/<id>.json` | `costumes` | `[ { "flag": "shop_opened", "spriteId": "todd_shop" } ]`: from that story moment on the character fights with that sprite (the latest set wins); the sprite contract checks costume sprites too. |
+| `manifest.json` `campaignTracks[].hero` | `characterId` | The track is told by one of the game's characters: its party starts with that character instead of a class-based hero. |
 
 A hero without a class uses its character file's combat spells and grants.
 
@@ -66,15 +68,18 @@ A hero without a class uses its character file's combat spells and grants.
 | `"target": "ally"` | Heals or restores the party member named ("Mending Word Lyra"); an enemy named, or none, means the caster. |
 | `healPctOfMax` | Heals this share of each target's max HP (0.2 = 20%), times the resonance multiplier; with `hitsAll` it is a party heal. |
 | `manaRestorePct` | Restores this share of max MP (mana games); with `"target": "ally"` or `hitsAll` it restores others. |
-| `piercing` | Ignores the target's `armor`. |
 
 ### Weaknesses, resistances and armour (`enemies/enemies.json`, `combat/affinity_matrix.json`)
 | Where | Field | Meaning |
 |---|---|---|
 | enemy | `weak`, `resist` | School ids (`PYROMANCY`, `CRYOMANCY`, `ELECTROMANCY`, `NATURE`, `HOLY`, `SHADOW`, `PHYSICAL`): x2.0 / x0.8 for that school, overriding the family table. |
-| enemy | `armor` | Flat damage taken off every hit (`piercing` spells ignore it). |
+| enemy | `neutral` | School ids that hit it at x1.0 whatever its family and own element. |
+| enemy | `armor` | Armour is for blows: its value is taken off every PHYSICAL hit. Lightning conducts through it (x1.25 on an armoured target); other magic ignores it. |
 | encounter `bossPhases[]` | `weak`, `resist` | A phase changes the boss's weaknesses ("the aura turns to frost"). |
 | `affinity_matrix.json` | `schoolNames`, `familyNames` | The game's own names for schools and families in speech and on screen (ids stay). |
+
+A stun (overload, freeze) is the turn it skips; afterwards the target, enemy or hero, shrugs off stuns for 2 of its
+turns (bosses 3). Slows stacked together never take a fighter below 40% speed.
 
 Players learn weaknesses by hitting: a school's effect is remembered per enemy type in the save (the bestiary) and
 the "Enemies" voice report adds what's known. Enemies never heal or restore (a drain does damage only).
