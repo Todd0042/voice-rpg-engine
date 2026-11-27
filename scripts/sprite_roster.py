@@ -176,7 +176,9 @@ class Roster:
 
     REQUIRED = {"party": ["idle", "ready", "charge", "cast", "attack", "hurt", "ko", "victory"],
                 "enemy": ["idle", "attack", "hurt"],
-                "boss": ["idle", "windup", "attack", "cast", "hurt", "charge_ultimate", "ultimate"]}
+                "boss": ["idle", "windup", "attack", "cast", "hurt", "charge_ultimate", "ultimate"],
+                # a hero who is also fought as a boss: the boss versions recolour this sheet, so it carries both sets
+                "party+boss": ["idle", "ready", "charge", "cast", "attack", "hurt", "ko", "victory", "windup", "charge_ultimate", "ultimate"]}
 
     def mark(self, key, role=None, cell=None):
         """✅ when the delivered sheet meets its spec; ⚠️ REDO with the reason when it doesn't (wrong size, missing tags)."""
@@ -243,9 +245,9 @@ class Roster:
             L += [f"## Party fighters ({len(party)}, 64 px)", ""]
             for p in party:
                 c = self.characters.get(p["id"], {})
-                L += [f"### `{p['id']}`: {p['name']}{self.mark(p['id'], None if p.get('variant_of') else 'party', 64)}", ""]
+                L += [f"### `{p['id']}`: {p['name']}{self.mark(p['id'], None if p.get('variant_of') else ('party+boss' if p.get('boss_versions') else 'party'), 64)}", ""]
                 if not p.get("variant_of"):
-                    L += [self.spec(p["id"], "party", 64, " · also the boss tags" if p.get("boss_versions") else ""), ""]
+                    L += [self.spec(p["id"], "party", 64, " · **plus, because this hero is also fought as a boss: windup, charge_ultimate, ultimate (release=5), death**" if p.get("boss_versions") else ""), ""]
                 if c.get("portraitAsset"):
                     L += [f"Portrait: `{c['portraitAsset']}`.", ""]
                 L += [p["look"], ""]

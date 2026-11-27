@@ -344,8 +344,16 @@ def pack_aseprite_sheet(
     png_path = out_dir / f"{sprite_id}.png"
     json_path = out_dir / f"{sprite_id}.json"
     sheet.save(png_path)
-    # Sole line per SPRITE_BRIEFS.md: row 58 of 64, 90 of 96, 122 of 128 (cell_sz - 6)
-    sole_bottom = cell_sz - 6
+    # The feet slice sits on the drawn soles: the lowest opaque row most idle frames share (a fixed row floats the
+    # sprite whenever the model draws the feet higher, as it does in 96 and 128 px cells).
+    alpha = np.asarray(sheet)[..., 3]
+    idle = next((t for t in tags_json if t["name"] == "idle"), tags_json[0])
+    lows = []
+    for i in range(idle["from"], idle["to"] + 1):
+        rows = np.where(alpha[:, i * cell_sz:(i + 1) * cell_sz].any(axis=1))[0]
+        if rows.size:
+            lows.append(int(rows.max()))
+    sole_bottom = max(set(lows), key=lows.count) if lows else cell_sz - 6
     with json_path.open("w", encoding="utf-8") as fh:
         json.dump(
             {
