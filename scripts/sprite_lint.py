@@ -67,6 +67,14 @@ def frame_rects(data: dict) -> list[dict]:
     return list(frames.values()) if isinstance(frames, dict) else frames
 
 
+def letter_shaped(pts, k: float = 1.0) -> bool:
+    """A letter has a few pixels and is no wider than twice its height; the stroke of a motion arc or a streak is
+    long and flat, and an aura's flecks are single pixels."""
+    ys = [p[0] for p in pts]; xs = [p[1] for p in pts]
+    h, w = max(ys) - min(ys) + 1, max(xs) - min(xs) + 1
+    return len(pts) >= 4 * k and w <= 2 * h + 1
+
+
 def lint_sheet(json_path: str, fix: bool, strip_above: bool = False):
     problems = []
     data = json.load(open(json_path))
@@ -104,8 +112,10 @@ def lint_sheet(json_path: str, fix: bool, strip_above: bool = False):
                 if len(line) >= 3:
                     maybe.add(i)             # looks like a line of text, or aligned debris: a look decides
                 continue
-            # Text has substance: a line of letters adds up to a few pixels at least; stray specks don't.
-            if above and sum(len(m[2]) for m in line) >= LABEL_MIN_PIXELS * k:
+            # Text has substance: a line of letters adds up to a few pixels at least; stray specks don't. And it is
+            # letters: at least two compact marks, not the thin stroke of a motion arc or an aura's rim.
+            letters = [m for m in line if m[1] < body_top and letter_shaped(m[2], k)]
+            if above and len(letters) >= 2 and sum(len(m[2]) for m in line) >= LABEL_MIN_PIXELS * k:
                 labelled.add(i)
                 if fix:
                     for y, x in pts:
