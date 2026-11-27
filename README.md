@@ -150,7 +150,7 @@ All character and enemy abilities inherit from standardized categories defined i
 - `DEFENSE`: Damage mitigation, shields, and party buffs.
 - `MANA`: Recovery and attunement spells.
 
-**Planned, not built yet:** levels and XP removed, mana optional per game, spells learned at story moments, learned enemy weaknesses, route-locked warps, and a battle simulator that holds every game's fights to a rising difficulty curve. Decisions and build order: [`docs/COMBAT_PROGRESSION_PLAN.md`](docs/COMBAT_PROGRESSION_PLAN.md).
+**Progression and balance:** no levels or XP; mana is optional per game (`combatResource`); fighters learn spells at story moments (`spellGrants`, catch-up for late joiners); heals can target allies or a share of max HP; enemies have learned weaknesses, resistances and armour, and never heal; a stun skips one turn and leaves the enemy briefly immune to stuns; warps replay the story on the save's own route; Pure Story Mode wins the fastest way. `BalanceContractTest` plays every story fight on every route with `BattleSimulator` (the real combat on virtual time) against rising difficulty targets, and `BalanceTunerTest` suggests enemy HP and attack per fight. Fields: [`docs/GAME_CREATION_GUIDE.md`](docs/GAME_CREATION_GUIDE.md#3-combat-content-reference); design and decisions: [`docs/COMBAT_PROGRESSION_PLAN.md`](docs/COMBAT_PROGRESSION_PLAN.md).
 
 ### Battle cues & effects (`BattleCue.kt`, `CombatTiming.kt`, `ui/fx/`)
 
