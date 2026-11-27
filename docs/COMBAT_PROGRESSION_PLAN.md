@@ -49,6 +49,15 @@ Status: planned 2026-11-27; every decision in section 2 is Todd's. Nothing built
 17. **Saves made before this change are wiped** (test saves only).
 18. **Type names** for the non-magic games: proposed by Claude, approved by Todd per game.
 19. **No resonance tracking.**
+20. **Type names approved as proposed** (each game's `docs/ENEMY_TYPES_PROPOSAL.md`); Superstore: Henderson is
+    Management, the Auditor is Corporate.
+21. **Solemn fights keep their weight:** Wally's 3 AM fight ("The Alternative") keeps its weakness mechanics but
+    none of the gamey layer: no "Weak!"/effectiveness callouts, no taunts, no victory fanfare; it ends on its own
+    story line. An encounter-level option any game can use (also available to the Pay Cut and Shingles fights).
+    The story itself is not softened.
+22. **Recurring people keep the same weakness every time they're fought**, except Commander America (weak to
+    Scandal in 2016, resistant from the mugshot on).
+23. **Wally's Todd starts with a second attack type** from the first fight: Volt Snap (Know-How).
 
 ---
 
@@ -119,6 +128,9 @@ its tests (end to end on every game's content via `scripts/test_content_packs.sh
   piercing spells ignore it); boss phases may change weaknesses ("the aura turns to frost").
 - **Type names per game:** `affinity_matrix.json` may rename schools and families (display and speech only;
   engine ids unchanged), so non-magic games get their own types.
+- **`weak` / `resist` override the family table:** weak = x2.0, resist = x0.8 for that school.
+- **Solemn encounters:** `"solemn": true` on an encounter silences tag callouts, effectiveness lines, taunts and
+  the victory fanfare; `"endLine"` gives the line it closes on.
 - **Learned weaknesses:** a school's effect on an enemy type is revealed by the first hit (the existing "Weak!" /
   "Resisted." callouts) and remembered in a bestiary in the save. The "Enemies" voice report adds what's known
   ("Orc, 300 HP, weak to fire"); a weakness icon on the enemy bar once known.
@@ -259,5 +271,4 @@ tests pass. Story lines are drafted in the game's voice for Todd's review; nothi
 ## 6. To confirm during the passes
 
 - Wally's World: the healer kit belongs to Adriana in both forms (decision 5's reading).
-- Type names per non-magic game (Claude proposes, Todd approves).
 - Each game's story lines for spell beats, Blue's handovers and Red's rebalance (drafts for Todd's review).

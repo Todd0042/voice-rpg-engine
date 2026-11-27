@@ -1,3 +1,4 @@
+import java.time.Duration
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -111,4 +112,6 @@ dependencies {
 // a content-only change re-runs the tests instead of reporting an old result.
 tasks.withType<Test>().configureEach {
     inputs.dir("src/main/assets").withPropertyName("gameContent").withPathSensitivity(PathSensitivity.RELATIVE)
+    // A test that waits forever (e.g. for a step the game's content doesn't have) fails the run instead of hanging it.
+    timeout.set(Duration.ofMinutes(20))
 }
