@@ -730,7 +730,8 @@ class CombatViewModel(
             }
             val aliveHeroes = _state.value.party.filter { it.isAlive && !it.isGhost && !it.isUntargetable }.ifEmpty { mortalHeroes }
 
-            // 2. Begin-of-enemy-turn status effects: DoT ticks and stun/bind skips.
+            // 2. Begin-of-enemy-turn status effects: DoT ticks and stun/bind skips; stun fatigue wears off by a turn.
+            _state.update { s -> s.copy(enemies = s.enemies.map { if (it.id == enemy.id && it.stunFatigue > 0) it.copy(stunFatigue = it.stunFatigue - 1) else it }) }
             val livingSelf = _state.value.enemies.firstOrNull { it.id == enemy.id } ?: return@launch
             if (livingSelf.statuses.isNotEmpty()) {
                 val wasStunned = StatusSystem.isStunned(livingSelf.statuses)
@@ -2405,7 +2406,10 @@ class CombatViewModel(
                 random
             )
             val effectiveDamage = strike.damage
-            HitOutcome(enemy, effectiveDamage, strike.affinity, statusId?.let { StatusSystem.apply(it, resonance.tier.name, familyOf(enemy), effectiveDamage.toFloat()) })
+            // A stun doesn't take on an enemy still stunned or just out of one (stun fatigue): control buys time.
+            val landed = statusId?.let { StatusSystem.apply(it, resonance.tier.name, familyOf(enemy), effectiveDamage.toFloat()) }
+                ?.takeUnless { StatusSystem.isStun(it) && (enemy.stunFatigue > 0 || StatusSystem.isStunned(enemy.statuses)) }
+            HitOutcome(enemy, effectiveDamage, strike.affinity, landed)
         }
         val totalDamage = hits.sumOf { it.damage }
 
@@ -2434,7 +2438,10 @@ class CombatViewModel(
                     currentHp = newHp,
                     atbGauge = if (newHp <= 0) 0f else enemy.atbGauge,
                     isDamagedFlash = true,
-                    statuses = StatusSystem.merge(enemy.statuses, hit.landed)
+                    statuses = StatusSystem.merge(enemy.statuses, hit.landed),
+                    stunFatigue = if (hit.landed != null && StatusSystem.isStun(hit.landed))
+                        hit.landed.turnsLeft + if (enemy.isBoss) StatusSystem.BOSS_STUN_FATIGUE_TURNS else StatusSystem.STUN_FATIGUE_TURNS
+                    else enemy.stunFatigue
                 )
             } ?: enemy
         }

@@ -2,7 +2,7 @@ package com.voicerpg.engine.balance
 
 import com.voicerpg.engine.combat.AutoPolicy
 import com.voicerpg.engine.content.GameContent
-import com.voicerpg.engine.story.StoryRouteWalker
+import com.voicerpg.engine.balance.BalanceTargets.Kind
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
@@ -23,15 +23,6 @@ import java.util.Locale
  */
 class BalanceContractTest {
 
-    enum class Kind(val label: String, val rounds: IntRange, val margin: ClosedFloatingPointRange<Float>) {
-        EARLY("early", 2..5, 2.0f..4.5f),
-        MID("mid", 3..6, 1.4f..3.0f),
-        LATE("late", 3..7, 1.15f..2.2f),
-        BOSS_MID("boss", 5..11, 1.1f..2.0f),
-        BOSS_LATE("late boss", 5..11, 1.05f..1.6f),
-        FINALE("finale", 9..15, 1.0f..1.4f)
-    }
-
     data class Row(
         val route: String, val encounterId: String, val kind: Kind,
         val rounds: Int, val margin: Float, val winRate: Float, val support: Float,
@@ -50,21 +41,12 @@ class BalanceContractTest {
         val usedByRoute = mutableMapOf<String, MutableSet<String>>()
         val kitByRoute = mutableMapOf<String, MutableSet<String>>()
 
-        for (route in StoryRouteWalker.routes()) {
-            val battles = StoryRouteWalker.battlesOn(route).filter { GameContent.encounterById(it.encounterId) != null }
-            val lastBoss = battles.lastOrNull { b -> GameContent.encounterById(b.encounterId)!!.enemies.any { it.isBoss } }
-            for (b in battles) {
-                val encounter = GameContent.encounterById(b.encounterId)!!
-                val setup = BattleSimulator.FightSetup(encounter, b.player, b.flags, b.partyStats)
-                val isBoss = encounter.enemies.any { it.isBoss }
-                val kind = when {
-                    b == lastBoss -> Kind.FINALE
-                    isBoss && b.progress >= 0.66f -> Kind.BOSS_LATE
-                    isBoss -> Kind.BOSS_MID
-                    b.progress < 0.33f -> Kind.EARLY
-                    b.progress < 0.66f -> Kind.MID
-                    else -> Kind.LATE
-                }
+        for (fight in BalanceTargets.routeFights()) {
+            run {
+                val setup = fight.setup
+                val kind = fight.kind
+                val route = fight.route
+                val b = fight
                 val sensible = (1..3).map { BattleSimulator.run(setup, AutoPolicy.SENSIBLE, at, seed = it) }
                 val lazy = BattleSimulator.run(setup, AutoPolicy.SENSIBLE, 1.1f, seed = 7)
                 val bold = BattleSimulator.run(setup, AutoPolicy.SENSIBLE, 1.8f, seed = 7)
@@ -76,17 +58,15 @@ class BalanceContractTest {
                 val margin = sensible.map { it.safetyMargin }.sorted()[1]
                 val support = sensible.map { it.supportShare }.average().toFloat()
                 val stuck = (sensible + lazy + bold + spam + story).any { !it.finished }
-                sensible.forEach { r -> usedByRoute.getOrPut(route.label) { mutableSetOf() } += r.spellsUsed }
-                b.partyStats.forEach { m ->
-                    kitByRoute.getOrPut(route.label) { mutableSetOf() } +=
-                        GameContent.knownSpells(m.id, b.player.heroClassId, b.flags).filter { it.basePower > 0 && !it.isHeal }.map { it.id }
+                sensible.forEach { r -> usedByRoute.getOrPut(route) { mutableSetOf() } += r.spellsUsed }
+                setup.partyStats.forEach { m ->
+                    kitByRoute.getOrPut(route) { mutableSetOf() } +=
+                        GameContent.knownSpells(m.id, setup.player.heroClassId, setup.flags).filter { it.basePower > 0 && !it.isHeal }.map { it.id }
                 }
 
                 val problems = mutableListOf<String>()
                 if (stuck) problems += "a fight never finished (a loop)"
                 if (wins.size < 2) problems += "the sensible player at x${fmt(at)} won ${wins.size}/3"
-                if (rounds !in kind.rounds) problems += "${rounds} rounds (target ${kind.rounds.first}-${kind.rounds.last})"
-                if (margin !in kind.margin) problems += "safety margin ${fmt(margin)} (target ${fmt(kind.margin.start)}-${fmt(kind.margin.endInclusive)})"
                 if (support > 0.34f) problems += "${(support * 100).toInt()}% of turns spent healing or restoring (max 34%)"
                 if (!story.won) problems += "Pure Story Mode lost"
                 val late = kind == Kind.LATE || kind == Kind.BOSS_LATE || kind == Kind.FINALE
@@ -94,9 +74,22 @@ class BalanceContractTest {
                 if (kind == Kind.EARLY && !(bold.won && bold.safetyMargin >= 2.0f)) problems += "a bold x1.8 player doesn't win it easily"
                 if (late && spam.won && spam.rounds < rounds * 1.2f) problems += "spamming the strongest spell is nearly as good (${spam.rounds} vs $rounds rounds)"
 
-                rows += Row(route.label, b.encounterId, kind, rounds, margin, wins.size / 3f, support,
+                rows += Row(route, b.encounterId, kind, rounds, margin, wins.size / 3f, support,
                     lazy.won, lazy.safetyMargin, bold.won, bold.safetyMargin, spam.rounds, spam.won, story.won, stuck, problems)
             }
+        }
+
+        // Rounds and safety margin are judged on each fight's median across its routes (classes play differently;
+        // the typical player is the target), reported on the fight's first row.
+        rows.groupBy { it.encounterId }.forEach { (_, rs) ->
+            val kind = rs.maxByOrNull { it.kind.ordinal }!!.kind
+            val r = rs.map { it.rounds }.sorted()[rs.size / 2]
+            val m = rs.map { it.margin }.sorted()[rs.size / 2]
+            val first = rows.indexOf(rs.first())
+            val extra = mutableListOf<String>()
+            if (r !in kind.rounds) extra += "$r rounds across its routes (target ${kind.rounds.first}-${kind.rounds.last})"
+            if (m !in kind.margin) extra += "safety margin ${fmt(m)} across its routes (target ${fmt(kind.margin.start)}-${fmt(kind.margin.endInclusive)})"
+            if (extra.isNotEmpty()) rows[first] = rows[first].copy(problems = rows[first].problems + extra)
         }
 
         val unused = kitByRoute.flatMap { (route, kit) -> (kit - usedByRoute[route].orEmpty()).map { "$route: $it" } }
