@@ -98,6 +98,13 @@ BOSS_EXTRA_TRANSITIONS: list[TransitionSpec] = [
     TransitionSpec("ultimate", 6, 7, (0, 3, 6, 9, 12, 16), 110, "16-bit pixel art boss monster unleashing a massive devastating ultimate attack wave forward, flat #FF00FF magenta background, static camera", "stiff board, camera movement, blurry", event="release=5"),
 ]
 
+PARTY_BOSS_EXTRA_TRANSITIONS: list[TransitionSpec] = [
+    TransitionSpec("windup", 0, 1, (0, 5, 10, 14), 160, "16-bit SNES JRPG pixel art fighter coiling back into a menacing windup telegraph stance, raising weapon ready to strike, flat #FF00FF magenta background, static camera", "walking, turning, camera movement, blurry"),
+    TransitionSpec("charge_ultimate", 2, 2, (0, 4, 8, 12), 120, "16-bit SNES JRPG pixel art fighter gathering overwhelming aura, pulsing bright energy around raised weapon, flat #FF00FF magenta background, static camera", "camera movement, blurry, fading out"),
+    TransitionSpec("ultimate", 2, 4, (0, 3, 6, 9, 12, 16), 100, "16-bit SNES JRPG pixel art fighter unleashing a massive devastating ultimate finishing wave forward with bright flare, flat #FF00FF magenta background, static camera", "stiff board, camera movement, blurry, distorted limbs", event="release=5"),
+    TransitionSpec("death", 0, 6, (0, 3, 6, 9, 12, 16), 120, "16-bit SNES JRPG pixel art fighter taking a final blow, knees buckling and collapsing dramatically onto the ground defeated, flat #FF00FF magenta background, static camera", "stiff board, rigid tipping, camera movement, blurry"),
+]
+
 BUILTIN_CAST: dict[str, dict[str, Any]] = {
     "hero": {
         "role": "party",
@@ -406,6 +413,8 @@ def main() -> None:
     p.add_argument("--raw-sheet", default="", help="Reuse an existing 4x2 raw sheet PNG instead of running Klein")
     p.add_argument("--seed", type=int, default=108)
     p.add_argument("--colors", type=int, default=0, help="0 = full 32-bit RGBA (default), or e.g. 24 for shared retro palette")
+    p.add_argument("--boss-extras", action="store_true", help="Include windup, charge_ultimate, ultimate, death for party heroes also fought as bosses")
+    p.add_argument("--only-tags", default="", help="Comma-separated tag subset to generate during --only-wan")
     p.add_argument("--skip-wan", action="store_true", help="Skip Wan interpolation (pack static key poses only)")
     p.add_argument("--only-poses", action="store_true", help="Only generate 4x2 Klein sheet and extract pose_0..pose_7.png")
     p.add_argument("--only-wan", action="store_true", help="Only run Wan 2.2-14B FLF from existing pose_0..pose_7.png and save picked frames")
@@ -460,6 +469,11 @@ def main() -> None:
     transitions = list(PARTY_TRANSITIONS if role == "party" else ENEMY_TRANSITIONS)
     if role == "boss":
         transitions.extend(BOSS_EXTRA_TRANSITIONS)
+    elif role == "party" and args.boss_extras:
+        transitions.extend(PARTY_BOSS_EXTRA_TRANSITIONS)
+    if args.only_tags.strip():
+        wanted = {x.strip() for x in args.only_tags.split(",") if x.strip()}
+        transitions = [t for t in transitions if t.tag in wanted]
 
     if args.dry_run:
         print(json.dumps({

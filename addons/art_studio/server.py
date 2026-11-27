@@ -203,6 +203,8 @@ def execute_art_item(game_dir: Path, item: dict[str, Any]) -> str:
             "--work-dir", str(work_root),
             "--only-pack",
         ]
+        if item.get("bossExtras"):
+            cmd.append("--boss-extras")
         res = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
         if res.returncode != 0:
             raise RuntimeError(f"Pack sprite sheet failed: {(res.stderr or res.stdout)[-400:]}")
@@ -265,11 +267,12 @@ def execute_art_item(game_dir: Path, item: dict[str, Any]) -> str:
         subprocess.run(["ssh", DESKTOP_SSH, f"mkdir -p {desk_work}"], check=True, timeout=15)
         pose_files = [str(local_char_work / f"pose_{i}.png") for i in range(8)]
         subprocess.run(["scp", "-q", *pose_files, f"{DESKTOP_SSH}:{desk_work}/"], check=True, timeout=30)
+        extras_flag = " --boss-extras" if item.get("bossExtras") else ""
         cmd = (
             f"/home/todd/storage/graphical-studio/.venv/bin/python "
             f"/home/todd/Documents/GitHub/voice-rpg-engine/scripts/generate_battle_sprites.py "
             f"--id {shlex.quote(aid)} --role {shlex.quote(role)} --cell {cell} "
-            f"--desc {shlex.quote(desc)} --work-dir /tmp/art_studio_wan/{shlex.quote(game_dir.name)} --only-wan"
+            f"--desc {shlex.quote(desc)} --work-dir /tmp/art_studio_wan/{shlex.quote(game_dir.name)} --only-wan{extras_flag}"
         )
         subprocess.run(["ssh", DESKTOP_SSH, cmd], check=True, timeout=1800)
 

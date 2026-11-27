@@ -161,6 +161,8 @@ def _parse_deliver_briefs(game_dir: Path) -> dict[str, dict[str, Any]]:
             if m_del:
                 out[cur_id]["role"] = m_del.group(1)
                 out[cur_id]["cell"] = int(m_del.group(2))
+            if "also fought as a boss" in s or "charge_ultimate" in s:
+                out[cur_id]["bossExtras"] = True
             continue
         if s and not s.startswith("Element:"):
             desc_lines.append(s.replace("*Moves*:", "Moves:").strip())
@@ -268,6 +270,7 @@ def generate_game_plan(game_dir: Path, *, wave_size: int = 5, palette_colors: in
             br_c = deliver_briefs.get(c["id"]) or {}
             role = str(br_c.get("role") or c.get("role") or "party")
             cell = int(br_c.get("cell") or c.get("cell") or (128 if role == "boss" else 64))
+            boss_extras = bool(br_c.get("bossExtras"))
             base_st, base_out = _existing_status(game_dir, "base_sprite", c["id"])
             items.append(
                 {
@@ -277,6 +280,7 @@ def generate_game_plan(game_dir: Path, *, wave_size: int = 5, palette_colors: in
                     "kind": "base_sprite",
                     "role": role,
                     "cell": cell,
+                    "bossExtras": boss_extras,
                     "machine": "laptop",
                     "wave": wave_label,
                     "promptDesc": c["promptDesc"],
@@ -295,6 +299,7 @@ def generate_game_plan(game_dir: Path, *, wave_size: int = 5, palette_colors: in
                     "kind": "wan_animation",
                     "role": role,
                     "cell": cell,
+                    "bossExtras": boss_extras,
                     "machine": "desktop",
                     "wave": wave_label,
                     "dependsOn": f"base:{c['id']}",
@@ -314,6 +319,7 @@ def generate_game_plan(game_dir: Path, *, wave_size: int = 5, palette_colors: in
                     "kind": "sprite_sheet",
                     "role": role,
                     "cell": cell,
+                    "bossExtras": boss_extras,
                     "paletteColors": int(palette_colors),
                     "machine": "laptop",
                     "wave": wave_label,
