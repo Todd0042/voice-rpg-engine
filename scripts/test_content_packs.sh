@@ -22,6 +22,7 @@ set -euo pipefail
 
 ENGINE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # Games are expected next to the engine; VB_GAMES_ROOT points elsewhere (e.g. a folder of worktrees).
+# VB_TEST_FILTER runs only matching tests (Gradle --tests pattern), e.g. VB_TEST_FILTER="*BalanceContractTest*".
 GITHUB_ROOT="${VB_GAMES_ROOT:-$(cd "${ENGINE_ROOT}/.." && pwd)}"
 WORK_ROOT="${TMPDIR:-/tmp}/vb-content-packs"
 GAMES=("$@")
@@ -81,7 +82,7 @@ for game in "${GAMES[@]}"; do
 
     echo "[*] ${game}: running engine tests on content from ${source_desc}"
     log="$run/gradle-test.log"
-    if (cd "$run" && ./gradlew --console=plain --no-daemon testDebugUnitTest >"$log" 2>&1); then
+    if (cd "$run" && ./gradlew --console=plain --no-daemon testDebugUnitTest ${VB_TEST_FILTER:+--tests "$VB_TEST_FILTER"} >"$log" 2>&1); then
         summary+=("PASS  ${game}  [content: ${source_desc}]")
     else
         failed=1
