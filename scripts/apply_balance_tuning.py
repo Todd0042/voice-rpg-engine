@@ -17,13 +17,13 @@ def main(game, tuning_path):
     tuning = json.load(open(tuning_path))
     raw = open(enc_path, encoding="utf-8").read()
     data = json.loads(raw)
-    edits = {}  # (encounter id, enemy instance id) -> {"hp": n, "attack": n}
+    edits = {}  # (encounter id, index in its enemies list) -> {"hp": n, "attack": n}
     for enc in data["encounters"]:
         t = tuning.get(enc["id"])
         if not t:
             continue
         hp_s, at_s = t["hpScale"], t["attackScale"]
-        for ref in enc["enemies"]:
+        for k, ref in enumerate(enc["enemies"]):
             tpl = templates.get(ref.get("templateId"), {})
             change = {}
             if abs(hp_s - 1) > 0.03:
@@ -32,7 +32,7 @@ def main(game, tuning_path):
                 change["attack"] = max(1, round((ref.get("attack") or tpl.get("attack", 10)) * at_s))
             if change:
                 ref.update(change)
-                edits[(enc["id"], ref["id"])] = change
+                edits[(enc["id"], k)] = change
     if not edits:
         print("nothing to change"); return
     m = re.match(r'\{\n( +)"', raw)
@@ -42,24 +42,45 @@ def main(game, tuning_path):
         text = json.dumps(data, indent=indent, ensure_ascii=False) + ("\n" if raw.endswith("\n") else "")
     else:
         text = raw
-        for (enc_id, inst), change in edits.items():
-            enc_start = text.index('"id": "%s"' % enc_id) if '"id": "%s"' % enc_id in text else text.index('"id":"%s"' % enc_id)
-            pos = re.compile(r'"id"\s*:\s*"%s"' % re.escape(inst)).search(text, enc_start)
-            # the enclosing { ... } of this enemy entry
-            i = text.rfind("{", 0, pos.start()); depth, j = 0, i
+
+        def match_close(t, i, open_ch, close_ch):
+            depth, j, in_str = 0, i, False
             while True:
-                if text[j] == "{": depth += 1
-                elif text[j] == "}":
+                c = t[j]
+                if in_str:
+                    if c == "\\": j += 1
+                    elif c == '"': in_str = False
+                elif c == '"': in_str = True
+                elif c == open_ch: depth += 1
+                elif c == close_ch:
                     depth -= 1
-                    if depth == 0: break
+                    if depth == 0: return j
                 j += 1
-            obj = text[i:j + 1]
+
+        for (enc_id, k), change in sorted(edits.items(), key=lambda e: -text.find('"%s"' % e[0][0])):
+            m = re.search(r'"id"\s*:\s*"%s"' % re.escape(enc_id), text)
+            enc_start = text.rfind("{", 0, m.start())
+            enc_end = match_close(text, enc_start, "{", "}")
+            arr = re.compile(r'"enemies"\s*:\s*\[').search(text, enc_start, enc_end)
+            j = arr.end()
+            # walk to the k-th object of the array
+            for idx in range(k + 1):
+                j = text.index("{", j)
+                end = match_close(text, j, "{", "}")
+                if idx < k: j = end + 1
+            i, obj = j, text[j:end + 1]
             for key, val in change.items():
                 if re.search(r'"%s"\s*:\s*-?\d+' % key, obj):
                     obj = re.sub(r'("%s"\s*:\s*)-?\d+(\.\d+)?' % key, r'\g<1>%d' % val, obj, count=1)
                 else:
-                    obj = obj[:-1].rstrip() + (', "%s": %d' % (key, val)) + obj[len(obj[:-1].rstrip()):]
-            text = text[:i] + obj + text[j + 1:]
+                    body = obj[:-1].rstrip()
+                    if "\n" in obj:
+                        # a multi-line entry: a new line, indented like the entry's last key
+                        indent = re.findall(r'\n([ \t]+)"', body)[-1]
+                        obj = body + (',\n%s"%s": %d' % (indent, key, val)) + obj[len(body):]
+                    else:
+                        obj = body + (', "%s": %d' % (key, val)) + obj[len(body):]
+            text = text[:i] + obj + text[end + 1:]
         if json.loads(text) != data:
             sys.exit("text edit did not reproduce the intended data; nothing written")
     open(enc_path, "w", encoding="utf-8").write(text)

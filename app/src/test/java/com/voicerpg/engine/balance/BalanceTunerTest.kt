@@ -21,7 +21,7 @@ class BalanceTunerTest {
 
     data class Tuning(val kind: String, val hpScale: Float, val attackScale: Float, val rounds: Int, val margin: Float, val winRate: Float)
 
-    private data class Eval(val rounds: Int, val margin: Float, val winRate: Float)
+    private data class Eval(val rounds: Int, val margin: Float, val winRate: Float, val support: Float = 0f)
 
     private fun scaled(setup: BattleSimulator.FightSetup, hp: Float, attack: Float): BattleSimulator.FightSetup =
         setup.copy(encounter = setup.encounter.copy(enemies = setup.encounter.enemies.map { e ->
@@ -34,7 +34,7 @@ class BalanceTunerTest {
     private val debug get() = only != null
 
     private fun evaluate(setups: List<Pair<String, BattleSimulator.FightSetup>>, hp: Float, attack: Float, at: Float): Eval {
-        val labelled = setups.flatMap { (label, s) -> (1..2).map { seed -> label to BattleSimulator.run(scaled(s, hp, attack), AutoPolicy.SENSIBLE, at, seed) } }
+        val labelled = setups.flatMap { (label, s) -> (1..3).map { seed -> label to BattleSimulator.run(scaled(s, hp, attack), AutoPolicy.SENSIBLE, at, seed) } }
         val runs = labelled.map { it.second }
         if (debug) labelled.forEach { (label, r) ->
             println(String.format(Locale.US, "    [%s] hp x%.2f atk x%.2f: %s %s rounds %d, took %d of %d HP (margin %.2f), %d falls, %d/%d support, spells %s",
@@ -44,7 +44,7 @@ class BalanceTunerTest {
         val wins = runs.filter { it.won }
         val rounds = (wins.ifEmpty { runs }).map { it.rounds }.sorted().let { it[it.size / 2] }
         val margin = runs.map { it.safetyMargin }.sorted().let { it[it.size / 2] }
-        return Eval(rounds, margin, wins.size.toFloat() / runs.size)
+        return Eval(rounds, margin, wins.size.toFloat() / runs.size, runs.map { it.supportShare }.average().toFloat())
     }
 
     @Test
@@ -62,13 +62,15 @@ class BalanceTunerTest {
             var attack = 1f
             var e = evaluate(setups, hp, attack, at)
             repeat(4) {
-                hp = (hp * (kind.targetRounds / e.rounds.coerceAtLeast(1)).coerceIn(0.5f, 2f)).coerceIn(0.3f, 6f)
+                // Damped steps (a partial move toward the target) so noisy fights settle instead of swinging past it.
+                hp = (hp * Math.pow((kind.targetRounds / e.rounds.coerceAtLeast(1)).coerceIn(0.5f, 2f).toDouble(), 0.6).toFloat()).coerceIn(0.3f, 6f)
                 e = evaluate(setups, hp, attack, at)
-                attack = (attack * (e.margin / kind.targetMargin).coerceIn(0.5f, 2f)).coerceIn(0.3f, 6f)
+                attack = (attack * Math.pow((e.margin / kind.targetMargin).coerceIn(0.5f, 2f).toDouble(), 0.6).toFloat()).coerceIn(0.3f, 6f)
                 e = evaluate(setups, hp, attack, at)
                 // The sensible player must still win: ease off the attack until they do.
                 var guard = 0
-                while (e.winRate < 0.67f && attack > 0.3f && guard++ < 6) {
+                // ... and without spending more than about a third of its turns healing (no heal loops).
+                while ((e.winRate < 0.67f || e.support > 0.3f) && attack > 0.3f && guard++ < 6) {
                     attack *= 0.85f
                     e = evaluate(setups, hp, attack, at)
                 }

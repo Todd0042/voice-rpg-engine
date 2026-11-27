@@ -74,7 +74,9 @@ class BalanceContractTest {
                 val late = kind == Kind.LATE || kind == Kind.BOSS_LATE || kind == Kind.FINALE
                 if ((kind == Kind.BOSS_LATE || kind == Kind.FINALE) && lazy.won && lazy.safetyMargin >= 1.0f) problems += "a lazy x1.1 player wins it comfortably"
                 if (kind == Kind.EARLY && !(bold.won && bold.safetyMargin >= 2.0f)) problems += "a bold x1.8 player doesn't win it easily"
-                if (late && spam.won && spam.rounds < rounds * 1.2f) problems += "spamming the strongest spell is nearly as good (${spam.rounds} vs $rounds rounds)"
+                // Only where spell choice mattered: the sensible player used two or more different attacks.
+                val attacksUsed = sensible.flatMap { it.spellsUsed }.distinct().mapNotNull { GameContent.spellById(it) }.count { it.basePower > 0 && !it.isHeal && !it.isGuard }
+                if (late && attacksUsed >= 2 && spam.won && spam.rounds < rounds * 1.2f) problems += "spamming the strongest spell is nearly as good (${spam.rounds} vs $rounds rounds)"
 
                 rows += Row(route, b.encounterId, kind, rounds, margin, wins.size / 3f, support,
                     lazy.won, lazy.safetyMargin, bold.won, bold.safetyMargin, spam.rounds, spam.won, story.won, stuck, problems)

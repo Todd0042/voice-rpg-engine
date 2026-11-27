@@ -69,6 +69,13 @@ object AutoPlayer {
             return Choice(s, if (s.hitsAll) "${s.name} all" else s.name)
         }
 
+        // A finishing blow: when one cast (at a middling x1.5) can end the fight, attack instead of healing.
+        val finisher = attacks.filter { s ->
+            val dmg = if (s.hitsAll) foes.map { f -> s.basePower * mult(s, f) * 1.5f } else listOf(s.basePower * (foes.maxOfOrNull { mult(s, it) } ?: 1f) * 1.5f)
+            if (s.hitsAll) foes.zip(dmg).all { (f, d) -> d >= f.currentHp } else foes.size == 1 && dmg.first() >= foes.first().currentHp
+        }.maxByOrNull(::value)
+        val solo = allies.size <= 1
+
         if (!canAttack) {
             // A support fighter: heal whoever needs it, otherwise any useful non-attack.
             return healChoice(0.7f)
@@ -78,11 +85,13 @@ object AutoPlayer {
         }
         return when (policy) {
             AutoPolicy.FASTEST ->
-                (if ((lowest?.hpRatio ?: 1f) < 0.25f) healChoice(0.25f) else null)
+                finisher?.let(::attack)
+                    ?: (if ((lowest?.hpRatio ?: 1f) < (if (solo) 0.35f else 0.25f)) healChoice(if (solo) 0.35f else 0.25f) else null)
                     ?: attacks.maxByOrNull(::value)?.let(::attack)
                     ?: restoreChoice()
             AutoPolicy.SENSIBLE ->
-                healChoice(0.4f)
+                finisher?.let(::attack)
+                    ?: healChoice(0.4f)
                     ?: restoreChoice()
                     ?: attacks.maxByOrNull(::value)?.let(::attack)
             AutoPolicy.SPAM ->
