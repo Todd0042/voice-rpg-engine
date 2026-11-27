@@ -230,11 +230,10 @@ object StoryRouteWalker {
             )
             if (stopAtNodeId != null && node.id == stopAtNodeId) break
 
-            val hubRedirect = node.hubCompletion?.let { hc ->
-                if (hc.requiredFlags.all { flags[it] == true }) hc.redirectToNodeId else null
-            }
-            if (hubRedirect != null) {
-                node = GameContent.nodes[hubRedirect]
+            // The story's own hub redirect (StoryChoiceRules), so the walk sees the choices a player sees.
+            val effectiveHub = StoryChoiceRules.effectiveHub(node, flags, defeated.toList(), visited)
+            if (effectiveHub.id != node.id) {
+                node = effectiveHub
                 continue
             }
 
@@ -243,7 +242,20 @@ object StoryRouteWalker {
                 // player sees; a hub's unfinished options first, as Pure Story Mode plays it.
                 val eligible = StoryChoiceRules.eligible(node, flags, defeated.toList(), visited)
                 val routeChoice = if (prefix.isNotBlank() && chosenRouteFlag != null) eligible.firstOrNull { it.completionFlag == chosenRouteFlag } else null
+                // A branch into a battle not fought yet comes first (a player can take every fight a hub offers before
+                // finishing it; the balance simulator must see them all), then the hub's unfinished options.
+                fun leadsToNewBattle(c: com.voicerpg.engine.model.DialogueChoice): Boolean {
+                    var id: String? = c.nextNodeId
+                    repeat(6) {
+                        val n = GameContent.nodes[id] ?: return false
+                        n.triggerBattleEncounterId?.let { return it !in defeated }
+                        if (n.choices.isNotEmpty()) return false
+                        id = n.nextNodeIdFor(flags)
+                    }
+                    return false
+                }
                 val picked = routeChoice
+                    ?: eligible.firstOrNull(::leadsToNewBattle)
                     ?: eligible.firstOrNull { it.completionFlag != null && flags[it.completionFlag] != true && (prefix.isBlank() || !it.completionFlag.startsWith(prefix)) }
                     ?: eligible.firstOrNull()
                 if (picked == null) {

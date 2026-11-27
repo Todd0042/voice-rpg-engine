@@ -13,6 +13,29 @@ object StoryChoiceRules {
     /** How far a hub's branch is followed when checking whether it was played. */
     const val MAX_BRANCH_LENGTH = 40
 
+    /**
+     * Where a hub sends the player: once every flag its `hubCompletion` requires is set, on to the completion node,
+     * but not while an open choice of its own (e.g. an unlocked battle) is still waiting to be chosen. Follows
+     * chained hubs.
+     */
+    fun effectiveHub(node: DialogueNode, flags: Map<String, Boolean>, defeated: List<String>, visited: Set<String>): DialogueNode {
+        var effective = node
+        var guard = 0
+        while (guard++ < 16) {
+            val completion = effective.hubCompletion ?: break
+            if (completion.requiredFlags.isEmpty() || !completion.requiredFlags.all { flags[it] == true }) break
+            val hasPendingChoice = effective.choices.any { choice ->
+                !isChoiceCompleted(choice, flags, defeated, effective, visited) && !isChoiceLocked(choice, effective, flags) &&
+                    choice.nextNodeId != completion.redirectToNodeId
+            }
+            if (hasPendingChoice) break
+            val redirect = StoryScript.ALL_NODES[completion.redirectToNodeId]
+            if (redirect == null || redirect.id == effective.id) break
+            effective = redirect
+        }
+        return effective
+    }
+
     /** The choices of [node] still open: not done and not locked. */
     fun eligible(node: DialogueNode, flags: Map<String, Boolean>, defeated: List<String>, visited: Set<String>): List<DialogueChoice> =
         node.choices.filter { !isChoiceCompleted(it, flags, defeated, node, visited) && !isChoiceLocked(it, node, flags) }

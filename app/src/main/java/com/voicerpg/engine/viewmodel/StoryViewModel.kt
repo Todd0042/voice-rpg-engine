@@ -1277,36 +1277,8 @@ class StoryViewModel(
         }
     }
 
-    private fun resolveEffectiveHubNode(node: DialogueNode, flags: Map<String, Boolean>): DialogueNode {
-        // Data-driven hub auto-redirect: when every required flag is set, a hub with a
-        // hubCompletion block reroutes to the declared completion node (choice-elimination
-        // endgame). See StoryScene/story JSON files for the schema.
-        var effective = node
-        var guard = 0
-        while (guard < 16) {
-            val completion = effective.hubCompletion
-            if (completion == null || completion.requiredFlags.isEmpty()) break
-            if (completion.requiredFlags.all { flags[it] == true }) {
-                // If the hub still has an eligible choice that is not yet completed (e.g. an unlocked battle),
-                // do not redirect immediately; let the choice be presented and chosen.
-                val hasPendingChoice = effective.choices.any { choice ->
-                    val notCompleted = !isChoiceCompleted(choice, flags, _state.value.defeatedEncounters, effective)
-                    val notLocked = !isChoiceLocked(choice, effective, flags)
-                    notCompleted && notLocked && choice.nextNodeId != completion.redirectToNodeId
-                }
-                if (hasPendingChoice) {
-                    break
-                }
-                val redirect = StoryScript.ALL_NODES[completion.redirectToNodeId]
-                if (redirect == null || redirect.id == effective.id) break
-                effective = redirect
-            } else {
-                break
-            }
-            guard++
-        }
-        return effective
-    }
+    private fun resolveEffectiveHubNode(node: DialogueNode, flags: Map<String, Boolean>): DialogueNode =
+        StoryChoiceRules.effectiveHub(node, flags, _state.value.defeatedEncounters, _state.value.visitedNodeIds)
 
     var onOpenOptions: (() -> Unit)? = null
     var onCloseOptions: (() -> Unit)? = null

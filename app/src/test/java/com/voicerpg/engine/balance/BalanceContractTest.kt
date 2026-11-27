@@ -59,9 +59,11 @@ class BalanceContractTest {
                 val support = sensible.map { it.supportShare }.average().toFloat()
                 val stuck = (sensible + lazy + bold + spam + story).any { !it.finished }
                 sensible.forEach { r -> usedByRoute.getOrPut(route) { mutableSetOf() } += r.spellsUsed }
-                setup.partyStats.forEach { m ->
+                // The spells of the fighters in this fight (its own party list, else the story's party).
+                val fighters = setup.encounter.initialParty?.map { it.id } ?: setup.partyStats.map { it.id }
+                fighters.forEach { id ->
                     kitByRoute.getOrPut(route) { mutableSetOf() } +=
-                        GameContent.knownSpells(m.id, setup.player.heroClassId, setup.flags).filter { it.basePower > 0 && !it.isHeal }.map { it.id }
+                        GameContent.knownSpells(id, setup.player.heroClassId, setup.flags).filter { it.basePower > 0 && !it.isHeal && !it.isGuard }.map { it.id }
                 }
 
                 val problems = mutableListOf<String>()
