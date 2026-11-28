@@ -96,7 +96,9 @@ object StoryAssetLoader {
         val primaryPath = BackgroundAspect.variantPath(assetPath, aspect)
         val fallbackPath = if (primaryPath != assetPath) assetPath else null
 
-        if (bitmapCache.containsKey(primaryPath)) return bitmapCache[primaryPath]
+        if (bitmapCache.containsKey(primaryPath)) {
+            return bitmapCache[primaryPath] ?: fallbackPath?.let { loadBitmap(context, it) }
+        }
 
         val primaryBitmap = tryLoadBitmap(context, primaryPath)
         if (primaryBitmap != null) {

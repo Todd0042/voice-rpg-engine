@@ -33,6 +33,10 @@ object SpriteBitmaps {
         cache.getOrPut(key) { load(context, sprite) }
     }
 
+    fun clear() = synchronized(cache) {
+        cache.clear()
+    }
+
     private fun load(context: Context, sprite: SheetSprite): ImageBitmap? = runCatching {
         val opts = BitmapFactory.Options().apply { inScaled = false; inPremultiplied = true }
         val bitmap = context.assets.open(sprite.sheet.imagePath).use { BitmapFactory.decodeStream(it, null, opts) } ?: return null
@@ -102,13 +106,14 @@ fun SpriteCanvas(
                 is SheetSprite -> {
                     val f = source.sheet.frames.getOrNull(frame) ?: return@scale
                     val img = image ?: return@scale
+                    val flashAlpha = flash.coerceIn(0f, 1f)
                     drawImage(
                         image = img,
                         srcOffset = IntOffset(f.x, f.y),
                         srcSize = IntSize(f.w, f.h),
                         dstOffset = IntOffset((f.offX * artPx + dx).roundToInt(), (f.offY * artPx).roundToInt()),
                         dstSize = IntSize((f.w * artPx).roundToInt(), (f.h * artPx).roundToInt()),
-                        colorFilter = if (flash > 0f) ColorFilter.tint(Color.White.copy(alpha = flash.coerceIn(0f, 1f)), BlendMode.SrcAtop) else null,
+                        colorFilter = if (flashAlpha >= 0.01f) ColorFilter.tint(Color.White.copy(alpha = flashAlpha), BlendMode.SrcAtop) else null,
                         filterQuality = FilterQuality.None
                     )
                 }

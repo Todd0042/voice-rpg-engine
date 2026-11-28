@@ -286,7 +286,7 @@ The included sync utility [`scripts/sync_engine_to_games.sh`](scripts/sync_engin
 
 ## 9. Optional Art Studio Addon
 
-The supplemental [`addons/art_studio/`](addons/art_studio/README.md) web dashboard and [`scripts/generate_battle_sprites.py`](scripts/generate_battle_sprites.py) pipeline automate 16-bit animated sprite sheet (`FLUX.2 Klein` + `Wan 2.2-14B` `WanFirstLastFrameToVideo`) and `SDXL` combat backdrop generation once your character and enemy JSON profiles are in place:
+The supplemental [`addons/art_studio/`](addons/art_studio/README.md) web dashboard and [`scripts/generate_battle_sprites.py`](scripts/generate_battle_sprites.py) pipeline automate 16-bit animated sprite sheet (`FLUX.2 Klein` + `Wan 2.2-14B` `WanFirstLastFrameToVideo`) and `SDXL` combat backdrop generation once your character and enemy JSON profiles are in place. [`scripts/generate_battle_backgrounds.py`](scripts/generate_battle_backgrounds.py) and [`scripts/generate_story_backgrounds.py`](scripts/generate_story_backgrounds.py) batch-generate landscape (`.jpg`/`.png`), portrait (`_p`), and foldable square (`_s`) backgrounds across all games (using Square `_s` as a `ReferenceLatent` anchor in FLUX.2 Klein 4B for story scenes):
 
 ```bash
 # 1. Install dependencies & verify ComfyUI models
@@ -299,7 +299,7 @@ The supplemental [`addons/art_studio/`](addons/art_studio/README.md) web dashboa
 
 ---
 
-## 10. Automated Unit Verification Suite
+## 10. Automated Unit Verification Suite & Linux Desktop Tester
 
 The engine features an automated suite of **339 unit tests** across 58 test files, covering intent parsing, multilingual resonance incantations, ATB timeline priority, save state integrity, and the JVM **Balance Harness** ([`BalanceHarnessTest.kt`](app/src/test/java/com/voicerpg/engine/combat/BalanceHarnessTest.kt)):
 ```bash
@@ -308,6 +308,9 @@ The engine features an automated suite of **339 unit tests** across 58 test file
 
 # Build debug APK:
 ./gradlew assembleDebug
+
+# Launch the native Linux Compose Desktop tester (Game, Layout: Portrait/Landscape/Foldable, Scale: 50%-150%, Start/Stop, Piper TTS):
+./scripts/run_desktop.sh [superstore-saga|wallys-world|commander-america-rpg|echoes-of-logos|voice-rpg-engine]
 ```
 
 ---

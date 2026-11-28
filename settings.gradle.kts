@@ -16,3 +16,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "VoiceRPG-Engine"
 include(":app")
+include(":desktop")
