@@ -879,4 +879,56 @@ class DynamicEncounterTest {
 
         assertTrue("Auto hero action in pure story mode must resolve and deal damage to enemies", turnResolved)
     }
+
+    @Test
+    fun testSetEnvironmentIdUpdatesStateAndOverlay() {
+        viewModel.startEncounter(GameContent.encounters.getValue("template_solo_battle"))
+        val firstEnv = GameContent.environments.values.first()
+        viewModel.setEnvironmentId(firstEnv.id)
+        assertEquals(firstEnv.id, viewModel.state.value.currentEnvironmentId)
+        assertEquals(firstEnv.overlayType, viewModel.state.value.currentOverlayType)
+    }
+
+    @Test
+    fun testStoryNodeBattleOverridesApplyToTriggeredEncounter() {
+        val storyVm = com.voicerpg.engine.viewmodel.StoryViewModel(
+            speechManager = SpeechManager(),
+            combatNarrator = com.voicerpg.engine.audio.CombatNarrator(),
+            scopeOverride = CoroutineScope(Dispatchers.Default)
+        )
+        try {
+            val firstEnv = GameContent.environments.values.first()
+            val baseEnc = GameContent.encounters.getValue("template_solo_battle")
+            val enemyId = baseEnc.enemies.first().id
+            val node = com.voicerpg.engine.model.DialogueNode(
+                id = "test_override_node",
+                speaker = com.voicerpg.engine.model.DialogueSpeaker.NARRATOR,
+                side = com.voicerpg.engine.model.SpeakerSide.CENTER_NARRATOR,
+                text = "Override battle",
+                triggerBattleEncounterId = baseEnc.id,
+                battleEnvironmentId = firstEnv.id,
+                battleOverlayType = "NONE",
+                battleEnemies = listOf(
+                    com.voicerpg.engine.model.BattleEnemyOverride(
+                        id = enemyId,
+                        name = "Custom Rival",
+                        subtitle = "Department Rival",
+                        spriteId = "custom_rival_sheet"
+                    )
+                )
+            )
+            storyVm.applyNodeTransition(node, suppressNarration = true)
+            storyVm.triggerEncounter(baseEnc.id)
+
+            val active = storyVm.state.value.activeEncounter
+            assertNotNull(active)
+            assertEquals(firstEnv.id, active!!.environmentId)
+            assertEquals("NONE", active.overlayType)
+            assertEquals("Custom Rival", active.enemies.first().name)
+            assertEquals("Department Rival", active.enemies.first().subtitle)
+            assertEquals("custom_rival_sheet", active.enemies.first().spriteId)
+        } finally {
+            storyVm.cancelPendingAutoAdvance()
+        }
+    }
 }

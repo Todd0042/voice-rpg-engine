@@ -290,6 +290,7 @@ data class EncounterDefinition(
     val description: String = "",
     val environment: BattleEnvironment,
     val environmentId: String = "",
+    val overlayType: String? = null,
     val enemies: List<Enemy>,
     val initialParty: List<PartyMember>? = null,
     val bossPhases: List<BossPhaseRule> = emptyList(),

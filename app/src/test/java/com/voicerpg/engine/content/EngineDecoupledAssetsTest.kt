@@ -120,6 +120,17 @@ class EngineDecoupledAssetsTest {
         assertTrue("Encounters must not be empty", pack.encounters.isNotEmpty())
         for ((_, enc) in pack.encounters) {
             assertTrue("Encounter '${enc.id}' must have an environmentId", enc.environmentId.isNotBlank())
+            assertNotNull(
+                "Encounter '${enc.id}' environmentId '${enc.environmentId}' must resolve in environments.json",
+                GameContent.environmentById(enc.environmentId)
+            )
+        }
+        for (node in pack.nodes.values) {
+            val envId = node.battleEnvironmentId ?: continue
+            assertNotNull(
+                "Node '${node.id}' battleEnvironmentId '$envId' must resolve in environments.json",
+                GameContent.environmentById(envId)
+            )
         }
     }
 

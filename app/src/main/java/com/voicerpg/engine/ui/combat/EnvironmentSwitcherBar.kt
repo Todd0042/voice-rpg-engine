@@ -36,10 +36,13 @@ import com.voicerpg.engine.ui.theme.RetroPanel
 fun EnvironmentSwitcherBar(
     currentEnvironment: BattleEnvironment,
     onSelectEnvironment: (BattleEnvironment) -> Unit,
+    currentEnvironmentId: String = "",
+    onSelectEnvironmentId: ((String) -> Unit)? = null,
     onSelectEncounter: ((EncounterDefinition) -> Unit)? = null,
     onSummonMinion: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
+    val gameEnvs = remember { GameContent.environments.values.toList() }
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -48,36 +51,68 @@ fun EnvironmentSwitcherBar(
         horizontalArrangement = Arrangement.spacedBy(6.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // 1. Environments
-        BattleEnvironment.entries.forEach { env ->
-            val isSelected = env == currentEnvironment
-            Box(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(6.dp))
-                    .background(
-                        if (isSelected) LogosGold.copy(alpha = 0.2f) else RetroPanel.copy(alpha = 0.85f)
-                    )
-                    .border(
-                        width = if (isSelected) 1.5.dp else 1.dp,
-                        color = if (isSelected) LogosGold else RetroBorder,
-                        shape = RoundedCornerShape(6.dp)
-                    )
-                    .clickable { onSelectEnvironment(env) }
-                    .padding(horizontal = 8.dp, vertical = 4.dp)
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = env.icon,
-                        fontSize = 11.sp
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(
-                        text = env.displayName.uppercase(),
-                        color = if (isSelected) LogosGlow else Color(0xFFB0BEC5),
-                        fontSize = 10.sp,
-                        fontWeight = if (isSelected) FontWeight.Black else FontWeight.Medium,
-                        fontFamily = FontFamily.Monospace
-                    )
+        // 1. Environments (from GameContent when available, else legacy enum entries)
+        if (gameEnvs.isNotEmpty() && onSelectEnvironmentId != null) {
+            gameEnvs.forEach { env ->
+                val isSelected = env.id.equals(currentEnvironmentId, ignoreCase = true)
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(
+                            if (isSelected) LogosGold.copy(alpha = 0.2f) else RetroPanel.copy(alpha = 0.85f)
+                        )
+                        .border(
+                            width = if (isSelected) 1.5.dp else 1.dp,
+                            color = if (isSelected) LogosGold else RetroBorder,
+                            shape = RoundedCornerShape(6.dp)
+                        )
+                        .clickable { onSelectEnvironmentId(env.id) }
+                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(text = env.icon, fontSize = 11.sp)
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = env.displayName.uppercase(),
+                            color = if (isSelected) LogosGlow else Color(0xFFB0BEC5),
+                            fontSize = 10.sp,
+                            fontWeight = if (isSelected) FontWeight.Black else FontWeight.Medium,
+                            fontFamily = FontFamily.Monospace
+                        )
+                    }
+                }
+            }
+        } else {
+            BattleEnvironment.entries.forEach { env ->
+                val isSelected = env == currentEnvironment
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(
+                            if (isSelected) LogosGold.copy(alpha = 0.2f) else RetroPanel.copy(alpha = 0.85f)
+                        )
+                        .border(
+                            width = if (isSelected) 1.5.dp else 1.dp,
+                            color = if (isSelected) LogosGold else RetroBorder,
+                            shape = RoundedCornerShape(6.dp)
+                        )
+                        .clickable { onSelectEnvironment(env) }
+                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = env.icon,
+                            fontSize = 11.sp
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = env.displayName.uppercase(),
+                            color = if (isSelected) LogosGlow else Color(0xFFB0BEC5),
+                            fontSize = 10.sp,
+                            fontWeight = if (isSelected) FontWeight.Black else FontWeight.Medium,
+                            fontFamily = FontFamily.Monospace
+                        )
+                    }
                 }
             }
         }

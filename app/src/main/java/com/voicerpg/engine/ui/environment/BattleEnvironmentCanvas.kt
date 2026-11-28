@@ -42,6 +42,7 @@ import kotlin.math.sin
 fun BattleEnvironmentCanvas(
     environment: BattleEnvironment = BattleEnvironment.FOREST,
     environmentId: String? = null,
+    overlayType: String? = null,
     isPortrait: Boolean = false,
     bgAspect: BackgroundAspect? = null,
     partyCount: Int = 4,
@@ -74,8 +75,14 @@ fun BattleEnvironmentCanvas(
     )
     val frameIndex = cycleProgress.toInt().coerceIn(0, 3)
 
-    val overlayEnv = remember(envDef, environment) {
-        envDef?.let { runCatching { BattleEnvironment.valueOf(it.overlayType) }.getOrNull() } ?: environment
+    val rawOverlay = (overlayType?.takeIf { it.isNotBlank() } ?: envDef?.overlayType)?.trim()
+    val overlayEnv: BattleEnvironment? = remember(rawOverlay, envDef, environment) {
+        when {
+            rawOverlay.equals("NONE", ignoreCase = true) -> null
+            !rawOverlay.isNullOrBlank() -> runCatching { BattleEnvironment.valueOf(rawOverlay.uppercase()) }.getOrNull()
+            envDef == null -> environment
+            else -> null
+        }
     }
 
     Canvas(modifier = modifier.fillMaxSize()) {
@@ -100,34 +107,27 @@ fun BattleEnvironmentCanvas(
                     dstSize = IntSize(w.toInt(), h.toInt())
                 )
             }
-            // Soft darkening over backdrop to push it into depth behind the stage
-            drawRect(
-                color = Color.Black.copy(alpha = 0.22f),
-                size = Size(w, horizonY + 12f)
-            )
-        } else {
-            // Procedural fallback if bitmap fails to load
-            when (overlayEnv) {
-                BattleEnvironment.FOREST -> drawForestScene(w, h, horizonY, frameIndex)
-                BattleEnvironment.CASTLE -> drawCastleScene(w, h, horizonY, frameIndex)
-                BattleEnvironment.DUNGEON -> drawDungeonScene(w, h, horizonY, frameIndex)
-                BattleEnvironment.CAVE -> drawCaveScene(w, h, horizonY, frameIndex)
-                BattleEnvironment.SWAMP -> drawSwampScene(w, h, horizonY, frameIndex)
-            }
-        }
-
-        // 2. Mode-7 Style Perspective Battle Floor + Horizon Mist Seam
-        drawPerspectiveFloorPlane(w, h, horizonY, overlayEnv, frameIndex)
-
-        // 3. Dynamic 4-Frame Living Environmental Animation (midground torches, banners, crystals)
-        if (backgroundBitmap != null) {
+            // 2. Dynamic 4-Frame Living Environmental Animation (only when a non-NONE overlay is configured)
             when (overlayEnv) {
                 BattleEnvironment.FOREST -> drawForestAnimationOverlay(w, h, horizonY, frameIndex)
                 BattleEnvironment.CASTLE -> drawCastleAnimationOverlay(w, h, horizonY, frameIndex)
                 BattleEnvironment.DUNGEON -> drawDungeonAnimationOverlay(w, h, horizonY, frameIndex)
                 BattleEnvironment.CAVE -> drawCaveAnimationOverlay(w, h, horizonY, frameIndex)
                 BattleEnvironment.SWAMP -> drawSwampAnimationOverlay(w, h, horizonY, frameIndex)
+                null -> Unit
             }
+        } else {
+            // Procedural fallback if bitmap fails to load
+            val fallbackEnv = overlayEnv ?: environment
+            when (fallbackEnv) {
+                BattleEnvironment.FOREST -> drawForestScene(w, h, horizonY, frameIndex)
+                BattleEnvironment.CASTLE -> drawCastleScene(w, h, horizonY, frameIndex)
+                BattleEnvironment.DUNGEON -> drawDungeonScene(w, h, horizonY, frameIndex)
+                BattleEnvironment.CAVE -> drawCaveScene(w, h, horizonY, frameIndex)
+                BattleEnvironment.SWAMP -> drawSwampScene(w, h, horizonY, frameIndex)
+            }
+            // Mode-7 Style Perspective Battle Floor + Horizon Mist Seam for procedural fallback
+            drawPerspectiveFloorPlane(w, h, horizonY, fallbackEnv, frameIndex)
         }
     }
 }
@@ -141,14 +141,23 @@ fun BattleEnvironmentCanvas(
 fun BattleForegroundOverlay(
     environment: BattleEnvironment = BattleEnvironment.FOREST,
     environmentId: String? = null,
+    overlayType: String? = null,
     modifier: Modifier = Modifier
 ) {
     val envDef = remember(environmentId, environment) {
         GameContent.environmentById(environmentId) ?: GameContent.environmentById(environment.name)
     }
-    val overlayEnv = remember(envDef, environment) {
-        envDef?.let { runCatching { BattleEnvironment.valueOf(it.overlayType) }.getOrNull() } ?: environment
+    val rawOverlay = (overlayType?.takeIf { it.isNotBlank() } ?: envDef?.overlayType)?.trim()
+    val overlayEnv: BattleEnvironment? = remember(rawOverlay, envDef, environment) {
+        when {
+            rawOverlay.equals("NONE", ignoreCase = true) -> null
+            !rawOverlay.isNullOrBlank() -> runCatching { BattleEnvironment.valueOf(rawOverlay.uppercase()) }.getOrNull()
+            envDef == null -> environment
+            else -> null
+        }
     }
+
+    if (overlayEnv == null) return
 
     val infiniteTransition = rememberInfiniteTransition(label = "FgAnimation")
     val driftProgress by infiniteTransition.animateFloat(

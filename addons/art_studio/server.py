@@ -225,7 +225,7 @@ def execute_art_item(game_dir: Path, item: dict[str, Any]) -> str:
         }
         pid = _comfy_post({"prompt": wf, "client_id": str(uuid.uuid4())})["prompt_id"]
         raw = _comfy_wait(pid)
-        out_p = game_dir / f"app/src/main/assets/game/environments/{aid}.png"
+        out_p = game_dir / f"app/src/main/assets/environments/{aid}.png"
         out_p.write_bytes(raw)
         return str(out_p)
 

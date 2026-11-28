@@ -72,9 +72,12 @@ class HealsAndRolesTest {
     }
 
     private fun waitTurnComplete(vm: com.voicerpg.engine.viewmodel.CombatViewModel, check: () -> Boolean) {
+        fun settled() = check() &&
+            vm.state.value.phase == com.voicerpg.engine.model.CombatPhase.ATB_WAITING &&
+            vm.state.value.activePartyMemberId == null
         val end = System.currentTimeMillis() + 20_000
-        while (System.currentTimeMillis() < end && !check()) Thread.sleep(10)
-        assertTrue("expected state change within timeout", check())
+        while (System.currentTimeMillis() < end && !settled()) Thread.sleep(10)
+        assertTrue("expected state change within timeout", settled())
     }
 
     @Test

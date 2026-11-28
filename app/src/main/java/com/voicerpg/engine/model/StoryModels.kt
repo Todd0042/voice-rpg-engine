@@ -96,7 +96,12 @@ data class DialogueNode(
      */
     val flagRoutes: List<FlagRoute> = emptyList(),
     /** Optional checkpoint label for route-locked warp targets. */
-    val checkpoint: String = ""
+    val checkpoint: String = "",
+    /** Optional per-node battle overrides so story nodes can dictate backdrop, overlay, party, or enemies. */
+    val battleEnvironmentId: String? = null,
+    val battleOverlayType: String? = null,
+    val battleParty: List<String>? = null,
+    val battleEnemies: List<BattleEnemyOverride> = emptyList()
 ) {
     /** Where "next" leads with these story flags: the first matching [flagRoutes] entry, else [nextNodeId]. */
     fun nextNodeIdFor(flags: Map<String, Boolean>): String? =
@@ -108,6 +113,19 @@ data class DialogueNode(
 
 /** One branch of [DialogueNode.flagRoutes]. */
 data class FlagRoute(val requiredFlags: List<String>, val nextNodeId: String)
+
+/** Per-node enemy override or replacement when a story node triggers a shared encounter. */
+data class BattleEnemyOverride(
+    val templateId: String = "",
+    val id: String? = null,
+    val name: String? = null,
+    val subtitle: String? = null,
+    val spriteId: String? = null,
+    val hp: Int? = null,
+    val attack: Int? = null,
+    val defense: Int? = null,
+    val speed: Int? = null
+)
 
 data class StoryScene(
     val id: String,

@@ -188,6 +188,8 @@ fun RetroBattleScreen(
                     EnvironmentSwitcherBar(
                         currentEnvironment = state.currentEnvironment,
                         onSelectEnvironment = { viewModel.setEnvironment(it) },
+                        currentEnvironmentId = state.currentEnvironmentId,
+                        onSelectEnvironmentId = { viewModel.setEnvironmentId(it) },
                         onSelectEncounter = { viewModel.startEncounter(it) },
                         onSummonMinion = {
                             val minionNum = (state.enemies.size + 1)
@@ -238,6 +240,7 @@ fun RetroBattleScreen(
                     BattleEnvironmentCanvas(
                         environment = state.currentEnvironment,
                         environmentId = state.currentEnvironmentId,
+                        overlayType = state.currentOverlayType,
                         bgAspect = bgAspect,
                         partyCount = state.party.size,
                         enemyCount = state.enemies.size,
@@ -292,6 +295,7 @@ fun RetroBattleScreen(
                     BattleForegroundOverlay(
                         environment = state.currentEnvironment,
                         environmentId = state.currentEnvironmentId,
+                        overlayType = state.currentOverlayType,
                         modifier = Modifier.fillMaxSize()
                     )
 

@@ -12,6 +12,7 @@ import com.voicerpg.engine.combat.PhaseRule
 import com.voicerpg.engine.combat.StatusDef
 import com.voicerpg.engine.combat.StatusTier
 import com.voicerpg.engine.model.SpellGraphics
+import com.voicerpg.engine.model.BattleEnemyOverride
 import com.voicerpg.engine.model.BattleEnvironment
 import com.voicerpg.engine.model.DialogueChoice
 import com.voicerpg.engine.model.DialogueNode
@@ -361,6 +362,7 @@ data class EncounterEnemyDto(
     val id: String? = null,
     val name: String? = null,
     val subtitle: String? = null,
+    val spriteId: String? = null,
     val hp: Int? = null,
     val attack: Int? = null,
     val defense: Int? = null,
@@ -395,6 +397,7 @@ data class EncounterDto(
     val description: String = "",
     val environment: String = "FOREST",
     val environmentId: String? = null,
+    val overlayType: String? = null,
     val party: List<String>? = null,
     val enemies: List<EncounterEnemyDto>? = null,
     val bossPhases: List<BossPhaseDto>? = null,
@@ -470,7 +473,15 @@ data class NodeDto(
     val metricOverrides: Map<String, Float>? = null,
     val assignHeroClassId: String? = null,
     val allowIncidents: Boolean? = null,
-    val blacklistIncidents: Boolean? = null
+    val blacklistIncidents: Boolean? = null,
+    @SerializedName(value = "battleEnvironmentId", alternate = ["environmentId"])
+    val battleEnvironmentId: String? = null,
+    @SerializedName(value = "battleOverlayType", alternate = ["overlayType"])
+    val battleOverlayType: String? = null,
+    @SerializedName(value = "battleParty", alternate = ["party"])
+    val battleParty: List<String>? = null,
+    @SerializedName(value = "battleEnemies", alternate = ["enemies"])
+    val battleEnemies: List<EncounterEnemyDto>? = null
 )
 
 data class NodeFileDto(val nodes: List<NodeDto>? = null)
@@ -1002,6 +1013,7 @@ data class EnemyTemplate(
         instanceId: String? = null,
         nameOverride: String? = null,
         subtitleOverride: String? = null,
+        spriteIdOverride: String? = null,
         hpOverride: Int? = null,
         attackOverride: Int? = null,
         defenseOverride: Int? = null,
@@ -1022,7 +1034,7 @@ data class EnemyTemplate(
             isBoss = isBoss,
             isTargeted = isTargeted,
             spriteTint = spriteTint,
-            spriteId = spriteId,
+            spriteId = spriteIdOverride?.takeIf { it.isNotBlank() } ?: spriteId,
             family = family,
             selfElement = selfElement,
             movesetId = movesetId,
@@ -1701,6 +1713,7 @@ class GameContentLoader(private val source: ContentSource) {
                 instanceId = ref.id,
                 nameOverride = ref.name,
                 subtitleOverride = ref.subtitle,
+                spriteIdOverride = ref.spriteId,
                 hpOverride = ref.hp,
                 attackOverride = ref.attack,
                 defenseOverride = ref.defense,
@@ -1716,6 +1729,7 @@ class GameContentLoader(private val source: ContentSource) {
             description = description,
             environment = runCatching { BattleEnvironment.valueOf(environment.uppercase()) }.getOrDefault(BattleEnvironment.FOREST),
             environmentId = envId,
+            overlayType = overlayType?.takeIf { it.isNotBlank() },
             enemies = enemies,
             initialParty = party.ifEmpty { null },
             bossPhases = (bossPhases ?: emptyList()).map {
@@ -1799,7 +1813,23 @@ class GameContentLoader(private val source: ContentSource) {
         flagRoutes = (flagRoutes ?: emptyList())
             .filter { it.nextNodeId.isNotBlank() }
             .map { FlagRoute(it.requiredFlags ?: emptyList(), it.nextNodeId) },
-        checkpoint = checkpoint?.trim().orEmpty()
+        checkpoint = checkpoint?.trim().orEmpty(),
+        battleEnvironmentId = battleEnvironmentId?.takeIf { it.isNotBlank() },
+        battleOverlayType = battleOverlayType?.takeIf { it.isNotBlank() },
+        battleParty = battleParty?.filter { it.isNotBlank() }?.takeIf { it.isNotEmpty() },
+        battleEnemies = (battleEnemies ?: emptyList()).map {
+            BattleEnemyOverride(
+                templateId = it.templateId,
+                id = it.id?.takeIf { s -> s.isNotBlank() },
+                name = it.name?.takeIf { s -> s.isNotBlank() },
+                subtitle = it.subtitle?.takeIf { s -> s.isNotBlank() },
+                spriteId = it.spriteId?.takeIf { s -> s.isNotBlank() },
+                hp = it.hp,
+                attack = it.attack,
+                defense = it.defense,
+                speed = it.speed
+            )
+        }
     )
 
     private fun EnvironmentDefinitionDto.toDefinition(): EnvironmentDefinition = EnvironmentDefinition(

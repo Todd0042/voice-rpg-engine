@@ -1122,7 +1122,7 @@ class StoryViewModel(
         persistCurrentState()
     }
 
-    private fun applyNodeTransition(newNode: DialogueNode, suppressNarration: Boolean = false) {
+    internal fun applyNodeTransition(newNode: DialogueNode, suppressNarration: Boolean = false) {
         var updatedFlags = if (newNode.setFlagOnEnter != null) {
             _state.value.narrativeFlags + (newNode.setFlagOnEnter to true)
         } else {
@@ -1288,7 +1288,13 @@ class StoryViewModel(
         cancelPendingStoryMode()
         // Data-driven encounter dispatch: the engine only knows encounter IDs as declared
         // in the game's encounter data files, never hardcoded story battles.
-        val encounter = GameContent.encounterById(encounterId) ?: return
+        val baseEncounter = GameContent.encounterById(encounterId) ?: return
+        val node = _state.value.currentNode
+        val encounter = if (node.triggerBattleEncounterId == encounterId) {
+            applyNodeBattleOverrides(baseEncounter, node)
+        } else {
+            baseEncounter
+        }
         speechManager.cancel()
         combatNarrator.stop()
 
@@ -1296,6 +1302,78 @@ class StoryViewModel(
             gameScreen = GameScreen.COMBAT_ARENA,
             activeEncounter = encounter
         )
+    }
+
+    private fun applyNodeBattleOverrides(base: EncounterDefinition, node: DialogueNode): EncounterDefinition {
+        val envId = node.battleEnvironmentId?.takeIf { it.isNotBlank() } ?: base.environmentId
+        val overlay = node.battleOverlayType?.takeIf { it.isNotBlank() } ?: base.overlayType
+        val party = node.battleParty?.mapNotNull { GameContent.characterById(it)?.toPartyMember() }?.takeIf { it.isNotEmpty() } ?: base.initialParty
+        val enemies = resolveBattleEnemies(base.enemies, node.battleEnemies)
+        return base.copy(
+            environmentId = envId,
+            overlayType = overlay,
+            initialParty = party,
+            enemies = enemies
+        )
+    }
+
+    private fun resolveBattleEnemies(
+        baseEnemies: List<com.voicerpg.engine.model.Enemy>,
+        overrides: List<com.voicerpg.engine.model.BattleEnemyOverride>
+    ): List<com.voicerpg.engine.model.Enemy> {
+        if (overrides.isEmpty()) return baseEnemies
+        val matchesExisting = overrides.any { ov ->
+            (ov.id != null && baseEnemies.any { it.id == ov.id }) || (ov.id == null && baseEnemies.size == 1 && overrides.size == 1)
+        }
+        if (matchesExisting) {
+            return baseEnemies.map { baseEnemy ->
+                val ov = overrides.firstOrNull { it.id == baseEnemy.id }
+                    ?: overrides.firstOrNull { it.id == null && baseEnemies.size == 1 }
+                    ?: return@map baseEnemy
+                val tpl = ov.templateId.takeIf { it.isNotBlank() }?.let { GameContent.enemyTemplateById(it) }
+                if (tpl != null) {
+                    tpl.toEnemy(
+                        instanceId = baseEnemy.id,
+                        nameOverride = ov.name,
+                        subtitleOverride = ov.subtitle,
+                        spriteIdOverride = ov.spriteId,
+                        hpOverride = ov.hp ?: baseEnemy.maxHp,
+                        attackOverride = ov.attack ?: baseEnemy.baseAttack,
+                        defenseOverride = ov.defense,
+                        speedOverride = ov.speed,
+                        isTargeted = baseEnemy.isTargeted,
+                        atbGauge = baseEnemy.atbGauge
+                    )
+                } else {
+                    val hp = ov.hp ?: baseEnemy.maxHp
+                    baseEnemy.copy(
+                        name = ov.name ?: baseEnemy.name,
+                        shortName = if (ov.name != null) "" else baseEnemy.shortName,
+                        subtitle = ov.subtitle ?: baseEnemy.subtitle,
+                        spriteId = ov.spriteId ?: baseEnemy.spriteId,
+                        maxHp = hp,
+                        currentHp = hp,
+                        baseAttack = ov.attack ?: baseEnemy.baseAttack,
+                        defense = ov.defense ?: baseEnemy.defense,
+                        speed = ov.speed ?: baseEnemy.speed
+                    )
+                }
+            }
+        }
+        val replaced = overrides.mapIndexedNotNull { idx, ov ->
+            GameContent.enemyTemplateById(ov.templateId)?.toEnemy(
+                instanceId = ov.id,
+                nameOverride = ov.name,
+                subtitleOverride = ov.subtitle,
+                spriteIdOverride = ov.spriteId,
+                hpOverride = ov.hp,
+                attackOverride = ov.attack,
+                defenseOverride = ov.defense,
+                speedOverride = ov.speed,
+                isTargeted = idx == 0
+            )
+        }
+        return replaced.ifEmpty { baseEnemies }
     }
 
     fun onCombatVictory() {

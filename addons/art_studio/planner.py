@@ -115,8 +115,8 @@ def _existing_status(game_dir: Path, kind: str, asset_id: str) -> tuple[str, str
             except Exception:
                 pass
     if kind == "combat_backdrop":
-        bg = game_dir / f"app/src/main/assets/game/environments/{asset_id}.jpg"
-        bg_png = game_dir / f"app/src/main/assets/game/environments/{asset_id}.png"
+        bg = game_dir / f"app/src/main/assets/environments/{asset_id}.jpg"
+        bg_png = game_dir / f"app/src/main/assets/environments/{asset_id}.png"
         if bg.is_file():
             return ("completed", str(bg))
         if bg_png.is_file():

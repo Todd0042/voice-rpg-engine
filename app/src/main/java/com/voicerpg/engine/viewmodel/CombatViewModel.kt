@@ -76,6 +76,7 @@ data class CombatState(
     val floatingTexts: List<FloatingCombatText> = emptyList(),
     val currentEnvironment: BattleEnvironment = BattleEnvironment.DUNGEON,
     val currentEnvironmentId: String = "",
+    val currentOverlayType: String? = null,
     val isEyesFreeMode: Boolean = false,
     val isOptionsOpen: Boolean = false,
     val isPureStoryMode: Boolean = false,
@@ -2490,7 +2491,23 @@ class CombatViewModel(
     }
 
     fun setEnvironment(env: BattleEnvironment) {
-        _state.value = _state.value.copy(currentEnvironment = env)
+        val mappedId = GameContent.environmentById(env.name)?.id ?: env.name
+        _state.value = _state.value.copy(
+            currentEnvironment = env,
+            currentEnvironmentId = mappedId,
+            currentOverlayType = GameContent.environmentById(mappedId)?.overlayType
+        )
+    }
+
+    fun setEnvironmentId(environmentId: String) {
+        val envDef = GameContent.environmentById(environmentId)
+        val matchedEnum = envDef?.let { runCatching { BattleEnvironment.valueOf(it.overlayType.uppercase()) }.getOrNull() }
+            ?: runCatching { BattleEnvironment.valueOf(environmentId.uppercase()) }.getOrNull()
+        _state.value = _state.value.copy(
+            currentEnvironment = matchedEnum ?: _state.value.currentEnvironment,
+            currentEnvironmentId = envDef?.id ?: environmentId,
+            currentOverlayType = envDef?.overlayType
+        )
     }
 
     /**
@@ -2653,7 +2670,7 @@ class CombatViewModel(
                 e.copy(maxHp = hp, currentHp = hp, baseAttack = (e.baseAttack * preset.enemyAttack).roundToInt().coerceAtLeast(1))
             }
         }
-        startEncounter(partyToUse, enemies, encounter.environment, encounter.environmentId)
+        startEncounter(partyToUse, enemies, encounter.environment, encounter.environmentId, encounter.overlayType)
     }
 
     /** Persisted damaged HP/MP carry into the next fight; fresh battle with clean statuses. */
@@ -2679,7 +2696,8 @@ class CombatViewModel(
         party: List<PartyMember>,
         enemies: List<Enemy>,
         environment: BattleEnvironment,
-        environmentId: String = ""
+        environmentId: String = "",
+        overlayType: String? = null
     ) {
         conclusionTransitionJob?.cancel()
         conclusionTransitionJob = null
@@ -2703,6 +2721,7 @@ class CombatViewModel(
             enemies = enemies.map { decorateEnemy(it).let { e -> e.copy(atbGauge = e.atbGauge.coerceAtLeast(0.25f)) } }.take(6),
             currentEnvironment = environment,
             currentEnvironmentId = environmentId,
+            currentOverlayType = overlayType,
             isPureStoryMode = _state.value.isPureStoryMode,
             bestiaryWeaknesses = _state.value.bestiaryWeaknesses,
             isSolemn = encounterSolemn
